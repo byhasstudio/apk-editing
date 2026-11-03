@@ -28,7 +28,7 @@ APK.timeline=(function(){
     let ticks='';for(let s=0;s<=total;s+=step)ticks+=`<span class="tick" style="left:${s*pps}px">${APK.preview.fmt(s,true)}</span>`;
     const rows=p.tracks.map((tr,i)=>{
       const clips=tr.clips.map(c=>{const m=media(c.mediaId);
-        return `<div class="clip ${tr.kind}${c.id===sel?' sel':''}" data-id="${c.id}" style="left:${c.start*pps}px;width:${Math.max(3,c.dur*pps)}px" title="${esc(m?m.name:'')}"><i class="h l"></i><span>${esc(m?m.name:'(media hilang)')}</span><i class="h r"></i></div>`}).join('');
+        return `<div class="clip ${tr.kind}${c.id===sel?' sel':''}" data-id="${c.id}" style="left:${c.start*pps}px;width:${Math.max(3,c.dur*pps)}px" title="${esc(m?m.name:'')}"><i class="h l"></i>${tr.kind==='audio'?`<canvas class="wf" data-c="${c.id}"></canvas>`:''}<span>${esc(m?m.name:'(media hilang)')}</span><i class="h r"></i></div>`}).join('');
       return `<div class="tl-row"><div class="tl-head"><b title="${esc(tr.name)}">${esc(tr.name)}</b><span class="tl-btns">
         <button data-act="up" data-t="${tr.id}" title="Layer naik" ${i===0?'disabled':''}>▲</button>
         <button data-act="down" data-t="${tr.id}" title="Layer turun" ${i===p.tracks.length-1?'disabled':''}>▼</button>
@@ -39,6 +39,20 @@ APK.timeline=(function(){
     root.style.width=(HEAD+W)+'px';
     root.innerHTML=`<div class="tl-row tl-ruler"><div class="tl-head"></div><div class="tl-lane" id="tl-ruler" style="width:${W}px">${ticks}</div></div>${rows}<div class="playhead" id="tl-ph"></div>`;
     setPlayhead(APK.preview.time);
+    drawWaves();APK.properties&&APK.properties.refresh();
+  }
+  function drawWaves(){
+    document.querySelectorAll('#tl-content canvas.wf').forEach(cv=>{
+      const f=findClip(cv.dataset.c);if(!f)return;
+      const c=f.c,pk=APK.wave.peaks(c.mediaId);if(!pk)return;
+      const w=Math.max(1,Math.min(4000,Math.round(c.dur*pps))),h=40,R=APK.wave.RATE,g=cv.getContext('2d');
+      cv.width=w;cv.height=h;g.fillStyle='rgba(255,255,255,.75)';
+      for(let x=0;x<w;x++){
+        const i0=Math.floor((c.in+x/w*c.dur)*R),i1=Math.max(i0+1,Math.floor((c.in+(x+1)/w*c.dur)*R));
+        let v=0;for(let i=i0;i<i1&&i<pk.length;i++)if(pk[i]>v)v=pk[i];
+        const bh=Math.max(1,v*h);g.fillRect(x,(h-bh)/2,1,bh);
+      }
+    });
   }
 
   /* snapping */
@@ -57,7 +71,7 @@ APK.timeline=(function(){
     if(ce){
       const f=findClip(ce.dataset.id);if(!f)return;
       sel=f.c.id;
-      drag={mode:e.target.classList.contains('l')?'trimL':e.target.classList.contains('r')?'trimR':'move',id:f.c.id,x0:e.clientX,o:{...f.c}};
+      drag={mode:e.target.classList.contains('l')?'trimL':e.target.classList.contains('r')?'trimR':'move',id:f.c.id,x0:e.clientX,o:{...f.c},snap:APK.history.snapshot()};
       root.setPointerCapture(e.pointerId);render();return;
     }
     if(e.target.closest('#tl-ruler')){drag={mode:'seek'};root.setPointerCapture(e.pointerId);seekTo(e);return}
@@ -94,12 +108,28 @@ APK.timeline=(function(){
       c.dur=ne-o.start;drag.changed=true;render();
     }
   }
-  function up(){if(drag&&drag.changed)changed();drag=null}
+  function up(){if(drag&&drag.changed){APK.history.record(drag.snap);changed()}drag=null}
 
   /* operasi */
+  function restore(s){P().tracks=JSON.parse(s);if(sel&&!findClip(sel))sel=null;APK.project.markDirty();render();APK.preview.refresh()}
+  function selectedClip(){const f=sel&&findClip(sel);return f?{c:f.c,tr:f.tr,m:media(f.c.mediaId)}:null}
+  function touch(){APK.project.markDirty();APK.preview.refresh()}
+  function setTiming(field,v){
+    const f=sel&&findClip(sel);if(!f||!isFinite(v))return false;
+    const c=f.c,m=media(c.mediaId);
+    if(field==='start'){const ns=Math.max(0,v);if(!free(f.tr,ns,c.dur,c.id))return false;c.start=ns}
+    else{
+      let next=Infinity;for(const x of f.tr.clips)if(x.id!==c.id&&x.start>=c.start+c.dur-1e-6)next=Math.min(next,x.start);
+      let hi=next-c.start;
+      if(m&&m.type!=='image'&&m.duration>0)hi=Math.min(hi,m.duration-c.in);
+      c.dur=Math.min(Math.max(v,MIN),hi);
+    }
+    APK.project.markDirty();render();APK.preview.refresh();return true;
+  }
   function addMedia(mid){
     const p=P(),m=media(mid);if(!m)return;
     if(m.type!=='image'&&!(m.duration>0)){tt('Durasi media tidak terbaca');return}
+    APK.history.record();
     let tr=p.tracks.find(t=>t.kind===m.type)||p.tracks.find(t=>accepts(t,m.type));
     if(!tr){tr=mkTrack(m.type==='audio'?'audio':'video');m.type==='audio'?p.tracks.push(tr):p.tracks.unshift(tr)}
     const start=tr.clips.reduce((a,x)=>Math.max(a,x.start+x.dur),0);
@@ -110,11 +140,13 @@ APK.timeline=(function(){
     const f=sel&&findClip(sel);if(!f){tt('Pilih clip dulu');return}
     const t=APK.preview.time,c=f.c;
     if(t<=c.start+MIN||t>=c.start+c.dur-MIN){tt('Taruh playhead di dalam clip');return}
+    APK.history.record();
     const d=t-c.start,n={...c,id:uid('c_'),props:{...c.props},start:t,in:c.in+d,dur:c.dur-d};
     c.dur=d;f.tr.clips.push(n);sel=n.id;changed();
   }
   function duplicate(){
     const f=sel&&findClip(sel);if(!f){tt('Pilih clip dulu');return}
+    APK.history.record();
     const c=f.c;let s=c.start+c.dur;
     if(!free(f.tr,s,c.dur,null))s=f.tr.clips.reduce((a,x)=>Math.max(a,x.start+x.dur),0);
     const n={...c,id:uid('c_'),props:{...c.props},start:s};
@@ -122,22 +154,25 @@ APK.timeline=(function(){
   }
   function del(){
     const f=sel&&findClip(sel);if(!f){tt('Pilih clip dulu');return}
+    APK.history.record();
     f.tr.clips=f.tr.clips.filter(x=>x!==f.c);sel=null;changed();
   }
   function dropMedia(mid){
+    APK.history.clear();
     for(const tr of P().tracks)tr.clips=tr.clips.filter(c=>{if(c.mediaId===mid){if(c.id===sel)sel=null;return false}return true});
     render();APK.preview.refresh();
   }
-  function addTrack(kind){const p=P(),tr=mkTrack(kind);kind==='audio'?p.tracks.push(tr):p.tracks.unshift(tr);changed()}
+  function addTrack(kind){APK.history.record();const p=P(),tr=mkTrack(kind);kind==='audio'?p.tracks.push(tr):p.tracks.unshift(tr);changed()}
   function headClick(e){
     const b=e.target.closest('[data-act]');if(!b)return;
     const p=P(),i=p.tracks.findIndex(t=>t.id===b.dataset.t);if(i<0)return;
     const tr=p.tracks[i],a=b.dataset.act;
+    if(a==='rm'&&tr.clips.length&&!confirm(`Hapus track "${tr.name}" beserta ${tr.clips.length} clip?`))return;
+    APK.history.record();
     if(a==='up'&&i>0)[p.tracks[i-1],p.tracks[i]]=[tr,p.tracks[i-1]];
     else if(a==='down'&&i<p.tracks.length-1)[p.tracks[i+1],p.tracks[i]]=[tr,p.tracks[i+1]];
     else if(a==='mute')tr.muted=!tr.muted;
     else if(a==='rm'){
-      if(tr.clips.length&&!confirm(`Hapus track "${tr.name}" beserta ${tr.clips.length} clip?`))return;
       if(tr.clips.some(c=>c.id===sel))sel=null;
       p.tracks.splice(i,1);
     }
@@ -157,5 +192,5 @@ APK.timeline=(function(){
     $('tl-snap').onclick=e=>{snapOn=!snapOn;e.currentTarget.classList.toggle('on',snapOn)};
     $('tl-addtrack').onchange=e=>{if(e.target.value&&P())addTrack(e.target.value);e.target.value=''};
   }
-  return{init,load,render,setPlayhead,addMedia,dropMedia,split,duplicate,del,get selected(){return sel}};
+  return{init,load,render,setPlayhead,addMedia,dropMedia,split,duplicate,del,restore,selectedClip,touch,setTiming,get selected(){return sel}};
 })();

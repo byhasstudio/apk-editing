@@ -23,3 +23,10 @@
 .pv-controls{display:flex;align-items:center;gap:8px;flex:none}
 .pv-controls .sp{flex:1}.pv-controls .btn{padding:4px 12px}
 .pv-controls input[type=range]{width:80px;vertical-align:middle}
+#panel-props label{display:block;margin-top:10px;font-size:12px;color:var(--dim)}
+#panel-props input[type=number]{display:block;width:100%;margin-top:4px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 7px;font:inherit}
+.pr-row{display:flex;gap:8px;align-items:center;margin-top:4px}
+.pr-row input[type=range]{flex:1;min-width:0}
+#panel-props .pr-row input[type=number]{width:72px;margin-top:0}
+.pr-name{margin-top:8px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn:disabled{opacity:.4;cursor:default}

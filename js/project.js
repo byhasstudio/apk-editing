@@ -26,7 +26,7 @@ APK.project=(function(){
     get current(){return cur},get dirty(){return dirty},
     onChange:f=>listeners.push(f),
     async open(p){cur=p;dirty=false;APK.history.clear();emit()},
-    close(){clearTimeout(timer);APK.preview&&APK.preview.unload();APK.media&&APK.media.releaseUrls();cur=null;dirty=false},
+    close(){clearTimeout(timer);APK.preview&&APK.preview.unload();APK.wave&&APK.wave.clear();APK.media&&APK.media.releaseUrls();cur=null;dirty=false},
     async remove(id){const p=await APK.db.get(id);if(p)for(const m of p.media)await APK.db.delMedia(m.id);await APK.db.del(id)},
     rename(n){if(cur&&n.trim()){cur.name=n.trim();markDirty()}},
     setAspect(a){const q=Math.min(cur.width,cur.height);Object.assign(cur,{aspect:a},size(a,q));markDirty()},

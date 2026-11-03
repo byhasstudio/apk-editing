@@ -6,6 +6,8 @@
     const k=e.key,ctrl=e.ctrlKey||e.metaKey,pv=APK.preview;
     if(k===' '){e.preventDefault();if(e.target.blur)e.target.blur();pv.toggle()}
     else if(k==='Delete'){e.preventDefault();APK.timeline.del()}
+    else if(ctrl&&k.toLowerCase()==='z'){e.preventDefault();e.shiftKey?APK.history.redo():APK.history.undo()}
+    else if(ctrl&&k.toLowerCase()==='y'){e.preventDefault();APK.history.redo()}
     else if(ctrl&&k.toLowerCase()==='d'){e.preventDefault();APK.timeline.duplicate()}
     else if(!ctrl&&k.toLowerCase()==='s'){APK.timeline.split()}
     else if(k==='ArrowLeft'||k==='ArrowRight'){

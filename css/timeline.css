@@ -16,7 +16,8 @@
 .tl-lane{position:relative;flex:none;height:100%}
 .tick{position:absolute;top:0;height:100%;border-left:1px solid var(--line);padding-left:4px;font-size:10px;color:var(--dim);line-height:26px;white-space:nowrap}
 .clip{position:absolute;top:4px;bottom:4px;border-radius:6px;overflow:hidden;cursor:grab;display:flex;align-items:center;padding:0 10px;font-size:11px;color:#fff;border:1px solid rgba(255,255,255,.18);user-select:none;touch-action:none}
-.clip span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;pointer-events:none}
+.clip canvas.wf{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+.clip span{position:relative;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;pointer-events:none}
 .clip.video{background:#3b5bdb}.clip.audio{background:#2b8a6e}.clip.image{background:#b5651d}
 .clip.sel{outline:2px solid #fff;z-index:2}
 .h{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;background:rgba(255,255,255,.25)}

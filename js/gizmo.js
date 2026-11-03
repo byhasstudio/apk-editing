@@ -114,7 +114,7 @@ APK.gizmo=(function(){
   function set(c,p,val){
     const K=APK.kf,A=APK.autokey;c.props=Object.assign({},DEFP,c.props);
     /* mode kurva otomatis sedang merekam: setiap gerakan langsung jadi keyframe di playhead */
-    if(A&&A.recording&&K.VISUAL.includes(p)){if(A.key(c,p,drag.r,val))drag.newKey=true}
+    if(A&&A.recording&&K.VISUAL.includes(p)){if(A.key(c,p,rel(c),val))drag.newKey=true}   /* waktu SEKARANG: timeline berjalan saat merekam */
     else if(K.animated(c,p)){if(K.setKey(c,p,drag.r,val))drag.newKey=true}else c.props[p]=val;
   }
   function down(e){
@@ -181,6 +181,7 @@ APK.gizmo=(function(){
   function up(){
     if(!drag)return;
     const m=drag.moved;drag=null;guides={x:false,y:false};
+    if(m&&APK.autokey)APK.autokey.flush();
     if(m)APK.timeline.commit();else draw();
   }
   function hover(e){

@@ -2,7 +2,7 @@
    gradien dan bayangan, chroma key, mask, dan fade audio */
 window.APK=window.APK||{};
 APK.properties=(function(){
-  const $=id=>document.getElementById(id),panel=$('panel-props');
+  const $=id=>document.getElementById(id),panel=$('panel-props'),dock=$('curve-dock');
   const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const DEF={x:0,y:0,scale:1,opacity:1,rotation:0,volume:1};
   /* key, label, min, max, pengali tampilan, berlaku untuk */
@@ -33,7 +33,6 @@ APK.properties=(function(){
   function build(s){
     const type=typeOf(s),K=APK.kf,T=APK.text,locked=!!(s.tr&&s.tr.locked);
     const rows=F.filter(f=>f[5].includes(type)).map(f=>`<div class="pr-f"><div class="pr-lab"><span>${f[1]}</span><span class="kf-ctl"><button type="button" data-kfgo="-1" data-kp="${f[0]}" title="Loncat ke keyframe sebelumnya">◀</button><button type="button" class="kf-d" data-kf="${f[0]}" title="Tambah / hapus keyframe di posisi playhead">◇</button><button type="button" data-kfgo="1" data-kp="${f[0]}" title="Loncat ke keyframe berikutnya">▶</button></span></div><div class="pr-row"><input type="range" data-p="${f[0]}" min="${f[2]}" max="${f[3]}" step="1"><input type="number" data-p="${f[0]}" min="${f[2]}" max="${f[3]}" step="1"></div></div>`).join('');
-    const opts=Object.keys(K.EASE).map(k=>`<option value="${k}">${K.EASE[k].l}</option>`).join('')+'<option value="custom">Kustom (grafik bezier)</option>';
     const speed=type==='video'||type==='audio'?`<label title="100% = normal, 200% = 2x lebih cepat">Kecepatan (%)<input type="number" data-sp="1" min="10" max="800" step="5"></label>`:'';
     const rev=type==='video'?`<div class="tx-row"><label><input type="checkbox" data-cp="reverse">Putar mundur (audio dibisukan)</label></div>`:'';
     const aud=type==='video'||type==='audio'?`<h3 class="kf-title">Audio</h3>
@@ -86,20 +85,18 @@ APK.properties=(function(){
       <label>Waktu selesai (detik)<input type="number" data-end readonly></label>${speed}${rev}${aud}${txt}${shp}${vis}${chroma}${mask}
       <h3 class="kf-title">Keyframe animasi</h3>
       <div class="kf-bar"><button type="button" class="btn" data-kfall="add" title="Keyframe semua properti di playhead (K)">◆ Semua</button><button type="button" class="btn" data-kfall="del" title="Hapus keyframe di playhead">Hapus di playhead</button><button type="button" class="btn" data-kfall="clear" title="Hapus semua animasi clip ini">Reset</button></div>
-      <div class="adv"><label>Kurva animasi (keyframe di playhead)<select id="kf-ease" disabled>${opts}</select></label>
-      <canvas id="kf-graph" class="kf-graph" width="220" height="160" title="Seret dua titik putih untuk membuat kurva sendiri"></canvas>
-      <p class="kf-hint">Seret dua titik putih untuk mengatur kecepatan gerak antar keyframe: kurva curam = cepat, mendatar = pelan.</p></div>
+      <p class="kf-hint adv">Grafik kurva kecepatan ada di tab Media, di bawah daftar media.</p>
       <p class="kf-hint">Klik ◇ di samping properti untuk membuat keyframe di posisi playhead. Setelah properti beranimasi, mengubah nilainya otomatis membuat keyframe. Geser penanda kuning di clip untuk memindah waktunya. Pintasan: K (keyframe semua), [ dan ] (loncat keyframe).</p>${rows}</fieldset>`;
   }
   const gx=(cv,x)=>GPAD+x*(cv.width-GPAD*2),gy=(cv,y)=>GPAD+(1-(y+0.5)/2)*(cv.height-GPAD*2);
   const gix=(cv,px)=>(px-GPAD)/(cv.width-GPAD*2),giy=(cv,py)=>(1-(py-GPAD)/(cv.height-GPAD*2))*2-0.5;
   function drawGraph(s){
     const cv=$('kf-graph');if(!cv)return;
-    const g=cv.getContext('2d'),K=APK.kf,ez=K.easeAt(s.c,rel(s)),w=cv.width,h=cv.height;
+    const g=cv.getContext('2d'),K=APK.kf,ez=s&&K.easeAt(s.c,rel(s)),w=cv.width,h=cv.height;
     g.clearRect(0,0,w,h);
     g.strokeStyle='#2c313c';g.lineWidth=1;
     g.strokeRect(gx(cv,0),gy(cv,1),gx(cv,1)-gx(cv,0),gy(cv,0)-gy(cv,1));
-    if(!ez){g.fillStyle='#8b93a3';g.font='12px system-ui,sans-serif';g.textAlign='center';g.fillText('Taruh playhead tepat di keyframe',w/2,h/2);return}
+    if(!ez){g.fillStyle='#8b93a3';g.font='12px system-ui,sans-serif';g.textAlign='center';g.fillText(s?'Taruh playhead tepat di keyframe':'Pilih clip di timeline',w/2,h/2);return}
     const f=K.easeFn(ez);
     g.strokeStyle='#7f8cff';g.lineWidth=2;g.beginPath();
     for(let i=0;i<=60;i++){const x=i/60,y=f(x);i?g.lineTo(gx(cv,x),gy(cv,y)):g.moveTo(gx(cv,x),gy(cv,y))}
@@ -145,7 +142,11 @@ APK.properties=(function(){
   }
   function refresh(force){
     const s=APK.timeline.selectedClip();
-    if(!s){if(shown!==null){panel.innerHTML='<h3>Properti</h3><p class="empty">Pilih clip di timeline untuk melihat properti dan keyframe animasi.</p>';shown=null}return}
+    if(!s){
+      if(shown!==null){panel.innerHTML='<h3>Properti</h3><p class="empty">Pilih clip di timeline untuk melihat properti dan keyframe animasi.</p>';shown=null}
+      const se=$('kf-ease');if(se)se.disabled=true;
+      drawGraph(null);return;
+    }
     const k=keyOf(s);
     if(shown!==k){build(s);shown=k}
     fill(s,force);
@@ -200,23 +201,17 @@ APK.properties=(function(){
     if(d.p){
       const f=F.find(f=>f[0]===d.p),K=APK.kf,val=Math.min(f[3],Math.max(f[2],v))/f[4];
       s.c.props=Object.assign({},DEF,s.c.props);
-      if(K.animated(s.c,f[0])){
+      const A=APK.autokey;
+      if(A&&A.recording&&K.VISUAL.includes(f[0])){
+        /* mode kurva otomatis merekam: mengubah slider langsung membuat keyframe di playhead */
+        if(A.key(s.c,f[0],rel(s),val))APK.timeline.render();
+      }else if(K.animated(s.c,f[0])){
         if(K.setKey(s.c,f[0],rel(s),val))APK.timeline.render();
       }else s.c.props[f[0]]=val;
       fill(s,false);APK.timeline.touch();
     }else if(d.t){APK.timeline.setTiming(d.t,v)}
   });
   panel.addEventListener('change',e=>{
-    if(e.target.id==='kf-ease'){
-      const s=APK.timeline.selectedClip();
-      if(s&&!s.tr.locked){
-        const K=APK.kf,r=rel(s);let v=e.target.value;
-        APK.history.record();
-        if(v==='custom')v=K.fmtBz(K.bezOf(K.easeAt(s.c,r))||[.45,0,.55,1]);
-        K.setEase(s.c,r,v);APK.timeline.commit();
-      }
-      return;
-    }
     editing=false;spanRef=0;
     const d=e.target.dataset;
     if(d.tx==='content'||d.sh==='type')APK.timeline.render();
@@ -243,8 +238,21 @@ APK.properties=(function(){
       }).catch(()=>{});
     }
   });
+  /* ===== dock kurva (di bawah daftar Media): pilihan jenis kurva + editor grafik bezier ===== */
+  const dockSel=$('kf-ease');
+  if(dockSel)dockSel.innerHTML=Object.keys(APK.kf.EASE).map(k=>`<option value="${k}">${APK.kf.EASE[k].l}</option>`).join('')+'<option value="custom">Kustom (grafik bezier)</option>';
+  dock.addEventListener('change',e=>{
+    if(e.target.id!=='kf-ease')return;
+    const s=APK.timeline.selectedClip();
+    if(s&&!s.tr.locked){
+      const K=APK.kf,r=rel(s);let v=e.target.value;
+      APK.history.record();
+      if(v==='custom')v=K.fmtBz(K.bezOf(K.easeAt(s.c,r))||[.45,0,.55,1]);
+      K.setEase(s.c,r,v);APK.timeline.commit();
+    }
+  });
   /* editor grafik kurva bezier */
-  panel.addEventListener('pointerdown',e=>{
+  dock.addEventListener('pointerdown',e=>{
     if(e.target.id!=='kf-graph')return;
     const s=APK.timeline.selectedClip();if(!s||s.tr.locked)return;
     const K=APK.kf,ez=K.easeAt(s.c,rel(s)),bz=ez&&K.bezOf(ez);if(!bz)return;
@@ -255,7 +263,7 @@ APK.properties=(function(){
     gd={i:bi,bz:bz.slice(),moved:false};
     cv.setPointerCapture(e.pointerId);e.preventDefault();
   });
-  panel.addEventListener('pointermove',e=>{
+  dock.addEventListener('pointermove',e=>{
     if(!gd)return;
     const s=APK.timeline.selectedClip(),cv=$('kf-graph');if(!s||!cv){gd=null;return}
     const r=cv.getBoundingClientRect(),k=cv.width/r.width,px=(e.clientX-r.left)*k,py=(e.clientY-r.top)*k;
@@ -266,6 +274,6 @@ APK.properties=(function(){
     APK.timeline.touch();drawGraph(s);
   });
   const gend=()=>{if(!gd)return;gd=null;refresh(true)};
-  panel.addEventListener('pointerup',gend);panel.addEventListener('pointercancel',gend);
+  dock.addEventListener('pointerup',gend);dock.addEventListener('pointercancel',gend);
   return{refresh,tick,addAll,jump};
 })();

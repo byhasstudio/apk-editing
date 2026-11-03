@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="css/mobile.css?v=15">
 <link rel="stylesheet" href="css/studio.css?v=15">
 <link rel="stylesheet" href="css/vector.css?v=15">
+<link rel="stylesheet" href="css/autokey.css?v=18">
 </head>
 <body>
 <section id="home" class="view">
@@ -40,8 +41,12 @@
     <button class="btn primary" id="btn-save" title="Simpan (Ctrl+S)">Simpan</button>
   </header>
   <div class="workspace">
-    <aside class="panel" id="panel-media"><div class="panel-head"><h3>Media</h3><button class="btn" id="btn-import" title="Import video, audio, atau gambar">Import</button></div><div id="media-list" class="media-list"></div><input type="file" id="file-media" multiple accept=".mp4,.mov,.webm,.mp3,.wav,.png,.jpg,.jpeg,.webp" hidden></aside>
-    <div class="panel" id="panel-preview"><div id="preview-wrap" class="preview-wrap"><canvas id="pv-canvas"></canvas><canvas id="pv-gizmo" aria-label="Kontrol objek di preview"></canvas></div>
+    <aside class="panel" id="panel-media"><div class="panel-head"><h3>Media</h3><button class="btn" id="btn-import" title="Import video, audio, atau gambar">Import</button></div><div id="media-list" class="media-list"></div><input type="file" id="file-media" multiple accept=".mp4,.mov,.webm,.mp3,.wav,.png,.jpg,.jpeg,.webp" hidden>
+      <div id="curve-dock" class="curve-dock adv"><h3>Kurva animasi</h3>
+        <label>Jenis kurva (keyframe di playhead)<select id="kf-ease" disabled></select></label>
+        <canvas id="kf-graph" class="kf-graph" width="220" height="160" title="Seret dua titik putih untuk membuat kurva sendiri"></canvas>
+        <p class="kf-hint">Seret dua titik putih untuk mengatur kecepatan gerak antar keyframe: kurva curam = cepat, mendatar = pelan. Taruh playhead tepat di keyframe dulu.</p></div></aside>
+    <div class="panel" id="panel-preview"><div id="preview-wrap" class="preview-wrap"><canvas id="pv-canvas"></canvas><canvas id="pv-gizmo" aria-label="Kontrol objek di preview"></canvas><div id="auto-ui" class="auto-ui" hidden></div></div>
     <div class="pv-controls"><button class="btn" id="pv-play" title="Play/Pause (Space)">▶</button><button class="btn" id="pv-stop" title="Stop dan kembali ke awal">■</button><span id="pv-time" class="meta">00:00.00 / 00:00.00</span><span class="sp"></span>
     <label class="meta">Vol <input type="range" id="pv-vol" min="0" max="1" step="0.05" value="1"></label>
     <select id="pv-aspect" title="Rasio aspek"><option>16:9</option><option>9:16</option><option>1:1</option><option>4:3</option><option>21:9</option></select>
@@ -57,6 +62,7 @@
     <button class="btn" id="tl-pen" title="Pena (P): ketuk di preview untuk membuat titik, tarik untuk lengkung, ketuk titik awal untuk menutup path. Enter = selesai, Esc = keluar">✒ Pena</button>
     <button class="btn" id="tl-sticker" title="Tambah stiker emoji di playhead">☺ Stiker</button>
     <button class="btn" id="tl-group" title="Tambah layer grup kosong untuk dijadikan induk beberapa clip">▣ Grup</button>
+    <button class="btn" id="tl-auto" title="Mode kurva otomatis: tekan Mulai, hitung mundur 3 detik, lalu setiap geser, zoom, atau putar objek langsung jadi keyframe di playhead">⏺ Kurva otomatis</button>
     <button class="btn adv" id="tl-ext" title="Pisahkan audio dari clip video terpilih">Pisah audio</button>
     <select id="tl-addtrack" class="adv" title="Tambah track baru"><option value="">+ Track</option><option value="video">Video</option><option value="audio">Audio</option><option value="image">Gambar</option></select><span class="sp"></span>
     <button class="btn on adv" id="tl-snap" title="Snap: clip menempel ke tepi clip lain dan playhead">Snap</button><button class="btn" id="tl-zout" aria-label="Zoom out" title="Perkecil timeline">−</button><button class="btn" id="tl-zin" aria-label="Zoom in" title="Perbesar timeline">+</button></div>
@@ -108,9 +114,9 @@
 <script src="js/media.js?v=15"></script>
 <script src="js/preview.js?v=15"></script>
 <script src="js/waveform.js?v=15"></script>
-<script src="js/properties.js?v=15"></script>
+<script src="js/properties.js?v=18"></script>
 <script src="js/timeline.js?v=15"></script>
-<script src="js/gizmo.js?v=15"></script>
+<script src="js/gizmo.js?v=18"></script>
 <script src="js/keyboard.js?v=15"></script>
 <script src="js/export.js?v=15"></script>
 <script src="js/app.js?v=15"></script>
@@ -118,5 +124,6 @@
 <script src="js/layers-ui.js?v=15"></script>
 <script src="js/vector.js?v=15"></script>
 <script src="js/presets.js?v=17"></script>
+<script src="js/autokey.js?v=18"></script>
 </body>
 </html>

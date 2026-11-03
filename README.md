@@ -47,6 +47,13 @@ https://byhasstudio.github.io/apk-editing/
 - Layer vektor bisa di-keyframe untuk posisi, scale, opacity, dan rotasi, bisa jadi anak/induk, dan ikut ter-export seperti layer lainnya.
 - Data tersimpan di field opsional `clip.vec` (project lama tidak berubah dan tetap terbuka). Rincian format ada di komentar awal `js/vector.js`.
 
+### Kurva otomatis (auto-keyframe)
+- Tombol **⏺ Kurva otomatis** ada di bar timeline. Nyalakan, lalu di preview muncul tombol **▶ Mulai**.
+- Tekan Mulai: hitung mundur **3 detik**, lalu masuk mode **● MEREKAM**. Selama merekam, setiap kali objek digeser, di-zoom (scale), atau diputar di preview (juga lewat slider Posisi, Scale, Opacity, Rotasi di panel Properti), keyframe langsung dibuat otomatis di posisi playhead. Tidak perlu menekan ◇ satu-satu.
+- Playhead diam saat merekam. Untuk keyframe berikutnya, geser playhead ke waktu lain lalu gerakkan objek lagi. Kalau properti baru pertama kali diberi keyframe di waktu lebih dari 0, nilai awalnya otomatis dikunci di awal clip supaya gerakan mulai dari posisi semula.
+- **■ Berhenti** mengakhiri rekaman (mode tetap menyala, tekan Mulai untuk merekam lagi). **Tutup** atau menekan tombol Kurva otomatis lagi mematikan mode. Satu langkah Undo membatalkan satu gerakan.
+- **Grafik kurva kecepatan** (pilihan jenis kurva dan editor bezier dua titik putih) sekarang ada di **bawah daftar Media** (di ponsel: tab Media), bukan lagi di panel Properti. Tampil di mode Lanjutan.
+
 ### v13-v15 (preset)
 
 - Tombol **⬇ Preset** dan **⬆ Preset** ada di bar paling atas editor (sebelum tombol Mode).

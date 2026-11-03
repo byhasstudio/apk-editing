@@ -1,0 +1,15 @@
+/* Mode kurva otomatis: overlay di preview + dock grafik kurva di bawah daftar Media */
+.auto-ui{position:absolute;inset:0;z-index:5;pointer-events:none;display:flex;flex-wrap:wrap;align-content:flex-start;justify-content:center;gap:8px;padding:8px}
+.auto-ui[hidden]{display:none}
+.auto-ui>*{pointer-events:auto}
+.auto-ui .au-t{background:rgba(0,0,0,.68);color:#fff;font-size:12px;padding:5px 9px;border-radius:6px;align-self:center}
+.auto-ui .au-rec{background:#d93a3a;color:#fff;font-weight:700;font-size:12px;padding:5px 9px;border-radius:6px;align-self:center;animation:au-blink 1s ease-in-out infinite}
+.auto-ui .btn{padding:5px 12px}
+.auto-ui .au-big{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;font-size:120px;font-weight:800;line-height:1;color:#fff;text-shadow:0 2px 14px #000;pointer-events:none}
+@keyframes au-blink{50%{opacity:.45}}
+.curve-dock{margin-top:14px;padding-top:4px;border-top:1px solid var(--line)}
+.curve-dock label{display:block;margin-top:10px;font-size:12px;color:var(--dim)}
+.curve-dock select{display:block;width:100%;margin-top:4px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 7px;font:inherit}
+.curve-dock select:disabled{opacity:.5}
+.curve-dock .kf-graph{display:block;width:100%;max-width:260px;height:auto;margin-top:8px;touch-action:none;background:var(--bg);border-radius:6px}
+@media(max-width:900px){.curve-dock select{font-size:16px}}

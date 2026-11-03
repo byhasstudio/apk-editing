@@ -112,8 +112,10 @@ APK.gizmo=(function(){
   }
 
   function set(c,p,val){
-    const K=APK.kf;c.props=Object.assign({},DEFP,c.props);
-    if(K.animated(c,p)){if(K.setKey(c,p,drag.r,val))drag.newKey=true}else c.props[p]=val;
+    const K=APK.kf,A=APK.autokey;c.props=Object.assign({},DEFP,c.props);
+    /* mode kurva otomatis sedang merekam: setiap gerakan langsung jadi keyframe di playhead */
+    if(A&&A.recording&&K.VISUAL.includes(p)){if(A.key(c,p,drag.r,val))drag.newKey=true}
+    else if(K.animated(c,p)){if(K.setKey(c,p,drag.r,val))drag.newKey=true}else c.props[p]=val;
   }
   function down(e){
     const p=P();if(!p||e.button!==0)return;

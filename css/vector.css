@@ -1,0 +1,13 @@
+/* Layer vektor dan Pen Tool */
+#pv-gizmo{touch-action:none}
+body.pen-on #pv-gizmo{cursor:crosshair}
+#vec-props .vi{border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0}
+#vec-props .vi-h{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px}
+#vec-props .vi-h label{display:flex;align-items:center;gap:6px;margin:0}
+#vec-props .vi-h span{display:flex;gap:4px}
+#vec-props .vi-h button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;min-width:30px;height:28px;cursor:pointer}
+#vec-props .vi-h button:hover{border-color:var(--accent)}
+#vec-props select,#vec-props input[type=number]{display:block;width:100%;box-sizing:border-box;margin-top:4px}
+#vec-props .kf-bar{flex-wrap:wrap}
+#vec-props button:disabled{opacity:.45;cursor:not-allowed}
+body.mode-simple #vec-props .adv,body.mode-simple #vec-conv{display:none}

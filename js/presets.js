@@ -29,17 +29,26 @@ APK.presets=(function(){
   }
   /* ubah preset menjadi track baru. Format 2 dikembalikan persis seperti aslinya (waktu absolut, nama dan status track sama).
      Format 1 (lama) tetap bisa dibuka: waktunya relatif terhadap t. hasMedia(id) = apakah media itu ada di project ini. */
-  function unpack(o,t,hasMedia){
+  function unpack(o,t,hasMedia,existing){
     if(!o||(o.apkPreset!==1&&o.apkPreset!==2)||!Array.isArray(o.items))return null;
     const abs=o.apkPreset===2,off=abs?0:(t||0),hm=hasMedia||(()=>false);
-    let dropped=0;
-    const items=o.items.filter(i=>{
+    let dropped=0,same=0;
+    const all=o.items.filter(i=>{
       if(!(i&&i.c&&typeof i.c==='object'&&num(i.c.start)&&num(i.c.dur)&&i.c.dur>0))return false;
       if(i.c.mediaId&&!hm(i.c.mediaId)){dropped++;return false}
       return true;
     }).slice(0,500);
-    if(!items.length)return{tracks:[],ids:[],dropped,name:String(o.name||'Preset')};
-    const map={},groups=new Map(),meta=new Map((Array.isArray(o.tracks)?o.tracks:[]).filter(x=>x&&typeof x==='object').map(x=>[String(x.id),x]));
+    /* layer yang isinya sama persis dengan clip yang SUDAH ADA di project dilewati, supaya membuka preset berkali-kali
+       (atau ke project asalnya) tidak menumpuk salinan teks. Anak dari layer yang dilewati tetap tersambung ke layer yang sudah ada. */
+    const sigOf=(c,d)=>{const x=Object.assign({},c,{start:Math.max(0,c.start+d)});delete x.id;delete x.parent;return JSON.stringify(x)};
+    const have=new Map();for(const c of (existing||[]))if(c&&num(c.start))have.set(sigOf(c,0),c.id);
+    const map={},items=[];
+    for(const i of all){
+      const old=have.get(sigOf(i.c,off));
+      if(old){map[i.c.id]=old;same++}else items.push(i);
+    }
+    if(!items.length)return{tracks:[],ids:[],dropped,same,name:String(o.name||'Preset')};
+    const groups=new Map(),meta=new Map((Array.isArray(o.tracks)?o.tracks:[]).filter(x=>x&&typeof x==='object').map(x=>[String(x.id),x]));
     for(const i of items){const nid=uid('c_');map[i.c.id]=nid;i._n=nid}
     for(const i of items){
       const c=clone(i.c);
@@ -57,7 +66,7 @@ APK.presets=(function(){
       tracks.push({id:uid('t_'),kind:(m&&m.kind)||g.kind||'video',name:m&&m.name?String(m.name).slice(0,60):name+(groups.size>1?' '+n:''),
         muted:!!(m&&m.muted),hidden:!!(m&&m.hidden),locked:!!(m&&m.locked),clips:g.clips});
     }
-    return{tracks,ids:tracks.flatMap(t=>t.clips.map(c=>c.id)),dropped,name};
+    return{tracks,ids:tracks.flatMap(t=>t.clips.map(c=>c.id)),dropped,same,name};
   }
 
   /* tanpa seleksi banyak: ambil SEMUA clip di project; kalau 2+ clip dipilih: hanya yang dipilih */
@@ -80,15 +89,15 @@ APK.presets=(function(){
     const p=P();if(!p||!file)return;
     let o;
     try{o=JSON.parse(await file.text())}catch(_){toast('File preset tidak valid: '+file.name);return}
-    const r=unpack(o,APK.preview.time,id=>(p.media||[]).some(m=>m.id===id));
+    const r=unpack(o,APK.preview.time,id=>(p.media||[]).some(m=>m.id===id),p.tracks.flatMap(tr=>tr.clips));
     if(!r){toast('Bukan preset APK EDITING yang valid: '+file.name);return}
-    if(!r.ids.length){toast('Tidak ada layer yang bisa dimasukkan'+(r.dropped?' ('+r.dropped+' clip media tidak ditemukan di project ini)':''));return}
+    if(!r.ids.length){toast(r.same?'Preset "'+r.name+'" sudah ada di project ini ('+r.same+' layer sama), tidak ditambahkan lagi':'Tidak ada layer yang bisa dimasukkan'+(r.dropped?' ('+r.dropped+' clip media tidak ditemukan di project ini)':''));return}
     APK.history.record();
     p.tracks.unshift(...r.tracks);
     T().select(r.ids[0]);
     for(const id of r.ids.slice(1))T().select(id,{toggle:true});
     T().commit();
-    toast('Preset "'+r.name+'" dimasukkan persis seperti aslinya ('+r.ids.length+' layer)'+(r.dropped?'. '+r.dropped+' clip media dilewati karena medianya tidak ada di project ini':''));
+    toast('Preset "'+r.name+'" dimasukkan persis seperti aslinya ('+r.ids.length+' layer)'+(r.same?'. '+r.same+' layer yang sudah ada tidak diduplikat':'')+(r.dropped?'. '+r.dropped+' clip media dilewati karena medianya tidak ada di project ini':''));
   }
 
   function init(){

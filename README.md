@@ -53,7 +53,7 @@ https://byhasstudio.github.io/apk-editing/
 - **⬇ Preset (simpan)**: sekali klik langsung mengambil SEMUA layer di project (teks, bentuk, vektor, grup, dan clip media) lengkap dengan keyframe, jalur gerak, data vektor, hubungan induk-anak, serta struktur track (urutan, nama, mute, kunci, sembunyi). Beri nama, lalu browser mengunduh file `nama.apkpreset.json`. Kalau hanya ingin sebagian, pilih 2 clip atau lebih dulu (Shift/Ctrl + klik, atau Pilih banyak).
 - **⬆ Preset (buka)**: pilih satu atau beberapa file preset. Layer dikembalikan **persis seperti aslinya** (waktu mulai sama, urutan dan nama track sama, semua properti sama), tanpa digeser ke playhead. Hasilnya clip biasa sehingga bisa diedit, dan file aslinya tidak berubah. Satu langkah Undo menghapusnya. File preset format lama (v13/v14) tetap bisa dibuka.
 - File media tidak disimpan di dalam preset. Clip media hanya ikut dimasukkan kalau media dengan id yang sama ada di project tujuan (misalnya project yang sama); kalau tidak, dilewati dan kamu diberi tahu jumlahnya.
-- Membuka preset ke project yang sama menambah salinan di atas layer yang sudah ada.
+- Membuka preset ke project yang sama TIDAK menumpuk salinan: layer yang isinya sama persis dengan yang sudah ada dilewati (kamu diberi tahu jumlahnya), jadi aman dibuka berkali-kali. Hanya layer yang belum ada yang ditambahkan.
 
 ## Rencana berikutnya
 

@@ -1,6 +1,6 @@
 # APK EDITING
 
-Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v10** (sistem inti ala Alight Motion / CapCut: gizmo, multi-select, salin-tempel, kunci layer, kurva bezier, gradien, bayangan). Efek, transisi, dan filter sengaja belum dibuat.
+Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v11** (sistem inti ala Alight Motion / CapCut: gizmo, multi-select, salin-tempel, kunci layer, kurva bezier, gradien, bayangan, motion path, parent/grup layer). Efek, transisi, dan filter sengaja belum dibuat.
 
 ## Buka di web
 
@@ -21,7 +21,7 @@ https://byhasstudio.github.io/apk-editing/
 - Undo/redo (hingga 100 langkah)
 - Export video (MP4 jika didukung browser, selain itu WebM) dengan audio ter-mix
 
-### Baru di v10
+### v10
 
 - **Gizmo di preview**: klik objek lalu geser, tarik sudut untuk scale, tarik titik bulat untuk memutar (Shift = kelipatan 15°, Alt = matikan snap ke tengah)
 - **Multi-select**: Shift/Ctrl + klik, atau tombol Pilih banyak di ponsel; geser, duplikat, hapus, dan split banyak clip sekaligus; Ctrl+A pilih semua
@@ -29,13 +29,17 @@ https://byhasstudio.github.io/apk-editing/
 - **Kunci dan sembunyikan layer** per track (ikon gembok dan mata)
 - **Graph editor** kurva bezier kustom untuk easing keyframe
 - **Gradien warna, bayangan, dan stroke** untuk teks dan bentuk
-- **Mode Sederhana / Lanjutan** (tombol di atas) untuk menyembunyikan fitur rumit
-- **Tooltip** di semua tombol dan **tutorial singkat** saat pertama membuka editor (tombol ? untuk membuka lagi)
+- **Mode Sederhana / Lanjutan**, tooltip di semua tombol, tutorial singkat saat pertama membuka editor (tombol ?)
 - **Export PNG**: simpan frame di posisi playhead (resolusi mengikuti preview, maks. 1280 px sisi terpanjang)
+
+### v11
+
+- **Parent / grup layer**: tombol ▣ Grup membuat layer kosong; di panel Properti pilih "Induk" pada clip lain. Anak ikut bergerak, membesar, berputar, dan memudar bersama induknya (bisa berantai). Mengganti induk tidak membuat clip melompat selama posisinya tidak beranimasi.
+- **Motion path** (mode Lanjutan): aktifkan "Jalur gerak" di panel Properti, lalu seret titik jalur di preview. Pilihan kecepatan gerak, jalur melengkung atau lurus, dan hadap arah gerak.
 
 ## Rencana berikutnya
 
-Motion path, parent / grup layer, pen tool (vektor), export GIF dan hanya audio, lalu efek dan transisi.
+Pen tool (vektor), export GIF dan hanya audio, lalu efek dan transisi.
 
 ## Menjalankan lokal
 

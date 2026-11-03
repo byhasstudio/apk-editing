@@ -1,4 +1,5 @@
 /* Gizmo di preview: pilih, geser, scale, dan putar objek langsung di canvas (seperti Alight Motion).
+   Juga menggambar dan mengedit titik motion path, dan memahami induk (parent).
    Digambar di canvas terpisah (#pv-gizmo) sehingga tidak ikut ter-export. */
 window.APK=window.APK||{};
 APK.gizmo=(function(){
@@ -38,20 +39,62 @@ APK.gizmo=(function(){
     return null;
   }
 
+  /* ===== motion path: titik jalur di layar ===== */
+  function ptScreen(v,c,i){
+    const pr=APK.kf.props(c,rel(c)),q=c.mp.pts[i],w=APK.layers.world(c,APK.preview.time,pr.x+q[0],pr.y+q[1]);
+    return[v.ox+(v.W/2+w.x)*v.pu,v.oy+(v.H/2+w.y)*v.pu];
+  }
+  function hitPt(v,c,sx,sy){
+    let best=-1,bd=HR+6;
+    for(let i=0;i<c.mp.pts.length;i++){const[x,y]=ptScreen(v,c,i),d=Math.hypot(x-sx,y-sy);if(d<=bd){bd=d;best=i}}
+    return best;
+  }
+  function drawPath(v,s){
+    const c=s.c,mp=c.mp;
+    if(!mp||!mp.on||!mp.pts||mp.pts.length<2)return;
+    const t=APK.preview.time,pr=APK.kf.props(c,rel(c)),smp=APK.motion.samples(mp);
+    g.save();g.strokeStyle='#4cc38a';g.lineWidth=1.5;g.setLineDash([6,4]);g.beginPath();
+    smp.forEach((q,i)=>{
+      const w=APK.layers.world(c,t,pr.x+q[0],pr.y+q[1]),x=v.ox+(v.W/2+w.x)*v.pu,y=v.oy+(v.H/2+w.y)*v.pu;
+      i?g.lineTo(x,y):g.moveTo(x,y);
+    });
+    g.stroke();g.setLineDash([]);
+    if(!s.tr.locked)mp.pts.forEach((q,i)=>{
+      const[x,y]=ptScreen(v,c,i);
+      g.beginPath();g.arc(x,y,HR*0.8,0,Math.PI*2);
+      g.fillStyle=i===0?'#4cc38a':i===mp.pts.length-1?'#ff6b6b':'#fff';g.fill();
+      g.strokeStyle='#1e2327';g.lineWidth=1.5;g.stroke();
+    });
+    g.restore();
+  }
+
   function draw(){
     if(!cv)return;
     const w=$('preview-wrap'),cw=w.clientWidth,ch=w.clientHeight,dpr=window.devicePixelRatio||1;
     if(cv.width!==Math.round(cw*dpr)||cv.height!==Math.round(ch*dpr)){cv.width=Math.round(cw*dpr);cv.height=Math.round(ch*dpr)}
     g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,cw,ch);
     if(!P()||APK.preview.exporting)return;
-    const v=view();
+    const v=view(),s=APK.timeline.selectedClip();
+    /* layer grup (kosong) tidak terlihat di hasil, jadi diberi garis putus-putus tipis agar mudah ditemukan */
+    g.save();g.strokeStyle='rgba(139,147,163,.85)';g.lineWidth=1;g.setLineDash([4,4]);
+    for(const tr of P().tracks){
+      if(tr.hidden)continue;
+      for(const c of tr.clips){
+        if(!c.shape||c.shape.type!=='group'||(s&&s.c.id===c.id))continue;
+        const b=APK.preview.bounds(c.id);if(!b)continue;
+        g.save();g.translate(v.ox+b.cx*v.pu,v.oy+b.cy*v.pu);g.rotate(b.rot*Math.PI/180);
+        g.strokeRect(-b.w*v.pu/2,-b.h*v.pu/2,b.w*v.pu,b.h*v.pu);g.restore();
+      }
+    }
+    g.restore();
     if(drag&&(guides.x||guides.y)){
       g.save();g.strokeStyle='#ff6b6b';g.lineWidth=1;g.setLineDash([5,4]);g.beginPath();
       if(guides.x){const x=v.ox+v.W/2*v.pu;g.moveTo(x,v.oy);g.lineTo(x,v.oy+v.H*v.pu)}
       if(guides.y){const y=v.oy+v.H/2*v.pu;g.moveTo(v.ox,y);g.lineTo(v.ox+v.W*v.pu,y)}
       g.stroke();g.restore();
     }
-    const s=APK.timeline.selectedClip();if(!s)return;
+    if(!s)return;
+    drawPath(v,s);
     const b=APK.preview.bounds(s.c.id);if(!b)return;
     const hw=b.w*v.pu/2,hh=b.h*v.pu/2,lock=!!s.tr.locked;
     g.save();
@@ -75,8 +118,13 @@ APK.gizmo=(function(){
   function down(e){
     const p=P();if(!p||e.button!==0)return;
     const[sx,sy]=pos(e),v=view(),multi=e.shiftKey||e.ctrlKey||e.metaKey;
-    let sc=APK.timeline.selectedClip(),mode=null,id=null;
-    if(sc&&!sc.tr.locked&&!multi){const b=APK.preview.bounds(sc.c.id);if(b){mode=hitHandle(v,b,sx,sy);if(mode)id=sc.c.id}}
+    let sc=APK.timeline.selectedClip(),mode=null,id=null,pi=-1;
+    /* titik motion path punya prioritas tertinggi */
+    if(sc&&!sc.tr.locked&&!multi&&sc.c.mp&&sc.c.mp.on&&sc.c.mp.pts&&sc.c.mp.pts.length>1){
+      pi=hitPt(v,sc.c,sx,sy);
+      if(pi>=0){mode='mpt';id=sc.c.id}
+    }
+    if(!mode&&sc&&!sc.tr.locked&&!multi){const b=APK.preview.bounds(sc.c.id);if(b){mode=hitHandle(v,b,sx,sy);if(mode)id=sc.c.id}}
     if(!mode){
       const pid=pick(v,sx,sy);
       if(!pid){APK.timeline.select(null);return}
@@ -86,8 +134,10 @@ APK.gizmo=(function(){
       if(!sc||sc.c.id!==pid||sc.tr.locked)return;
       mode='move';id=pid;
     }
-    const c=sc.c,r=rel(c),pr=APK.kf.props(c,r),[px,py]=toProj(v,sx,sy),cx=p.width/2+pr.x,cy=p.height/2+pr.y,a0=Math.atan2(py-cy,px-cx);
-    drag={mode,id,r,x0:pr.x,y0:pr.y,s0:pr.scale,rot0:pr.rotation,px,py,cx,cy,d0:Math.hypot(px-cx,py-cy)||1,last:a0,acc:0,moved:false,newKey:false};
+    const c=sc.c,r=rel(c),pr=APK.kf.props(c,r),[px,py]=toProj(v,sx,sy),b0=APK.preview.bounds(c.id),
+      cx=b0?b0.cx:p.width/2+pr.x,cy=b0?b0.cy:p.height/2+pr.y,a0=Math.atan2(py-cy,px-cx);
+    drag={mode,id,r,x0:pr.x,y0:pr.y,s0:pr.scale,rot0:pr.rotation,px,py,cx,cy,d0:Math.hypot(px-cx,py-cy)||1,last:a0,acc:0,moved:false,newKey:false,
+      pi,q0:mode==='mpt'?c.mp.pts[pi].slice():null};
     cv.setPointerCapture(e.pointerId);e.preventDefault();
   }
   function move(e){
@@ -100,12 +150,17 @@ APK.gizmo=(function(){
     }
     guides={x:false,y:false};
     if(drag.mode==='move'){
-      let nx=drag.x0+(px-drag.px),ny=drag.y0+(py-drag.py);const th=6/v.pu;
-      if(!e.altKey){
+      /* selisih di layar diubah ke ruang induk supaya anak bergerak mengikuti jari/kursor */
+      const d=APK.layers.toLocal(c,APK.preview.time,px-drag.px,py-drag.py),follow=APK.layers.hasParent(c)||(c.mp&&c.mp.on);
+      let nx=drag.x0+d.x,ny=drag.y0+d.y;const th=6/v.pu;
+      if(!e.altKey&&!follow){
         if(Math.abs(nx)<th){nx=0;guides.x=true}
         if(Math.abs(ny)<th){ny=0;guides.y=true}
       }
       set(c,'x',Math.round(nx*10)/10);set(c,'y',Math.round(ny*10)/10);
+    }else if(drag.mode==='mpt'){
+      const d=APK.layers.toLocal(c,APK.preview.time,px-drag.px,py-drag.py);
+      if(c.mp&&c.mp.pts[drag.pi])c.mp.pts[drag.pi]=[Math.round((drag.q0[0]+d.x)*10)/10,Math.round((drag.q0[1]+d.y)*10)/10];
     }else if(drag.mode==='scale'){
       const k=Math.hypot(px-drag.cx,py-drag.cy)/drag.d0;
       set(c,'scale',Math.min(10,Math.max(0.01,drag.s0*k)));
@@ -129,7 +184,10 @@ APK.gizmo=(function(){
   function hover(e){
     if(!P())return;
     const[sx,sy]=pos(e),v=view(),sc=APK.timeline.selectedClip();let cur='default';
-    if(sc&&!sc.tr.locked){const b=APK.preview.bounds(sc.c.id);if(b){const h=hitHandle(v,b,sx,sy);if(h)cur=h==='rot'?'grab':'nwse-resize'}}
+    if(sc&&!sc.tr.locked){
+      if(sc.c.mp&&sc.c.mp.on&&sc.c.mp.pts&&sc.c.mp.pts.length>1&&hitPt(v,sc.c,sx,sy)>=0)cur='pointer';
+      if(cur==='default'){const b=APK.preview.bounds(sc.c.id);if(b){const h=hitHandle(v,b,sx,sy);if(h)cur=h==='rot'?'grab':'nwse-resize'}}
+    }
     if(cur==='default'&&pick(v,sx,sy))cur='move';
     cv.style.cursor=cur;
   }

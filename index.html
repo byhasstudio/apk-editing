@@ -5,20 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache">
 <title>APK EDITING</title>
-<link rel="stylesheet" href="css/style.css?v=10">
-<link rel="stylesheet" href="css/components.css?v=10">
-<link rel="stylesheet" href="css/home.css?v=10">
-<link rel="stylesheet" href="css/editor.css?v=10">
-<link rel="stylesheet" href="css/timeline.css?v=10">
-<link rel="stylesheet" href="css/keyframes.css?v=10">
-<link rel="stylesheet" href="css/features.css?v=10">
-<link rel="stylesheet" href="css/mobile.css?v=10">
-<link rel="stylesheet" href="css/studio.css?v=10">
+<link rel="stylesheet" href="css/style.css?v=11">
+<link rel="stylesheet" href="css/components.css?v=11">
+<link rel="stylesheet" href="css/home.css?v=11">
+<link rel="stylesheet" href="css/editor.css?v=11">
+<link rel="stylesheet" href="css/timeline.css?v=11">
+<link rel="stylesheet" href="css/keyframes.css?v=11">
+<link rel="stylesheet" href="css/features.css?v=11">
+<link rel="stylesheet" href="css/mobile.css?v=11">
+<link rel="stylesheet" href="css/studio.css?v=11">
 </head>
 <body>
 <section id="home" class="view">
   <header class="home-head">
-    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO · v10 gizmo + multi-select + bezier + gradien</small></div></div>
+    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO · v11 motion path + parent/grup layer</small></div></div>
     <div class="actions"><button class="btn" id="btn-open">Buka Project</button><button class="btn primary" id="btn-new">Project Baru</button></div>
   </header>
   <main class="home-main"><h2>Project terakhir</h2><div id="project-list" class="project-grid"></div></main>
@@ -54,6 +54,7 @@
     <button class="btn" id="tl-text" title="Tambah teks / judul di playhead (T)">T Teks</button>
     <select id="tl-addshape" title="Tambah bentuk di playhead"><option value="">+ Bentuk</option></select>
     <button class="btn" id="tl-sticker" title="Tambah stiker emoji di playhead">☺ Stiker</button>
+    <button class="btn" id="tl-group" title="Tambah layer grup kosong untuk dijadikan induk beberapa clip">▣ Grup</button>
     <button class="btn adv" id="tl-ext" title="Pisahkan audio dari clip video terpilih">Pisah audio</button>
     <select id="tl-addtrack" class="adv" title="Tambah track baru"><option value="">+ Track</option><option value="video">Video</option><option value="audio">Audio</option><option value="image">Gambar</option></select><span class="sp"></span>
     <button class="btn on adv" id="tl-snap" title="Snap: clip menempel ke tepi clip lain dan playhead">Snap</button><button class="btn" id="tl-zout" aria-label="Zoom out" title="Perkecil timeline">−</button><button class="btn" id="tl-zin" aria-label="Zoom in" title="Perbesar timeline">+</button></div>
@@ -93,22 +94,25 @@
 <input type="file" id="file-open" accept=".json,.apkedit" hidden>
 <div id="toast" class="toast" role="status"></div>
 
-<script src="js/db.js?v=10"></script>
-<script src="js/history.js?v=10"></script>
-<script src="js/keyframes.js?v=10"></script>
-<script src="js/text.js?v=10"></script>
-<script src="js/shapes.js?v=10"></script>
-<script src="js/fx.js?v=10"></script>
-<script src="js/project.js?v=10"></script>
-<script src="js/media.js?v=10"></script>
-<script src="js/preview.js?v=10"></script>
-<script src="js/waveform.js?v=10"></script>
-<script src="js/properties.js?v=10"></script>
-<script src="js/timeline.js?v=10"></script>
-<script src="js/gizmo.js?v=10"></script>
-<script src="js/keyboard.js?v=10"></script>
-<script src="js/export.js?v=10"></script>
-<script src="js/app.js?v=10"></script>
-<script src="js/ui.js?v=10"></script>
+<script src="js/db.js?v=11"></script>
+<script src="js/history.js?v=11"></script>
+<script src="js/keyframes.js?v=11"></script>
+<script src="js/text.js?v=11"></script>
+<script src="js/shapes.js?v=11"></script>
+<script src="js/fx.js?v=11"></script>
+<script src="js/motion.js?v=11"></script>
+<script src="js/layers.js?v=11"></script>
+<script src="js/project.js?v=11"></script>
+<script src="js/media.js?v=11"></script>
+<script src="js/preview.js?v=11"></script>
+<script src="js/waveform.js?v=11"></script>
+<script src="js/properties.js?v=11"></script>
+<script src="js/timeline.js?v=11"></script>
+<script src="js/gizmo.js?v=11"></script>
+<script src="js/keyboard.js?v=11"></script>
+<script src="js/export.js?v=11"></script>
+<script src="js/app.js?v=11"></script>
+<script src="js/ui.js?v=11"></script>
+<script src="js/layers-ui.js?v=11"></script>
 </body>
 </html>

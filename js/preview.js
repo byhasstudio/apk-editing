@@ -31,6 +31,7 @@ APK.preview=(function(){
   function frame(){
     const p=P(),W=p.width,H=p.height;
     bmap.clear();
+    APK.layers.begin();
     ctx.setTransform(K,0,0,K,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
     ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
     const live=new Set();
@@ -51,15 +52,15 @@ APK.preview=(function(){
           continue;
         }
         if(c.text){
-          const pr=APK.kf.props(c,t-c.start),sc=Math.max(0,pr.scale),b=APK.text.draw(ctx,c,pr,W,H);
+          const pr=APK.layers.props(c,t),sc=Math.max(0,pr.scale),b=APK.text.draw(ctx,c,pr,W,H);
           mark(c.id,pr,W,H,b.w*sc,b.h*sc);continue;
         }
         if(c.shape){
-          const pr=APK.kf.props(c,t-c.start),sc=Math.max(0,pr.scale),b=APK.shapes.draw(ctx,c,pr,W,H);
+          const pr=APK.layers.props(c,t),sc=Math.max(0,pr.scale),b=APK.shapes.draw(ctx,c,pr,W,H);
           mark(c.id,pr,W,H,b.w*sc,b.h*sc);continue;
         }
         const e=getEl(c);if(!e||!e.ready)continue;
-        const pr=APK.kf.props(c,t-c.start),sp=Math.min(16,Math.max(0.0625,c.speed||1)),
+        const pr=APK.layers.props(c,t),sp=Math.min(16,Math.max(0.0625,c.speed||1)),
           rev=!!c.reverse&&e.type==='video'&&tr.kind!=='audio',
           src=rev?c.in+c.dur*sp-(t-c.start)*sp:c.in+(t-c.start)*sp;
         e.rev=rev;

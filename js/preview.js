@@ -15,7 +15,7 @@ APK.preview=(function(){
     const el=m.type==='image'?new Image():document.createElement(m.type);
     e={el,type:m.type,ready:false,gone:false};els.set(clip.id,e);
     if(m.type==='image')el.onload=()=>{e.ready=true;draw()};
-    else{el.preload='auto';el.playsInline=true;el.onloadeddata=()=>{e.ready=true;draw()};el.onseeked=()=>{if(!playing)draw()}}
+    else{el.preload='auto';el.playsInline=true;el.onloadeddata=()=>{e.ready=true;draw()};el.onseeked=()=>{if(!playing||e.rev)draw()}}
     if(hook&&m.type!=='image')hook(el);
     APK.media.getUrl(m.id).then(u=>{if(u&&!e.gone)el.src=u});
     return e;
@@ -44,13 +44,25 @@ APK.preview=(function(){
           continue;
         }
         if(c.text){APK.text.draw(ctx,c,APK.kf.props(c,t-c.start),W,H);continue}
+        if(c.shape){APK.shapes.draw(ctx,c,APK.kf.props(c,t-c.start),W,H);continue}
         const e=getEl(c);if(!e||!e.ready)continue;
-        const pr=APK.kf.props(c,t-c.start),sp=Math.min(16,Math.max(0.0625,c.speed||1)),src=c.in+(t-c.start)*sp;
+        const pr=APK.kf.props(c,t-c.start),sp=Math.min(16,Math.max(0.0625,c.speed||1)),
+          rev=!!c.reverse&&e.type==='video'&&tr.kind!=='audio',
+          src=rev?c.in+c.dur*sp-(t-c.start)*sp:c.in+(t-c.start)*sp;
+        e.rev=rev;
         if(e.type!=='image'){
-          const el=e.el;
-          el.volume=Math.min(1,Math.max(0,pr.volume*vol));el.muted=!!tr.muted;
+          const el=e.el,rl=t-c.start,fi=c.fadeIn||0,fo=c.fadeOut||0;
+          let fg=1;
+          if(fi>0)fg=Math.min(fg,rl/fi);
+          if(fo>0)fg=Math.min(fg,(c.dur-rl)/fo);
+          fg=Math.min(1,Math.max(0,fg));
+          el.volume=Math.min(1,Math.max(0,pr.volume*vol*fg));
+          el.muted=!!tr.muted||!!c.mute||rev;
           if(el.playbackRate!==sp)el.playbackRate=sp;
-          if(playing){
+          if(rev){
+            if(!el.paused)el.pause();
+            if(Math.abs(el.currentTime-src)>0.03)el.currentTime=src;
+          }else if(playing){
             if(el.paused){el.currentTime=src;el.play().catch(()=>{})}
             else if(Math.abs(el.currentTime-src)>0.3)el.currentTime=src;
           }else{
@@ -61,14 +73,14 @@ APK.preview=(function(){
         if(tr.kind==='audio')continue;
         const w=e.type==='image'?e.el.naturalWidth:e.el.videoWidth,h=e.type==='image'?e.el.naturalHeight:e.el.videoHeight;
         if(!w||!h)continue;
-        const s=Math.min(W/w,H/h)*Math.max(0,pr.scale);
+        const s=Math.min(W/w,H/h)*Math.max(0,pr.scale),fxc=APK.fx.process(e.el,w,h,c);
         ctx.save();
         ctx.globalAlpha=Math.min(1,Math.max(0,pr.opacity));
         ctx.globalCompositeOperation=c.blend||'source-over';
         ctx.translate(W/2+pr.x,H/2+pr.y);
         ctx.rotate(pr.rotation*Math.PI/180);
         ctx.scale(c.flipX?-1:1,c.flipY?-1:1);
-        ctx.drawImage(e.el,-w*s/2,-h*s/2,w*s,h*s);
+        ctx.drawImage(fxc||e.el,-w*s/2,-h*s/2,w*s,h*s);
         ctx.restore();
       }
     }

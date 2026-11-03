@@ -1,6 +1,6 @@
 # APK EDITING
 
-Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v14** (sistem inti ala Alight Motion / CapCut: gizmo, multi-select, salin-tempel, kunci layer, kurva bezier, gradien, bayangan, motion path, parent/grup layer, pen tool dan layer vektor, preset). Efek, transisi, dan filter sengaja belum dibuat.
+Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v15** (sistem inti ala Alight Motion / CapCut: gizmo, multi-select, salin-tempel, kunci layer, kurva bezier, gradien, bayangan, motion path, parent/grup layer, pen tool dan layer vektor, preset). Efek, transisi, dan filter sengaja belum dibuat.
 
 ## Buka di web
 
@@ -47,12 +47,13 @@ https://byhasstudio.github.io/apk-editing/
 - Layer vektor bisa di-keyframe untuk posisi, scale, opacity, dan rotasi, bisa jadi anak/induk, dan ikut ter-export seperti layer lainnya.
 - Data tersimpan di field opsional `clip.vec` (project lama tidak berubah dan tetap terbuka). Rincian format ada di komentar awal `js/vector.js`.
 
-### v13-v14 (preset)
+### v13-v15 (preset)
 
 - Tombol **⬇ Preset** dan **⬆ Preset** ada di bar paling atas editor (sebelum tombol Mode).
-- **⬇ Preset (simpan)**: sekali klik langsung mengambil SEMUA layer di project (teks, bentuk, vektor, grup) lengkap dengan keyframe, jalur gerak, data vektor, dan hubungan induk-anak. Beri nama, lalu browser mengunduh file `nama.apkpreset.json`. Kalau hanya ingin sebagian, pilih 2 clip atau lebih dulu (Shift/Ctrl + klik, atau Pilih banyak), maka hanya yang dipilih yang disimpan.
-- **⬆ Preset (buka)**: pilih satu atau beberapa file preset; layer dimasukkan di posisi playhead pada track baru. Hasilnya clip biasa, jadi semua bisa diedit dan file aslinya tidak berubah. Satu langkah Undo menghapusnya.
-- File preset bisa dipindah antar project dan antar perangkat. Clip yang memakai media (video, gambar, audio) tidak ikut karena file medianya tidak ada di dalam preset.
+- **⬇ Preset (simpan)**: sekali klik langsung mengambil SEMUA layer di project (teks, bentuk, vektor, grup, dan clip media) lengkap dengan keyframe, jalur gerak, data vektor, hubungan induk-anak, serta struktur track (urutan, nama, mute, kunci, sembunyi). Beri nama, lalu browser mengunduh file `nama.apkpreset.json`. Kalau hanya ingin sebagian, pilih 2 clip atau lebih dulu (Shift/Ctrl + klik, atau Pilih banyak).
+- **⬆ Preset (buka)**: pilih satu atau beberapa file preset. Layer dikembalikan **persis seperti aslinya** (waktu mulai sama, urutan dan nama track sama, semua properti sama), tanpa digeser ke playhead. Hasilnya clip biasa sehingga bisa diedit, dan file aslinya tidak berubah. Satu langkah Undo menghapusnya. File preset format lama (v13/v14) tetap bisa dibuka.
+- File media tidak disimpan di dalam preset. Clip media hanya ikut dimasukkan kalau media dengan id yang sama ada di project tujuan (misalnya project yang sama); kalau tidak, dilewati dan kamu diberi tahu jumlahnya.
+- Membuka preset ke project yang sama menambah salinan di atas layer yang sudah ada.
 
 ## Rencana berikutnya
 

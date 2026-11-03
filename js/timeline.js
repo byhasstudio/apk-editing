@@ -1,4 +1,4 @@
-/* Timeline: track, clip, move, trim, split, duplicate, delete, zoom, snap, layer, keyframe, drag & drop pintar */
+/* Timeline: track, clip, move, trim, split, duplicate, delete, zoom, snap, layer, keyframe, drag & drop pintar, klip teks, kecepatan */
 window.APK=window.APK||{};
 APK.timeline=(function(){
   const HEAD=132,MIN=0.1,LABEL={video:'Video',audio:'Audio',image:'Gambar'};
@@ -8,6 +8,8 @@ APK.timeline=(function(){
   const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   const accepts=(tr,type)=>tr.kind==='audio'?type==='audio':tr.kind==='image'?type==='image':type!=='audio';
   const media=id=>P().media.find(m=>m.id===id);
+  const spd=c=>c.speed||1;
+  const nameOf=(c,m)=>m?m.name:c.text?'T  '+String(c.text.content).split('\n')[0]:'(media hilang)';
   const mkTrack=kind=>({id:uid('t_'),kind,name:`${LABEL[kind]} ${P().tracks.filter(t=>t.kind===kind).length+1}`,muted:false,clips:[]});
   const free=(tr,s,d,ig)=>!tr.clips.some(x=>x.id!==ig&&s<x.start+x.dur-1e-6&&s+d>x.start+1e-6);
   function findClip(id){for(const tr of P().tracks){const c=tr.clips.find(c=>c.id===id);if(c)return{tr,c}}return null}
@@ -29,8 +31,8 @@ APK.timeline=(function(){
     const step=[1,2,5,10,15,30,60,120,300,600,1800].find(s=>s*pps>=80)||3600;
     let ticks='';for(let s=0;s<=total;s+=step)ticks+=`<span class="tick" style="left:${s*pps}px">${APK.preview.fmt(s,true)}</span>`;
     const rows=p.tracks.map((tr,i)=>{
-      const clips=tr.clips.map(c=>{const m=media(c.mediaId);
-        return `<div class="clip ${tr.kind}${c.id===sel?' sel':''}" data-id="${c.id}" style="left:${c.start*pps}px;width:${Math.max(3,c.dur*pps)}px" title="${esc(m?m.name:'')}"><i class="h l"></i>${tr.kind==='audio'?`<canvas class="wf" data-c="${c.id}"></canvas>`:''}<span>${esc(m?m.name:'(media hilang)')}</span>${kfMarks(c)}<i class="h r"></i></div>`}).join('');
+      const clips=tr.clips.map(c=>{const m=media(c.mediaId),nm=nameOf(c,m);
+        return `<div class="clip ${tr.kind}${c.text?' text':''}${c.id===sel?' sel':''}" data-id="${c.id}" style="left:${c.start*pps}px;width:${Math.max(3,c.dur*pps)}px" title="${esc(nm)}"><i class="h l"></i>${tr.kind==='audio'?`<canvas class="wf" data-c="${c.id}"></canvas>`:''}<span>${esc(nm)}</span>${kfMarks(c)}<i class="h r"></i></div>`}).join('');
       return `<div class="tl-row"><div class="tl-head"><b title="${esc(tr.name)}">${esc(tr.name)}</b><span class="tl-btns">
         <button data-act="up" data-t="${tr.id}" title="Layer naik" ${i===0?'disabled':''}>▲</button>
         <button data-act="down" data-t="${tr.id}" title="Layer turun" ${i===p.tracks.length-1?'disabled':''}>▼</button>
@@ -47,10 +49,10 @@ APK.timeline=(function(){
     document.querySelectorAll('#tl-content canvas.wf').forEach(cv=>{
       const f=findClip(cv.dataset.c);if(!f)return;
       const c=f.c,pk=APK.wave.peaks(c.mediaId);if(!pk)return;
-      const w=Math.max(1,Math.min(4000,Math.round(c.dur*pps))),h=40,R=APK.wave.RATE,g=cv.getContext('2d');
+      const sp=spd(c),w=Math.max(1,Math.min(4000,Math.round(c.dur*pps))),h=40,R=APK.wave.RATE,g=cv.getContext('2d');
       cv.width=w;cv.height=h;g.fillStyle='rgba(255,255,255,.75)';
       for(let x=0;x<w;x++){
-        const i0=Math.floor((c.in+x/w*c.dur)*R),i1=Math.max(i0+1,Math.floor((c.in+(x+1)/w*c.dur)*R));
+        const i0=Math.floor((c.in+x/w*c.dur*sp)*R),i1=Math.max(i0+1,Math.floor((c.in+(x+1)/w*c.dur*sp)*R));
         let v=0;for(let i=i0;i<i1&&i<pk.length;i++)if(pk[i]>v)v=pk[i];
         const bh=Math.max(1,v*h);g.fillRect(x,(h-bh)/2,1,bh);
       }
@@ -167,15 +169,15 @@ APK.timeline=(function(){
     }else if(drag.mode==='trimL'){
       let ns=o.start+dx;const b=snapEdge(ns,pts);if(b)ns=b.p;
       let prevEnd=0;for(const x of f.tr.clips)if(x.id!==c.id&&x.start<o.start+1e-6)prevEnd=Math.max(prevEnd,x.start+x.dur);
-      const lo=Math.max(prevEnd,m&&m.type!=='image'?o.start-o.in:0);
+      const lo=Math.max(prevEnd,m&&m.type!=='image'?o.start-o.in/spd(o):0);
       ns=Math.min(Math.max(ns,lo),o.start+o.dur-MIN);
-      c.start=ns;c.in=o.in+(ns-o.start);c.dur=o.dur-(ns-o.start);
+      c.start=ns;c.in=o.in+(ns-o.start)*spd(o);c.dur=o.dur-(ns-o.start);
       if(drag.kf0)c.kf=APK.kf.shift(drag.kf0,-(ns-o.start));
       drag.changed=true;render();
     }else{
       let ne=o.start+o.dur+dx;const b=snapEdge(ne,pts);if(b)ne=b.p;
       let hi=Infinity;for(const x of f.tr.clips)if(x.id!==c.id&&x.start>=o.start+o.dur-1e-6)hi=Math.min(hi,x.start);
-      if(m&&m.type!=='image'&&m.duration>0)hi=Math.min(hi,o.start+(m.duration-o.in));
+      if(m&&m.type!=='image'&&m.duration>0)hi=Math.min(hi,o.start+(m.duration-o.in)/spd(o));
       ne=Math.min(Math.max(ne,o.start+MIN),hi);
       c.dur=ne-o.start;drag.changed=true;render();
     }
@@ -276,10 +278,22 @@ APK.timeline=(function(){
     else{
       let next=Infinity;for(const x of f.tr.clips)if(x.id!==c.id&&x.start>=c.start+c.dur-1e-6)next=Math.min(next,x.start);
       let hi=next-c.start;
-      if(m&&m.type!=='image'&&m.duration>0)hi=Math.min(hi,m.duration-c.in);
+      if(m&&m.type!=='image'&&m.duration>0)hi=Math.min(hi,(m.duration-c.in)/spd(c));
       c.dur=Math.min(Math.max(v,MIN),hi);
     }
     APK.project.markDirty();render();APK.preview.refresh();return true;
+  }
+  /* ubah kecepatan video/audio; span = panjang sumber (detik) yang dipertahankan selama pengeditan */
+  function setSpeed(v,span){
+    const f=sel&&findClip(sel);if(!f||!isFinite(v))return;
+    const c=f.c,m=media(c.mediaId);if(!m||m.type==='image')return;
+    v=Math.min(8,Math.max(0.1,v));
+    const src=span||c.dur*spd(c);
+    let next=Infinity;for(const x of f.tr.clips)if(x.id!==c.id&&x.start>=c.start+c.dur-1e-6)next=Math.min(next,x.start);
+    const nd=Math.max(MIN,Math.min(src/v,next-c.start)),k=nd/c.dur;
+    if(c.kf)for(const p in c.kf)for(const q of c.kf[p])q.t*=k;
+    c.speed=v;c.dur=nd;
+    APK.project.markDirty();render();APK.preview.refresh();
   }
   function addMedia(mid){
     const p=P(),m=media(mid);if(!m)return;
@@ -291,12 +305,23 @@ APK.timeline=(function(){
     const c={id:uid('c_'),mediaId:mid,start,in:0,dur:m.type==='image'?5:m.duration,props:{x:0,y:0,scale:1,opacity:1,rotation:0,volume:1}};
     tr.clips.push(c);sel=c.id;changed();
   }
+  /* klip teks / judul di posisi playhead, selalu di layer paling atas */
+  function addText(){
+    const p=P();if(!p)return;
+    APK.history.record();
+    const t=APK.preview.time,dur=3,top=p.tracks[0];
+    let tr=top&&top.kind==='video'&&free(top,t,dur,null)?top:null;
+    if(!tr){tr=mkTrack('video');p.tracks.unshift(tr)}
+    const c={id:uid('c_'),mediaId:null,start:t,in:0,dur,props:{x:0,y:0,scale:1,opacity:1,rotation:0,volume:1},text:APK.text.make()};
+    tr.clips.push(c);sel=c.id;changed();
+  }
   function split(){
     const f=sel&&findClip(sel);if(!f){tt('Pilih clip dulu');return}
     const t=APK.preview.time,c=f.c;
     if(t<=c.start+MIN||t>=c.start+c.dur-MIN){tt('Taruh playhead di dalam clip');return}
     APK.history.record();
-    const d=t-c.start,n={...c,id:uid('c_'),props:{...c.props},start:t,in:c.in+d,dur:c.dur-d};
+    const d=t-c.start,n={...c,id:uid('c_'),props:{...c.props},start:t,in:c.in+d*spd(c),dur:c.dur-d};
+    if(c.text)n.text={...c.text};
     if(c.kf){const sp=APK.kf.split(c,d);c.kf=sp.left;n.kf=sp.right}
     c.dur=d;f.tr.clips.push(n);sel=n.id;changed();
   }
@@ -306,6 +331,7 @@ APK.timeline=(function(){
     const c=f.c;let s=c.start+c.dur;
     if(!free(f.tr,s,c.dur,null))s=f.tr.clips.reduce((a,x)=>Math.max(a,x.start+x.dur),0);
     const n={...c,id:uid('c_'),props:{...c.props},start:s};
+    if(c.text)n.text={...c.text};
     if(c.kf)n.kf=APK.kf.clone(c.kf);
     f.tr.clips.push(n);sel=n.id;changed();
   }
@@ -344,11 +370,11 @@ APK.timeline=(function(){
     root.addEventListener('pointerup',up);root.addEventListener('pointercancel',up);
     root.addEventListener('click',headClick);
     $('tl-scroll').addEventListener('wheel',e=>{if(e.ctrlKey){e.preventDefault();zoom(e.deltaY<0?1.15:1/1.15)}},{passive:false});
-    $('tl-split').onclick=split;$('tl-dup').onclick=duplicate;$('tl-del').onclick=del;
+    $('tl-split').onclick=split;$('tl-dup').onclick=duplicate;$('tl-del').onclick=del;$('tl-text').onclick=addText;
     $('tl-zin').onclick=()=>zoom(1.25);$('tl-zout').onclick=()=>zoom(0.8);
     $('tl-snap').onclick=e=>{snapOn=!snapOn;e.currentTarget.classList.toggle('on',snapOn)};
     $('tl-addtrack').onchange=e=>{if(e.target.value&&P())addTrack(e.target.value);e.target.value=''};
     initDnD();
   }
-  return{init,load,render,setPlayhead,addMedia,dropMedia,split,duplicate,del,restore,selectedClip,touch,setTiming,commit:changed,dragMedia:id=>{dragMid=id},get selected(){return sel}};
+  return{init,load,render,setPlayhead,addMedia,addText,setSpeed,dropMedia,split,duplicate,del,restore,selectedClip,touch,setTiming,commit:changed,dragMedia:id=>{dragMid=id},get selected(){return sel}};
 })();

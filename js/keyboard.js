@@ -10,6 +10,7 @@
     else if(ctrl&&k.toLowerCase()==='y'){e.preventDefault();APK.history.redo()}
     else if(ctrl&&k.toLowerCase()==='d'){e.preventDefault();APK.timeline.duplicate()}
     else if(!ctrl&&k.toLowerCase()==='s'){APK.timeline.split()}
+    else if(!ctrl&&k.toLowerCase()==='t'){e.preventDefault();APK.timeline.addText()}
     else if(!ctrl&&k.toLowerCase()==='k'){e.preventDefault();APK.properties.addAll()}
     else if(k==='['||k===']'){e.preventDefault();APK.properties.jump(k===']'?1:-1)}
     else if(k==='ArrowLeft'||k==='ArrowRight'){

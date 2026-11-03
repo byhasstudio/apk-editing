@@ -28,7 +28,7 @@ APK.preview=(function(){
   }
   function frame(){
     const p=P(),W=p.width,H=p.height;
-    ctx.setTransform(K,0,0,K,0,0);ctx.globalAlpha=1;
+    ctx.setTransform(K,0,0,K,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
     ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
     const live=new Set();
     for(const tr of p.tracks)for(const c of tr.clips)live.add(c.id);
@@ -43,11 +43,13 @@ APK.preview=(function(){
             if(t<c.start-5||t>c.start+c.dur+5)release(c.id)}
           continue;
         }
+        if(c.text){APK.text.draw(ctx,c,APK.kf.props(c,t-c.start),W,H);continue}
         const e=getEl(c);if(!e||!e.ready)continue;
-        const pr=APK.kf.props(c,t-c.start),src=c.in+(t-c.start);
+        const pr=APK.kf.props(c,t-c.start),sp=Math.min(16,Math.max(0.0625,c.speed||1)),src=c.in+(t-c.start)*sp;
         if(e.type!=='image'){
           const el=e.el;
           el.volume=Math.min(1,Math.max(0,pr.volume*vol));el.muted=!!tr.muted;
+          if(el.playbackRate!==sp)el.playbackRate=sp;
           if(playing){
             if(el.paused){el.currentTime=src;el.play().catch(()=>{})}
             else if(Math.abs(el.currentTime-src)>0.3)el.currentTime=src;
@@ -62,8 +64,10 @@ APK.preview=(function(){
         const s=Math.min(W/w,H/h)*Math.max(0,pr.scale);
         ctx.save();
         ctx.globalAlpha=Math.min(1,Math.max(0,pr.opacity));
+        ctx.globalCompositeOperation=c.blend||'source-over';
         ctx.translate(W/2+pr.x,H/2+pr.y);
         ctx.rotate(pr.rotation*Math.PI/180);
+        ctx.scale(c.flipX?-1:1,c.flipY?-1:1);
         ctx.drawImage(e.el,-w*s/2,-h*s/2,w*s,h*s);
         ctx.restore();
       }

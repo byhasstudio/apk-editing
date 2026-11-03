@@ -1,6 +1,6 @@
 # APK EDITING
 
-Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v12** (sistem inti ala Alight Motion / CapCut: gizmo, multi-select, salin-tempel, kunci layer, kurva bezier, gradien, bayangan, motion path, parent/grup layer, **pen tool dan layer vektor**). Efek, transisi, dan filter sengaja belum dibuat.
+Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v13** (sistem inti ala Alight Motion / CapCut: gizmo, multi-select, salin-tempel, kunci layer, kurva bezier, gradien, bayangan, motion path, parent/grup layer, pen tool dan layer vektor, preset). Efek, transisi, dan filter sengaja belum dibuat.
 
 ## Buka di web
 
@@ -47,9 +47,15 @@ https://byhasstudio.github.io/apk-editing/
 - Layer vektor bisa di-keyframe untuk posisi, scale, opacity, dan rotasi, bisa jadi anak/induk, dan ikut ter-export seperti layer lainnya.
 - Data tersimpan di field opsional `clip.vec` (project lama tidak berubah dan tetap terbuka). Rincian format ada di komentar awal `js/vector.js`.
 
+### v13 (preset)
+
+- **⬇ Simpan preset**: pilih satu atau banyak clip (teks, bentuk, vektor, grup), klik tombol, beri nama. Browser mengunduh file `nama.apkpreset.json` berisi layer lengkap dengan keyframe, jalur gerak, data vektor, dan hubungan induk-anak.
+- **⬆ Buka preset**: pilih file preset; layer dimasukkan di posisi playhead pada track baru. Hasilnya clip biasa, jadi semua bisa diedit (titik vektor, warna, teks, keyframe, durasi) dan tidak mengubah file aslinya.
+- File preset bisa dipindah antar project dan antar perangkat. Clip yang memakai media (video, gambar, audio) tidak ikut karena file medianya tidak ada di dalam preset.
+
 ## Rencana berikutnya
 
-Sistem vektor bagian 2 (gambar bebas dengan penghalusan, gabung/kurangi/irisan path), bagian 3 (path vektor sebagai motion path dan mask), lalu keyframe lanjutan (titik path, anchor, skew, graph editor penuh), mask/matte, precomp, teks lanjutan, audio, presisi, dan export. Efek dan transisi menyusul belakangan.
+Sistem vektor bagian 2 (gambar bebas dengan penghalusan, gabung/kurangi/irisan path), bagian 3 (path vektor sebagai motion path dan mask), lalu keyframe lanjutan (titik path, anchor, skew, graph editor penuh), mask/matte, precomp, teks lanjutan, audio, presisi, dan export. Efek dan transisi menyusul belakangan. Perpustakaan preset di dalam aplikasi (tanpa file) termasuk prioritas 7.
 
 ## Menjalankan lokal
 

@@ -1,0 +1,24 @@
+.timeline{height:300px;flex:none;border-top:1px solid var(--line);padding:0;display:flex;flex-direction:column;overflow:hidden}
+.tl-bar{display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);flex:none;background:var(--panel)}
+.tl-bar .btn{padding:4px 10px}.tl-bar .sp{flex:1}
+.btn.on{border-color:var(--accent);color:var(--accent)}
+.tl-bar select,.pv-controls select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px}
+.tl-scroll{flex:1;overflow:auto;position:relative;background:var(--bg)}
+.tl-content{position:relative;min-width:100%}
+.tl-row{display:flex;height:48px;border-bottom:1px solid var(--line)}
+.tl-ruler{height:26px;position:sticky;top:0;z-index:4;background:var(--panel)}
+.tl-head{position:sticky;left:0;z-index:5;flex:none;width:132px;background:var(--panel);border-right:1px solid var(--line);padding:4px 8px;display:flex;flex-direction:column;justify-content:center;gap:3px}
+.tl-head b{font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tl-btns{display:flex;gap:3px}
+.tl-btns button{background:var(--panel2);color:var(--dim);border:1px solid var(--line);border-radius:4px;font-size:10px;padding:1px 5px;cursor:pointer}
+.tl-btns button.on{color:var(--danger);border-color:var(--danger)}
+.tl-btns button:disabled{opacity:.35;cursor:default}
+.tl-lane{position:relative;flex:none;height:100%}
+.tick{position:absolute;top:0;height:100%;border-left:1px solid var(--line);padding-left:4px;font-size:10px;color:var(--dim);line-height:26px;white-space:nowrap}
+.clip{position:absolute;top:4px;bottom:4px;border-radius:6px;overflow:hidden;cursor:grab;display:flex;align-items:center;padding:0 10px;font-size:11px;color:#fff;border:1px solid rgba(255,255,255,.18);user-select:none;touch-action:none}
+.clip span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;pointer-events:none}
+.clip.video{background:#3b5bdb}.clip.audio{background:#2b8a6e}.clip.image{background:#b5651d}
+.clip.sel{outline:2px solid #fff;z-index:2}
+.h{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;background:rgba(255,255,255,.25)}
+.h.l{left:0}.h.r{right:0}
+.playhead{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--danger);z-index:6;pointer-events:none}

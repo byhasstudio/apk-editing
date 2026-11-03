@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APK EDITING</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/home.css">
+<link rel="stylesheet" href="css/editor.css">
+<link rel="stylesheet" href="css/timeline.css">
+</head>
+<body>
+<section id="home" class="view">
+  <header class="home-head">
+    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO</small></div></div>
+    <div class="actions"><button class="btn" id="btn-open">Buka Project</button><button class="btn primary" id="btn-new">Project Baru</button></div>
+  </header>
+  <main class="home-main"><h2>Project terakhir</h2><div id="project-list" class="project-grid"></div></main>
+</section>
+
+<section id="editor" class="view" hidden>
+  <header class="top">
+    <button class="btn" id="btn-back">Beranda</button>
+    <input id="project-name" class="name-input" aria-label="Nama project">
+    <span id="project-meta" class="meta"></span>
+    <span id="save-state" class="save-state"></span>
+    <button class="btn" id="btn-export-json">Simpan ke File</button>
+    <button class="btn primary" id="btn-save">Simpan</button>
+  </header>
+  <div class="workspace">
+    <aside class="panel" id="panel-media"><div class="panel-head"><h3>Media</h3><button class="btn" id="btn-import">Import</button></div><div id="media-list" class="media-list"></div><input type="file" id="file-media" multiple accept=".mp4,.mov,.webm,.mp3,.wav,.png,.jpg,.jpeg,.webp" hidden></aside>
+    <div class="panel" id="panel-preview"><div id="preview-wrap" class="preview-wrap"><canvas id="pv-canvas"></canvas></div>
+    <div class="pv-controls"><button class="btn" id="pv-play" title="Play/Pause (Space)">▶</button><button class="btn" id="pv-stop" title="Stop">■</button><span id="pv-time" class="meta">00:00.00 / 00:00.00</span><span class="sp"></span>
+    <label class="meta">Vol <input type="range" id="pv-vol" min="0" max="1" step="0.05" value="1"></label>
+    <select id="pv-aspect" title="Rasio aspek"><option>16:9</option><option>9:16</option><option>1:1</option><option>4:3</option><option>21:9</option></select>
+    <button class="btn" id="pv-full" title="Layar penuh">⛶</button></div></div>
+    <aside class="panel" id="panel-props"><h3>Properti</h3><p class="empty">Pilih clip untuk melihat properti (Tahap 4).</p></aside>
+  </div>
+  <div class="panel timeline" id="panel-timeline"><div class="tl-bar">
+    <button class="btn" id="tl-split" title="Split di playhead (S)">Split</button><button class="btn" id="tl-dup" title="Duplikat (Ctrl+D)">Duplikat</button><button class="btn danger" id="tl-del" title="Hapus (Delete)">Hapus</button>
+    <select id="tl-addtrack"><option value="">+ Track</option><option value="video">Video</option><option value="audio">Audio</option><option value="image">Gambar</option></select><span class="sp"></span>
+    <button class="btn on" id="tl-snap">Snap</button><button class="btn" id="tl-zout" aria-label="Zoom out">−</button><button class="btn" id="tl-zin" aria-label="Zoom in">+</button></div>
+    <div class="tl-scroll" id="tl-scroll"><div id="tl-content" class="tl-content"></div></div></div>
+</section>
+
+<dialog id="dlg-new"><form method="dialog" id="form-new">
+  <h3>Project baru</h3>
+  <label>Nama project<input name="name" value="Project tanpa judul" required maxlength="80"></label>
+  <label>Rasio aspek<select name="aspect"><option value="16:9">16:9 (YouTube)</option><option value="9:16">9:16 (Reels, TikTok)</option><option value="1:1">1:1 (Persegi)</option><option value="4:3">4:3</option><option value="21:9">21:9 (Sinema)</option></select></label>
+  <label>Kualitas<select name="quality"><option value="720">720p</option><option value="1080" selected>1080p</option><option value="2160">4K</option></select></label>
+  <label>Frame rate<select name="fps"><option>24</option><option>25</option><option>30</option><option selected>60</option></select></label>
+  <p class="meta" id="new-res"></p>
+  <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Batal</button><button class="btn primary" value="ok">Buat</button></div>
+</form></dialog>
+<input type="file" id="file-open" accept=".json,.apkedit" hidden>
+<div id="toast" class="toast" role="status"></div>
+
+<script src="js/db.js"></script>
+<script src="js/history.js"></script>
+<script src="js/project.js"></script>
+<script src="js/media.js"></script>
+<script src="js/preview.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/keyboard.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,13 +1,15 @@
 # APK EDITING
 
-Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **Tahap 6 selesai** (sistem utama lengkap + keyframe animasi).
+Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v9** (sistem utama lengkap, ditambah keyframe, teks, bentuk, stiker, chroma key, mask, dan tools audio; layout responsif desktop dan ponsel).
 
 ## Buka di web
+
 https://byhasstudio.github.io/apk-editing/
 
 (Aktifkan GitHub Pages: Settings > Pages > Source: Deploy from a branch > Branch `main`, folder `/ (root)`. Repo harus public untuk akun gratis.)
 
 ## Fitur yang sudah berfungsi
+
 - Halaman utama: project terakhir, tanggal edit, buka, hapus
 - Project baru: nama, rasio aspek, resolusi, FPS
 - Simpan manual (Ctrl+S), autosave 4 detik, indikator "Belum disimpan"
@@ -16,25 +18,32 @@ https://byhasstudio.github.io/apk-editing/
 - Preview canvas: play, pause, stop, volume, fullscreen, rasio aspek, waktu playback
 - Timeline multi-track (video, audio, gambar): geser, trim, split, duplikat, hapus, urutan layer, mute track, zoom, scroll, snap
 - Waveform pada clip audio
-- Panel properti clip: waktu mulai, durasi, waktu selesai, volume, posisi X/Y, scale, opacity, rotasi (langsung terlihat di preview)
+- Panel properti clip: waktu, durasi, volume, posisi X/Y, scale, opacity, rotasi
+- Keyframe animasi untuk posisi, scale, opacity, rotasi, volume, dengan kurva easing (linear, halus, ease in/out, overshoot, bounce, hold)
+- Teks / judul: font, ukuran, warna, outline, latar, rata teks
+- **Bentuk** (persegi, persegi membulat, lingkaran, segitiga, belah ketupat, bintang, hati): isi, garis, ukuran, bisa dianimasikan dengan keyframe
+- **Stiker emoji** di timeline
+- **Chroma key**: hapus warna latar (green screen) dengan toleransi, kehalusan tepi, dan pipet warna dari preview (Chrome/Edge)
+- **Mask**: potong clip dengan bentuk, atur posisi, ukuran, tepi lembut, dan balik mask
+- Mode blend dan balik horizontal/vertikal
+- **Kecepatan** clip (10% sampai 800%) dan **putar mundur** untuk video
+- **Tools audio**: fade in, fade out, bisukan clip, dan **Pisah audio** dari clip video ke track audio
 - Undo/redo (hingga 100 langkah)
-- Shortcut: Space, Delete, Ctrl+Z, Ctrl+Y, Ctrl+S, Ctrl+D, S (split), K (keyframe semua), [ dan ] (loncat keyframe), panah kiri/kanan, Home, End
+- Shortcut: Space, Delete, Ctrl+Z, Ctrl+Y, Ctrl+S, Ctrl+D, S (split), T (teks), K (keyframe), [ dan ] (loncat keyframe), panah kiri/kanan, Home, End
 - Export video: pilih format (MP4 jika browser mendukung, selain itu WebM), resolusi, FPS, dan kualitas; audio ikut ter-mix. Berjalan real-time lewat MediaRecorder, jadi lamanya sama dengan durasi timeline dan tab harus tetap terlihat
+- Layout responsif: di layar kecil, preview tampil di atas dan area bawah berganti lewat tab Timeline / Media / Properti
 
-### Keyframe animasi (baru)
-- Properti yang bisa dianimasikan: posisi X/Y, scale, opacity, rotasi, volume
-- Tombol ◇ di samping tiap properti: tambah/hapus keyframe di playhead; tombol ◀ ▶ untuk loncat antar keyframe
-- Auto-keyframe: setelah properti beranimasi, mengubah nilainya di playhead otomatis membuat/mengubah keyframe
-- Penanda keyframe (diamond kuning) di clip pada timeline: klik untuk loncat ke waktunya, geser untuk memindah (ikut snap)
-- Kurva animasi per keyframe: Linear, Halus (Ease In-Out), Ease In, Ease Out, Overshoot, Bounce, Hold
-- Tombol "Semua" (K) untuk keyframe semua properti visual sekaligus, "Hapus di playhead", dan "Reset" animasi clip
-- Keyframe ikut terjaga saat split (nilai disambung di titik potong), duplikat, trim kiri, undo/redo, simpan, dan export
+## Catatan
 
-## Belum selesai
-Efek, transisi, filter, dan preset sengaja belum dibuat (tahap berikutnya). Export belum memakai FFmpeg, jadi dukungan MP4 bergantung pada browser (Chrome terbaru umumnya mendukung).
+- Putar mundur bekerja dengan loncat frame, jadi preview dan hasil export bisa terlihat kurang mulus; audio clip yang diputar mundur dibisukan.
+- Chroma key dan mask diproses di canvas perantara (maksimal 1280 px sisi terpanjang), jadi clip 4K akan sedikit turun ketajamannya saat memakai efek ini.
+- Tepi lembut mask memakai `ctx.filter`, yang belum didukung Safari.
+- Efek, transisi, filter, dan preset belum dibuat (tahap berikutnya). Export belum memakai FFmpeg, jadi dukungan MP4 bergantung pada browser (Chrome terbaru umumnya mendukung).
 
 ## Menjalankan lokal
+
 Buka `index.html` di browser, atau jalankan server lokal: `python3 -m http.server`.
 
 ## Teknologi
+
 HTML5, CSS3, JavaScript (tanpa build step), IndexedDB, Canvas 2D, Web Audio API, MediaRecorder.

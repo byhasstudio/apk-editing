@@ -5,24 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache">
 <title>APK EDITING</title>
-<link rel="stylesheet" href="css/style.css?v=8">
-<link rel="stylesheet" href="css/components.css?v=8">
-<link rel="stylesheet" href="css/home.css?v=8">
-<link rel="stylesheet" href="css/editor.css?v=8">
-<link rel="stylesheet" href="css/timeline.css?v=8">
-<link rel="stylesheet" href="css/keyframes.css?v=8">
-<link rel="stylesheet" href="css/features.css?v=8">
+<link rel="stylesheet" href="css/style.css?v=9">
+<link rel="stylesheet" href="css/components.css?v=9">
+<link rel="stylesheet" href="css/home.css?v=9">
+<link rel="stylesheet" href="css/editor.css?v=9">
+<link rel="stylesheet" href="css/timeline.css?v=9">
+<link rel="stylesheet" href="css/keyframes.css?v=9">
+<link rel="stylesheet" href="css/features.css?v=9">
+<link rel="stylesheet" href="css/mobile.css?v=9">
 </head>
 <body>
 <section id="home" class="view">
   <header class="home-head">
-    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO · v8 teks + speed + blend</small></div></div>
+    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO · v9 chroma + mask + bentuk + audio</small></div></div>
     <div class="actions"><button class="btn" id="btn-open">Buka Project</button><button class="btn primary" id="btn-new">Project Baru</button></div>
   </header>
   <main class="home-main"><h2>Project terakhir</h2><div id="project-list" class="project-grid"></div></main>
 </section>
 
-<section id="editor" class="view" hidden>
+<section id="editor" class="view" data-tab="timeline" hidden>
   <header class="top">
     <button class="btn" id="btn-back">Beranda</button>
     <button class="btn" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>↶</button><button class="btn" id="btn-redo" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>↷</button>
@@ -45,9 +46,13 @@
   <div class="panel timeline" id="panel-timeline"><div class="tl-bar">
     <button class="btn" id="tl-split" title="Split di playhead (S)">Split</button><button class="btn" id="tl-dup" title="Duplikat (Ctrl+D)">Duplikat</button><button class="btn danger" id="tl-del" title="Hapus (Delete)">Hapus</button>
     <button class="btn" id="tl-text" title="Tambah teks / judul di playhead (T)">T Teks</button>
+    <select id="tl-addshape" title="Tambah bentuk di playhead"><option value="">+ Bentuk</option></select>
+    <button class="btn" id="tl-sticker" title="Tambah stiker emoji di playhead">☺ Stiker</button>
+    <button class="btn" id="tl-ext" title="Pisahkan audio dari clip video terpilih">Pisah audio</button>
     <select id="tl-addtrack"><option value="">+ Track</option><option value="video">Video</option><option value="audio">Audio</option><option value="image">Gambar</option></select><span class="sp"></span>
     <button class="btn on" id="tl-snap">Snap</button><button class="btn" id="tl-zout" aria-label="Zoom out">−</button><button class="btn" id="tl-zin" aria-label="Zoom in">+</button></div>
     <div class="tl-scroll" id="tl-scroll"><div id="tl-content" class="tl-content"></div></div></div>
+  <nav class="mtabs" id="mtabs" aria-label="Panel editor"><button class="on" data-tab="timeline">Timeline</button><button data-tab="media">Media</button><button data-tab="props">Properti</button></nav>
 </section>
 
 <dialog id="dlg-new"><form method="dialog" id="form-new">
@@ -58,6 +63,11 @@
   <label>Frame rate<select name="fps"><option>24</option><option>25</option><option>30</option><option selected>60</option></select></label>
   <p class="meta" id="new-res"></p>
   <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Batal</button><button class="btn primary" value="ok">Buat</button></div>
+</form></dialog>
+<dialog id="dlg-sticker"><form method="dialog">
+  <h3>Stiker</h3>
+  <div id="stk-grid" class="stk-grid"></div>
+  <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Tutup</button></div>
 </form></dialog>
 <dialog id="dlg-export"><form method="dialog" id="form-export">
   <h3>Export video</h3>
@@ -77,18 +87,20 @@
 <input type="file" id="file-open" accept=".json,.apkedit" hidden>
 <div id="toast" class="toast" role="status"></div>
 
-<script src="js/db.js?v=8"></script>
-<script src="js/history.js?v=8"></script>
-<script src="js/keyframes.js?v=8"></script>
-<script src="js/text.js?v=8"></script>
-<script src="js/project.js?v=8"></script>
-<script src="js/media.js?v=8"></script>
-<script src="js/preview.js?v=8"></script>
-<script src="js/waveform.js?v=8"></script>
-<script src="js/properties.js?v=8"></script>
-<script src="js/timeline.js?v=8"></script>
-<script src="js/keyboard.js?v=8"></script>
-<script src="js/export.js?v=8"></script>
-<script src="js/app.js?v=8"></script>
+<script src="js/db.js?v=9"></script>
+<script src="js/history.js?v=9"></script>
+<script src="js/keyframes.js?v=9"></script>
+<script src="js/text.js?v=9"></script>
+<script src="js/shapes.js?v=9"></script>
+<script src="js/fx.js?v=9"></script>
+<script src="js/project.js?v=9"></script>
+<script src="js/media.js?v=9"></script>
+<script src="js/preview.js?v=9"></script>
+<script src="js/waveform.js?v=9"></script>
+<script src="js/properties.js?v=9"></script>
+<script src="js/timeline.js?v=9"></script>
+<script src="js/keyboard.js?v=9"></script>
+<script src="js/export.js?v=9"></script>
+<script src="js/app.js?v=9"></script>
 </body>
 </html>

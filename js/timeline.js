@@ -1,4 +1,4 @@
-/* Timeline: track, clip, move, trim, split, duplicate, delete, zoom, snap, layer, keyframe, drag & drop pintar, klip teks, kecepatan */
+/* Timeline: track, clip, move, trim, split, duplicate, delete, zoom, snap, layer, keyframe, drag & drop pintar, klip teks/bentuk/stiker, kecepatan, pisah audio */
 window.APK=window.APK||{};
 APK.timeline=(function(){
   const HEAD=132,MIN=0.1,LABEL={video:'Video',audio:'Audio',image:'Gambar'};
@@ -9,7 +9,7 @@ APK.timeline=(function(){
   const accepts=(tr,type)=>tr.kind==='audio'?type==='audio':tr.kind==='image'?type==='image':type!=='audio';
   const media=id=>P().media.find(m=>m.id===id);
   const spd=c=>c.speed||1;
-  const nameOf=(c,m)=>m?m.name:c.text?'T  '+String(c.text.content).split('\n')[0]:'(media hilang)';
+  const nameOf=(c,m)=>m?m.name:c.shape?'◆  '+APK.shapes.label(c.shape.type):c.text?(c.stk?'☺  ':'T  ')+String(c.text.content).split('\n')[0]:'(media hilang)';
   const mkTrack=kind=>({id:uid('t_'),kind,name:`${LABEL[kind]} ${P().tracks.filter(t=>t.kind===kind).length+1}`,muted:false,clips:[]});
   const free=(tr,s,d,ig)=>!tr.clips.some(x=>x.id!==ig&&s<x.start+x.dur-1e-6&&s+d>x.start+1e-6);
   function findClip(id){for(const tr of P().tracks){const c=tr.clips.find(c=>c.id===id);if(c)return{tr,c}}return null}
@@ -17,6 +17,8 @@ APK.timeline=(function(){
   function changed(){APK.project.markDirty();render();APK.preview.refresh()}
   const kfMarks=c=>APK.kf.times(c).filter(t=>t>=-1e-6&&t<=c.dur+1e-6).map(t=>`<em class="kfm" data-t="${t}" style="left:${t*pps}px" title="Keyframe ${t.toFixed(2)} dtk (geser untuk memindah)"></em>`).join('');
   const mkDrag=o=>{o.sl=$('tl-scroll').scrollLeft;return o};
+  /* salin objek bersarang (teks, bentuk, chroma, mask) supaya clip hasil duplikat/split tidak berbagi data */
+  const copyExtra=(n,c)=>{for(const k of ['text','shape','chroma','mask'])if(c[k])n[k]={...c[k]};return n};
 
   function load(){const p=P();if(!p.tracks.length)p.tracks=[mkTrack('video'),mkTrack('audio')];sel=null;render()}
   function setPlayhead(t){
@@ -32,7 +34,7 @@ APK.timeline=(function(){
     let ticks='';for(let s=0;s<=total;s+=step)ticks+=`<span class="tick" style="left:${s*pps}px">${APK.preview.fmt(s,true)}</span>`;
     const rows=p.tracks.map((tr,i)=>{
       const clips=tr.clips.map(c=>{const m=media(c.mediaId),nm=nameOf(c,m);
-        return `<div class="clip ${tr.kind}${c.text?' text':''}${c.id===sel?' sel':''}" data-id="${c.id}" style="left:${c.start*pps}px;width:${Math.max(3,c.dur*pps)}px" title="${esc(nm)}"><i class="h l"></i>${tr.kind==='audio'?`<canvas class="wf" data-c="${c.id}"></canvas>`:''}<span>${esc(nm)}</span>${kfMarks(c)}<i class="h r"></i></div>`}).join('');
+        return `<div class="clip ${tr.kind}${c.text?' text':''}${c.shape?' shape':''}${c.stk?' stk':''}${c.id===sel?' sel':''}" data-id="${c.id}" style="left:${c.start*pps}px;width:${Math.max(3,c.dur*pps)}px" title="${esc(nm)}"><i class="h l"></i>${tr.kind==='audio'?`<canvas class="wf" data-c="${c.id}"></canvas>`:''}<span>${esc(nm)}</span>${kfMarks(c)}<i class="h r"></i></div>`}).join('');
       return `<div class="tl-row"><div class="tl-head"><b title="${esc(tr.name)}">${esc(tr.name)}</b><span class="tl-btns">
         <button data-act="up" data-t="${tr.id}" title="Layer naik" ${i===0?'disabled':''}>▲</button>
         <button data-act="down" data-t="${tr.id}" title="Layer turun" ${i===p.tracks.length-1?'disabled':''}>▼</button>
@@ -151,7 +153,10 @@ APK.timeline=(function(){
       ns=Math.max(0,ns);
       let tr=f.tr;
       const lane=document.elementsFromPoint(e.clientX,e.clientY).find(el=>el.dataset&&el.dataset.lane);
-      if(lane){const cand=P().tracks.find(t=>t.id===lane.dataset.lane);if(cand&&accepts(cand,m?m.type:'video'))tr=cand}
+      if(lane){
+        const cand=P().tracks.find(t=>t.id===lane.dataset.lane),ty=f.tr.kind==='audio'?'audio':(m?m.type:'video');
+        if(cand&&accepts(cand,ty))tr=cand;
+      }
       /* pintar: kalau menabrak clip lain, menempel ke tepi terdekat (jika cukup dekat) */
       if(!free(tr,ns,c.dur,c.id)){
         let best=null;
@@ -305,23 +310,47 @@ APK.timeline=(function(){
     const c={id:uid('c_'),mediaId:mid,start,in:0,dur:m.type==='image'?5:m.duration,props:{x:0,y:0,scale:1,opacity:1,rotation:0,volume:1}};
     tr.clips.push(c);sel=c.id;changed();
   }
-  /* klip teks / judul di posisi playhead, selalu di layer paling atas */
-  function addText(){
+  /* klip overlay (teks, bentuk, stiker) di posisi playhead, selalu di layer paling atas */
+  function addOverlay(extra){
     const p=P();if(!p)return;
     APK.history.record();
     const t=APK.preview.time,dur=3,top=p.tracks[0];
     let tr=top&&top.kind==='video'&&free(top,t,dur,null)?top:null;
     if(!tr){tr=mkTrack('video');p.tracks.unshift(tr)}
-    const c={id:uid('c_'),mediaId:null,start:t,in:0,dur,props:{x:0,y:0,scale:1,opacity:1,rotation:0,volume:1},text:APK.text.make()};
+    const c=Object.assign({id:uid('c_'),mediaId:null,start:t,in:0,dur,props:{x:0,y:0,scale:1,opacity:1,rotation:0,volume:1}},extra);
     tr.clips.push(c);sel=c.id;changed();
+  }
+  const addText=()=>addOverlay({text:APK.text.make()});
+  const addShape=type=>addOverlay({shape:APK.shapes.make(type)});
+  const addSticker=emoji=>addOverlay({text:Object.assign(APK.text.make(),{content:emoji,size:220,bold:false}),stk:1});
+  /* pisahkan audio dari clip video: buat clip audio di track audio, lalu bisukan audio clip videonya */
+  function extractAudio(){
+    const f=sel&&findClip(sel);if(!f){tt('Pilih clip video dulu');return}
+    const c=f.c,m=media(c.mediaId);
+    if(!m||m.type!=='video'||f.tr.kind==='audio'){tt('Pilih clip video untuk dipisah audionya');return}
+    if(c.mute){tt('Audio clip ini sudah dipisah / dibisukan');return}
+    APK.history.record();
+    const p=P();
+    let tr=p.tracks.filter(t=>t.kind==='audio').find(t=>free(t,c.start,c.dur,null));
+    if(!tr){tr=mkTrack('audio');p.tracks.push(tr)}
+    const n={id:uid('c_'),mediaId:c.mediaId,start:c.start,in:c.in,dur:c.dur,props:{...c.props}};
+    if(c.speed)n.speed=c.speed;
+    if(c.fadeIn)n.fadeIn=c.fadeIn;
+    if(c.fadeOut)n.fadeOut=c.fadeOut;
+    if(c.kf&&c.kf.volume)n.kf={volume:APK.kf.clone(c.kf.volume)};
+    tr.clips.push(n);c.mute=true;sel=n.id;changed();
+    tt('Audio dipisah ke track audio');
   }
   function split(){
     const f=sel&&findClip(sel);if(!f){tt('Pilih clip dulu');return}
     const t=APK.preview.time,c=f.c;
     if(t<=c.start+MIN||t>=c.start+c.dur-MIN){tt('Taruh playhead di dalam clip');return}
     APK.history.record();
-    const d=t-c.start,n={...c,id:uid('c_'),props:{...c.props},start:t,in:c.in+d*spd(c),dur:c.dur-d};
-    if(c.text)n.text={...c.text};
+    const d=t-c.start,n=copyExtra({...c,id:uid('c_'),props:{...c.props},start:t,in:c.in+d*spd(c),dur:c.dur-d},c);
+    /* fade in tetap di potongan kiri, fade out pindah ke potongan kanan */
+    if(c.fadeOut){delete c.fadeOut}
+    if(c.fadeIn)delete n.fadeIn;
+    if(c.reverse){n.in=c.in;c.in=c.in+(c.dur-d)*spd(c)}
     if(c.kf){const sp=APK.kf.split(c,d);c.kf=sp.left;n.kf=sp.right}
     c.dur=d;f.tr.clips.push(n);sel=n.id;changed();
   }
@@ -330,8 +359,7 @@ APK.timeline=(function(){
     APK.history.record();
     const c=f.c;let s=c.start+c.dur;
     if(!free(f.tr,s,c.dur,null))s=f.tr.clips.reduce((a,x)=>Math.max(a,x.start+x.dur),0);
-    const n={...c,id:uid('c_'),props:{...c.props},start:s};
-    if(c.text)n.text={...c.text};
+    const n=copyExtra({...c,id:uid('c_'),props:{...c.props},start:s},c);
     if(c.kf)n.kf=APK.kf.clone(c.kf);
     f.tr.clips.push(n);sel=n.id;changed();
   }
@@ -371,10 +399,16 @@ APK.timeline=(function(){
     root.addEventListener('click',headClick);
     $('tl-scroll').addEventListener('wheel',e=>{if(e.ctrlKey){e.preventDefault();zoom(e.deltaY<0?1.15:1/1.15)}},{passive:false});
     $('tl-split').onclick=split;$('tl-dup').onclick=duplicate;$('tl-del').onclick=del;$('tl-text').onclick=addText;
+    $('tl-ext').onclick=extractAudio;
+    $('tl-addshape').innerHTML='<option value="">+ Bentuk</option>'+APK.shapes.TYPES.map(t=>`<option value="${t[0]}">${t[1]}</option>`).join('');
+    $('tl-addshape').onchange=e=>{if(e.target.value&&P())addShape(e.target.value);e.target.value=''};
+    $('stk-grid').innerHTML=APK.shapes.STICKERS.map(s=>`<button type="button" class="stk" data-e="${s}" aria-label="Stiker ${s}">${s}</button>`).join('');
+    $('stk-grid').onclick=e=>{const b=e.target.closest('[data-e]');if(!b||!P())return;addSticker(b.dataset.e);$('dlg-sticker').close()};
+    $('tl-sticker').onclick=()=>{if(P())$('dlg-sticker').showModal()};
     $('tl-zin').onclick=()=>zoom(1.25);$('tl-zout').onclick=()=>zoom(0.8);
     $('tl-snap').onclick=e=>{snapOn=!snapOn;e.currentTarget.classList.toggle('on',snapOn)};
     $('tl-addtrack').onchange=e=>{if(e.target.value&&P())addTrack(e.target.value);e.target.value=''};
     initDnD();
   }
-  return{init,load,render,setPlayhead,addMedia,addText,setSpeed,dropMedia,split,duplicate,del,restore,selectedClip,touch,setTiming,commit:changed,dragMedia:id=>{dragMid=id},get selected(){return sel}};
+  return{init,load,render,setPlayhead,addMedia,addText,addShape,addSticker,extractAudio,setSpeed,dropMedia,split,duplicate,del,restore,selectedClip,touch,setTiming,commit:changed,dragMedia:id=>{dragMid=id},get selected(){return sel}};
 })();

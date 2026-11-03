@@ -1,7 +1,13 @@
-/* Fitur tambahan: kontrol klip teks, blend, flip, warna klip teks */
+/* Fitur tambahan: kontrol klip teks, blend, flip, bentuk, stiker, chroma key, mask */
 #panel-props textarea{display:block;width:100%;box-sizing:border-box;margin-top:4px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 7px;font:inherit;resize:vertical}
 #panel-props input[type=color]{display:block;width:100%;height:30px;margin-top:4px;padding:0;background:var(--bg);border:1px solid var(--line);border-radius:6px;cursor:pointer}
 #panel-props label input[type=checkbox]{display:inline-block;width:auto;margin:0}
+#panel-props label input[type=range]{display:block;width:100%;margin-top:6px}
 .tx-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--dim)}
 #panel-props .tx-row label{display:flex;align-items:center;gap:6px;margin-top:0}
 .clip.text{background:#9c36b5}
+.clip.shape{background:#d6336c}
+.clip.stk{background:#e8590c}
+.stk-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.stk-grid button{font-size:26px;line-height:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 0;cursor:pointer}
+.stk-grid button:hover{border-color:var(--accent)}

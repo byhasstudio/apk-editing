@@ -24,6 +24,14 @@
   async function openProject(p){await P.open(p);renderEditor();show('editor')}
   async function goHome(){if(P.dirty)await P.save();P.close();show('home');renderHome()}
 
+  /* tab bawah untuk layar kecil: Timeline / Media / Properti */
+  $('mtabs').onclick=e=>{
+    const b=e.target.closest('[data-tab]');if(!b)return;
+    $('editor').dataset.tab=b.dataset.tab;
+    document.querySelectorAll('#mtabs button').forEach(x=>x.classList.toggle('on',x===b));
+    if(b.dataset.tab==='props')APK.properties.refresh(true);
+  };
+
   P.onChange((p,d)=>{const s=$('save-state');s.textContent=d?'Belum disimpan':'Tersimpan';s.classList.toggle('dirty',d)});
 
   function updateRes(){const f=new FormData($('form-new')),s=P.size(f.get('aspect'),f.get('quality'));$('new-res').textContent=`Resolusi: ${s.width}×${s.height}`}

@@ -1,4 +1,4 @@
-/* Sistem media: import, metadata, thumbnail, daftar media */
+/* Sistem media: import, metadata, thumbnail, daftar media, drag media ke timeline */
 window.APK=window.APK||{};
 APK.media=(function(){
   const TYPES={mp4:'video',mov:'video',webm:'video',mp3:'audio',wav:'audio',png:'image',jpg:'image',jpeg:'image',webp:'image'};
@@ -39,9 +39,9 @@ APK.media=(function(){
       return{duration,width:el.videoWidth,height:el.videoHeight,thumb:el.videoWidth?thumbFrom(el,el.videoWidth,el.videoHeight):null};
     }finally{URL.revokeObjectURL(url)}
   }
+  /* mengembalikan daftar id media yang berhasil diimpor (dipakai drop file langsung ke timeline) */
   async function importFiles(files,toast){
-    const P=APK.project;if(!P.current)return;
-    let ok=0;
+    const P=APK.project,ids=[];if(!P.current)return ids;
     for(const f of files){
       const type=kind(f);
       if(!type){toast(`${f.name}: format tidak didukung`);continue}
@@ -49,10 +49,11 @@ APK.media=(function(){
         const info=await probe(f,type),id='m_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
         await APK.db.putMedia({id,projectId:P.current.id,blob:f});
         P.current.media.push({id,name:f.name,type,size:f.size,mime:f.type,...info});
-        ok++;
+        ids.push(id);
       }catch(e){toast(`${f.name}: gagal diimpor (${e.message})`)}
     }
-    if(ok){P.markDirty();render();toast(`${ok} media diimpor`)}
+    if(ids.length){P.markDirty();render();toast(`${ids.length} media diimpor`)}
+    return ids;
   }
   async function remove(id){
     const P=APK.project;
@@ -71,20 +72,29 @@ APK.media=(function(){
     if(!p)return;
     if(!p.media.length){list.innerHTML='<p class="empty">Belum ada media. Klik Import atau seret file ke sini.</p>';return}
     const icon={audio:'♪',video:'▶',image:'▣'};
-    list.innerHTML=p.media.map(m=>`<div class="media-item" data-id="${m.id}">
-      <div class="m-thumb">${m.thumb?`<img src="${m.thumb}" alt="">`:`<span>${icon[m.type]}</span>`}</div>
+    list.innerHTML=p.media.map(m=>`<div class="media-item" data-id="${m.id}" draggable="true" title="Seret ke timeline atau preview">
+      <div class="m-thumb">${m.thumb?`<img src="${m.thumb}" alt="" draggable="false">`:`<span>${icon[m.type]}</span>`}</div>
       <div class="m-info"><b title="${esc(m.name)}">${esc(m.name)}</b><small>${m.type==='image'?`${m.width}×${m.height}`:fmtDur(m.duration)} · ${fmtSize(m.size)}</small></div>
       <button class="btn" data-add="${m.id}" title="Tambah ke timeline" aria-label="Tambah ke timeline">+</button><button class="btn danger" data-rm="${m.id}" aria-label="Hapus media">✕</button></div>`).join('');
   }
   function init(toast){
-    const panel=$('panel-media');
+    const panel=$('panel-media'),list=$('media-list');
     $('btn-import').onclick=()=>$('file-media').click();
     $('file-media').onchange=e=>{const fs=[...e.target.files];e.target.value='';importFiles(fs,toast)};
-    $('media-list').onclick=e=>{const b=e.target.closest('[data-rm]'),a=e.target.closest('[data-add]');if(b)remove(b.dataset.rm);else if(a)APK.timeline.addMedia(a.dataset.add)};
-    $('media-list').ondblclick=e=>{const i=e.target.closest('.media-item');if(i&&!e.target.closest('button'))APK.timeline.addMedia(i.dataset.id)};
-    panel.addEventListener('dragover',e=>{e.preventDefault();panel.classList.add('drop')});
+    list.onclick=e=>{const b=e.target.closest('[data-rm]'),a=e.target.closest('[data-add]');if(b)remove(b.dataset.rm);else if(a)APK.timeline.addMedia(a.dataset.add)};
+    list.ondblclick=e=>{const i=e.target.closest('.media-item');if(i&&!e.target.closest('button'))APK.timeline.addMedia(i.dataset.id)};
+    list.addEventListener('dragstart',e=>{
+      const i=e.target.closest&&e.target.closest('.media-item');if(!i)return;
+      e.dataTransfer.setData('application/x-apk-media',i.dataset.id);
+      e.dataTransfer.setData('text/plain',i.dataset.id);
+      e.dataTransfer.effectAllowed='copy';
+      APK.timeline.dragMedia(i.dataset.id);
+    });
+    list.addEventListener('dragend',()=>APK.timeline.dragMedia(null));
+    const hasFiles=e=>e.dataTransfer&&[...e.dataTransfer.types].includes('Files');
+    panel.addEventListener('dragover',e=>{if(!hasFiles(e))return;e.preventDefault();panel.classList.add('drop')});
     panel.addEventListener('dragleave',()=>panel.classList.remove('drop'));
-    panel.addEventListener('drop',e=>{e.preventDefault();panel.classList.remove('drop');importFiles([...e.dataTransfer.files],toast)});
+    panel.addEventListener('drop',e=>{if(!hasFiles(e))return;e.preventDefault();panel.classList.remove('drop');importFiles([...e.dataTransfer.files],toast)});
   }
   return{init,render,importFiles,remove,getUrl,releaseUrls};
 })();

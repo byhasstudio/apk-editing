@@ -1,8 +1,8 @@
-/* Timeline: track, clip, move, trim, split, duplicate, delete, zoom, snap, layer, penanda keyframe */
+/* Timeline: track, clip, move, trim, split, duplicate, delete, zoom, snap, layer, keyframe, drag & drop pintar */
 window.APK=window.APK||{};
 APK.timeline=(function(){
   const HEAD=132,MIN=0.1,LABEL={video:'Video',audio:'Audio',image:'Gambar'};
-  let pps=50,snapOn=true,sel=null,drag=null,tt=()=>{};
+  let pps=50,snapOn=true,sel=null,drag=null,dragMid=null,tt=()=>{};
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
   const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
@@ -14,6 +14,7 @@ APK.timeline=(function(){
   function endTime(){let d=0;for(const tr of P().tracks)for(const c of tr.clips)d=Math.max(d,c.start+c.dur);return d}
   function changed(){APK.project.markDirty();render();APK.preview.refresh()}
   const kfMarks=c=>APK.kf.times(c).filter(t=>t>=-1e-6&&t<=c.dur+1e-6).map(t=>`<em class="kfm" data-t="${t}" style="left:${t*pps}px" title="Keyframe ${t.toFixed(2)} dtk (geser untuk memindah)"></em>`).join('');
+  const mkDrag=o=>{o.sl=$('tl-scroll').scrollLeft;return o};
 
   function load(){const p=P();if(!p.tracks.length)p.tracks=[mkTrack('video'),mkTrack('audio')];sel=null;render()}
   function setPlayhead(t){
@@ -64,33 +65,74 @@ APK.timeline=(function(){
     for(const p of pts.concat([Math.round(v/g)*g])){const d=Math.abs(v-p);if(d<thr&&(!best||d<best.d))best={d,p}}
     return best;
   }
-  function seekTo(e){const r=$('tl-ruler').getBoundingClientRect();APK.preview.seek(Math.max(0,(e.clientX-r.left)/pps))}
+  /* snap khusus playhead: ke tepi clip dan keyframe (tanpa grid), tahan Alt untuk mematikan */
+  function snapPlay(t){
+    if(!snapOn)return t;
+    const thr=8/pps;let best=null;
+    for(const tr of P().tracks)for(const c of tr.clips){
+      for(const p of [c.start,c.start+c.dur].concat(APK.kf.times(c).map(k=>c.start+k))){
+        const d=Math.abs(t-p);if(d<thr&&(!best||d<best.d))best={d,p};
+      }
+    }
+    return best?best.p:t;
+  }
+  function snapSpan(ns,dur){
+    const pts=snapPts(null),b1=snapEdge(ns,pts),b2=snapEdge(ns+dur,pts);
+    if(b1&&(!b2||b1.d<=b2.d))ns=b1.p;else if(b2)ns=b2.p-dur;
+    return Math.max(0,ns);
+  }
+  function seekTo(e){
+    const r=$('tl-ruler').getBoundingClientRect();
+    let t=Math.max(0,(e.clientX-r.left)/pps);
+    if(!e.altKey)t=snapPlay(t);
+    APK.preview.seek(t);
+  }
+  function nearPlayhead(e){
+    const ph=$('tl-ph');if(!ph)return false;
+    const r=ph.getBoundingClientRect();
+    return Math.abs(e.clientX-(r.left+r.width/2))<=5;
+  }
+  function autoScroll(e){
+    const sc=$('tl-scroll'),r=sc.getBoundingClientRect();
+    if(e.clientX>r.right-40)sc.scrollLeft+=18;
+    else if(e.clientX<r.left+HEAD+30)sc.scrollLeft-=18;
+  }
 
   function down(e){
     if(e.button!==0||e.target.closest('.tl-head'))return;
     const root=$('tl-content'),ce=e.target.closest('.clip');
+    /* garis playhead bisa digeser langsung (kecuali di atas handle trim / penanda keyframe) */
+    if(!e.target.closest('.h')&&!e.target.closest('.kfm')&&nearPlayhead(e)){
+      drag=mkDrag({mode:'seek'});root.setPointerCapture(e.pointerId);seekTo(e);return;
+    }
     if(ce){
       const f=findClip(ce.dataset.id);if(!f)return;
       sel=f.c.id;
       const km=e.target.closest('.kfm');
       if(km){
         const from=parseFloat(km.dataset.t);
-        drag={mode:'kf',id:f.c.id,x0:e.clientX,from,kf0:APK.kf.clone(f.c.kf||{}),snap:APK.history.snapshot()};
+        drag=mkDrag({mode:'kf',id:f.c.id,x0:e.clientX,from,kf0:APK.kf.clone(f.c.kf||{}),snap:APK.history.snapshot()});
         root.setPointerCapture(e.pointerId);
         APK.preview.seek(f.c.start+from);render();return;
       }
-      drag={mode:e.target.classList.contains('l')?'trimL':e.target.classList.contains('r')?'trimR':'move',id:f.c.id,x0:e.clientX,o:{...f.c},kf0:f.c.kf?APK.kf.clone(f.c.kf):null,snap:APK.history.snapshot()};
+      drag=mkDrag({mode:e.target.classList.contains('l')?'trimL':e.target.classList.contains('r')?'trimR':'move',id:f.c.id,x0:e.clientX,o:{...f.c},kf0:f.c.kf?APK.kf.clone(f.c.kf):null,snap:APK.history.snapshot()});
       root.setPointerCapture(e.pointerId);render();return;
     }
-    if(e.target.closest('#tl-ruler')){drag={mode:'seek'};root.setPointerCapture(e.pointerId);seekTo(e);return}
+    if(e.target.closest('#tl-ruler')){drag=mkDrag({mode:'seek'});root.setPointerCapture(e.pointerId);seekTo(e);return}
     if(e.target.closest('.tl-lane')){sel=null;render()}
   }
   function move(e){
-    if(!drag)return;
+    if(!drag){
+      const root=$('tl-content');
+      root.style.cursor=(!e.target.closest('.tl-head')&&!e.target.closest('.h')&&!e.target.closest('.kfm')&&nearPlayhead(e))?'ew-resize':'';
+      return;
+    }
+    autoScroll(e);
     if(drag.mode==='seek'){seekTo(e);return}
+    const sx=$('tl-scroll').scrollLeft-(drag.sl||0);
     if(drag.mode==='kf'){
       const kf=findClip(drag.id);if(!kf)return;
-      let to=drag.from+(e.clientX-drag.x0)/pps;
+      let to=drag.from+(e.clientX-drag.x0+sx)/pps;
       const b=snapEdge(kf.c.start+to,[APK.preview.time,kf.c.start,kf.c.start+kf.c.dur]);
       if(b)to=b.p-kf.c.start;
       to=Math.min(Math.max(to,0),kf.c.dur);
@@ -99,7 +141,7 @@ APK.timeline=(function(){
       render();APK.preview.seek(kf.c.start+to);return;
     }
     const f=findClip(drag.id);if(!f)return;
-    const c=f.c,o=drag.o,m=media(c.mediaId),dx=(e.clientX-drag.x0)/pps,pts=snapPts(c.id);
+    const c=f.c,o=drag.o,m=media(c.mediaId),dx=(e.clientX-drag.x0+sx)/pps,pts=snapPts(c.id);
     if(drag.mode==='move'){
       let ns=Math.max(0,o.start+dx);
       const b1=snapEdge(ns,pts),b2=snapEdge(ns+c.dur,pts);
@@ -108,6 +150,16 @@ APK.timeline=(function(){
       let tr=f.tr;
       const lane=document.elementsFromPoint(e.clientX,e.clientY).find(el=>el.dataset&&el.dataset.lane);
       if(lane){const cand=P().tracks.find(t=>t.id===lane.dataset.lane);if(cand&&accepts(cand,m?m.type:'video'))tr=cand}
+      /* pintar: kalau menabrak clip lain, menempel ke tepi terdekat (jika cukup dekat) */
+      if(!free(tr,ns,c.dur,c.id)){
+        let best=null;
+        for(const x of tr.clips){
+          if(x.id===c.id)continue;
+          for(const cand of [x.start+x.dur,x.start-c.dur])
+            if(cand>=0&&free(tr,cand,c.dur,c.id)&&(best==null||Math.abs(cand-ns)<Math.abs(best-ns)))best=cand;
+        }
+        if(best!=null&&Math.abs(best-ns)<=40/pps)ns=best;
+      }
       if(free(tr,ns,c.dur,c.id)){
         if(tr!==f.tr){f.tr.clips=f.tr.clips.filter(x=>x!==c);tr.clips.push(c)}
         c.start=ns;drag.changed=true;render();
@@ -129,6 +181,89 @@ APK.timeline=(function(){
     }
   }
   function up(){if(drag&&drag.changed){APK.history.record(drag.snap);changed()}drag=null}
+
+  /* ===== Drag & drop media / file ke timeline dan preview ===== */
+  const timeAt=e=>{const r=$('tl-ruler');return r?Math.max(0,(e.clientX-r.getBoundingClientRect().left)/pps):0};
+  const laneAt=e=>{const l=document.elementsFromPoint(e.clientX,e.clientY).find(el=>el.dataset&&el.dataset.lane);return l?l.dataset.lane:null};
+  const durOf=m=>m.type==='image'?5:(m.duration||5);
+  const dragOk=e=>!!P()&&(!!dragMid||(!!e.dataTransfer&&[...e.dataTransfer.types].includes('Files')));
+  /* rencana penempatan: lane yang dituju, kalau bentrok/tidak cocok cari track lain yang kosong, kalau tidak ada buat track baru */
+  function plan(m,t,laneId){
+    const p=P(),dur=durOf(m),ns=Math.max(0,t);
+    const ok=tr=>accepts(tr,m.type)&&free(tr,ns,dur,null);
+    const lane=laneId&&p.tracks.find(x=>x.id===laneId);
+    let tr=lane&&ok(lane)?lane:null;
+    if(!tr){
+      const pref=p.tracks.filter(x=>x.kind===m.type),rest=p.tracks.filter(x=>x.kind!==m.type);
+      tr=pref.concat(rest).find(ok)||null;
+    }
+    return{tr,start:ns,dur,kind:m.type==='audio'?'audio':'video'};
+  }
+  function placeMedia(mid,t,laneId,quiet){
+    const p=P(),m=media(mid);if(!m)return null;
+    if(m.type!=='image'&&!(m.duration>0)){tt('Durasi media tidak terbaca');return null}
+    const pl=plan(m,t,laneId);
+    if(!quiet)APK.history.record();
+    let tr=pl.tr;
+    if(!tr){tr=mkTrack(pl.kind);pl.kind==='audio'?p.tracks.push(tr):p.tracks.unshift(tr)}
+    const c={id:uid('c_'),mediaId:mid,start:pl.start,in:0,dur:pl.dur,props:{x:0,y:0,scale:1,opacity:1,rotation:0,volume:1}};
+    tr.clips.push(c);sel=c.id;
+    return c;
+  }
+  function hideDrop(){const g=$('tl-drop');if(g)g.remove();$('tl-scroll').classList.remove('dropping')}
+  function showDrop(m,t,dur,laneId){
+    const root=$('tl-content');let g=$('tl-drop');
+    if(!g){g=document.createElement('div');g.id='tl-drop';root.appendChild(g)}
+    $('tl-scroll').classList.add('dropping');
+    const pl=m?plan(m,t,laneId):null;
+    let laneEl=null;
+    if(pl&&pl.tr)laneEl=root.querySelector(`[data-lane="${pl.tr.id}"]`);
+    else if(!m&&laneId)laneEl=root.querySelector(`[data-lane="${laneId}"]`);
+    let top,h;
+    if(laneEl){top=laneEl.offsetTop+4;h=laneEl.offsetHeight-8;g.className='';g.textContent=m?m.name:''}
+    else{
+      const lanes=root.querySelectorAll('.tl-lane[data-lane]'),last=lanes[lanes.length-1];
+      top=m&&m.type==='audio'&&last?last.offsetTop+last.offsetHeight:26;h=22;
+      g.className='new';g.textContent='+ Track baru';
+    }
+    g.style.cssText=`left:${HEAD+t*pps}px;top:${top}px;height:${h}px;width:${Math.max(24,dur*pps)}px`;
+  }
+  async function handleDrop(e,t,laneId){
+    const mid=e.dataTransfer.getData('application/x-apk-media')||dragMid;
+    if(mid){const c=placeMedia(mid,t,laneId);if(c)changed();return}
+    const files=[...e.dataTransfer.files];if(!files.length)return;
+    const ids=await APK.media.importFiles(files,tt);
+    if(!ids||!ids.length)return;
+    APK.history.record();
+    let cur=t,last=null;
+    for(const id of ids){const c=placeMedia(id,cur,laneId,true);if(c){last=c;cur=c.start+c.dur}}
+    if(last)changed();
+  }
+  function initDnD(){
+    const sc=$('tl-scroll'),pv=$('panel-preview');
+    sc.addEventListener('dragover',e=>{
+      if(!dragOk(e))return;
+      e.preventDefault();e.dataTransfer.dropEffect='copy';
+      const m=dragMid&&media(dragMid),dur=m?durOf(m):0;
+      showDrop(m,snapSpan(timeAt(e),dur),dur||2,laneAt(e));
+      autoScroll(e);
+    });
+    sc.addEventListener('dragleave',e=>{if(!sc.contains(e.relatedTarget))hideDrop()});
+    sc.addEventListener('drop',e=>{
+      if(!dragOk(e))return;
+      e.preventDefault();hideDrop();
+      const m=dragMid&&media(dragMid),dur=m?durOf(m):0;
+      handleDrop(e,snapSpan(timeAt(e),dur),laneAt(e));
+    });
+    pv.addEventListener('dragover',e=>{if(!dragOk(e))return;e.preventDefault();e.dataTransfer.dropEffect='copy';pv.classList.add('drop')});
+    pv.addEventListener('dragleave',e=>{if(!pv.contains(e.relatedTarget))pv.classList.remove('drop')});
+    pv.addEventListener('drop',e=>{
+      if(!dragOk(e))return;
+      e.preventDefault();pv.classList.remove('drop');
+      handleDrop(e,APK.preview.time,null);
+    });
+    addEventListener('dragend',()=>{dragMid=null;hideDrop()});
+  }
 
   /* operasi */
   function restore(s){P().tracks=JSON.parse(s);if(sel&&!findClip(sel))sel=null;APK.project.markDirty();render();APK.preview.refresh()}
@@ -213,6 +348,7 @@ APK.timeline=(function(){
     $('tl-zin').onclick=()=>zoom(1.25);$('tl-zout').onclick=()=>zoom(0.8);
     $('tl-snap').onclick=e=>{snapOn=!snapOn;e.currentTarget.classList.toggle('on',snapOn)};
     $('tl-addtrack').onchange=e=>{if(e.target.value&&P())addTrack(e.target.value);e.target.value=''};
+    initDnD();
   }
-  return{init,load,render,setPlayhead,addMedia,dropMedia,split,duplicate,del,restore,selectedClip,touch,setTiming,commit:changed,get selected(){return sel}};
+  return{init,load,render,setPlayhead,addMedia,dropMedia,split,duplicate,del,restore,selectedClip,touch,setTiming,commit:changed,dragMedia:id=>{dragMid=id},get selected(){return sel}};
 })();

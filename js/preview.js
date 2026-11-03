@@ -2,7 +2,7 @@
 window.APK=window.APK||{};
 APK.preview=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
-  let canvas,ctx,t=0,playing=false,base=0,t0=0,raf=0,vol=1,K=1;
+  let canvas,ctx,t=0,playing=false,base=0,t0=0,raf=0,vol=1,K=1,hook=null,onEnd=null;
   const els=new Map();
   const mediaOf=id=>P().media.find(m=>m.id===id);
   function fmt(s,short){s=Math.max(0,s);const m=Math.floor(s/60);
@@ -16,6 +16,7 @@ APK.preview=(function(){
     e={el,type:m.type,ready:false,gone:false};els.set(clip.id,e);
     if(m.type==='image')el.onload=()=>{e.ready=true;draw()};
     else{el.preload='auto';el.playsInline=true;el.onloadeddata=()=>{e.ready=true;draw()};el.onseeked=()=>{if(!playing)draw()}}
+    if(hook&&m.type!=='image')hook(el);
     APK.media.getUrl(m.id).then(u=>{if(u&&!e.gone)el.src=u});
     return e;
   }
@@ -78,7 +79,7 @@ APK.preview=(function(){
     if(!playing)return;
     t=base+(performance.now()-t0)/1000;
     const d=duration();
-    if(t>=d){t=d;pause();return}
+    if(t>=d){t=d;pause();if(onEnd)onEnd();return}
     draw();raf=requestAnimationFrame(loop);
   }
   function play(){
@@ -104,6 +105,8 @@ APK.preview=(function(){
     canvas.width=Math.round(p.width*K);canvas.height=Math.round(p.height*K);
     $('project-meta').textContent=`${p.width}×${p.height} · ${p.fps} fps · ${p.aspect}`;
   }
+  function beginExport(w,h,hk,cb){unload();hook=hk;onEnd=cb;K=w/P().width;canvas.width=w;canvas.height=h;draw()}
+  function endExport(){unload();hook=null;onEnd=null;resize();draw()}
   function init(){
     canvas=$('pv-canvas');ctx=canvas.getContext('2d');
     $('pv-play').onclick=toggle;$('pv-stop').onclick=stop;
@@ -113,6 +116,6 @@ APK.preview=(function(){
   }
   function load(){t=0;playing=false;$('pv-aspect').value=P().aspect;$('pv-play').textContent='▶';resize();draw()}
   function unload(){playing=false;cancelAnimationFrame(raf);for(const id of [...els.keys()])release(id)}
-  return{init,load,unload,refresh:draw,seek,play,pause,toggle,stop,fmt,
+  return{init,load,unload,beginExport,endExport,refresh:draw,seek,play,pause,toggle,stop,fmt,
     get time(){return t},get playing(){return playing},get duration(){return duration()}};
 })();

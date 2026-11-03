@@ -1,8 +1,8 @@
-/* Shortcut dasar; tidak aktif saat mengetik di input */
+/* Shortcut dasar; tidak aktif saat mengetik di input atau saat dialog terbuka */
 (function(){
   addEventListener('keydown',e=>{
     const P=APK.project.current;
-    if(!P||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable)return;
+    if(!P||document.querySelector('dialog[open]')||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable)return;
     const k=e.key,ctrl=e.ctrlKey||e.metaKey,pv=APK.preview;
     if(k===' '){e.preventDefault();if(e.target.blur)e.target.blur();pv.toggle()}
     else if(k==='Delete'){e.preventDefault();APK.timeline.del()}

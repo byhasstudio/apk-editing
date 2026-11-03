@@ -1,5 +1,6 @@
-/* Preset: simpan layer terpilih (beserta animasi keyframe, jalur gerak, vektor, teks, bentuk, parent) jadi file .apkpreset.json,
-   lalu masukkan lagi ke project mana pun. Hasil import adalah clip biasa di track baru, jadi bisa diedit seperti biasa.
+/* Preset: simpan semua layer project sekali klik (atau hanya yang dipilih bila memilih 2 clip atau lebih) jadi file .apkpreset.json,
+   berisi animasi keyframe, jalur gerak, vektor, teks, bentuk, dan hubungan parent.
+   Lalu masukkan lagi ke project mana pun. Hasil import adalah clip biasa di track baru, jadi bisa diedit seperti biasa.
    Format: {apkPreset:1, name, created, items:[{kind, tid, c:<clip dengan start relatif>}]}
    Clip yang memakai media (video/gambar/audio) tidak ikut karena file media tidak ada di dalam preset. */
 window.APK=window.APK||{};
@@ -48,15 +49,16 @@ APK.presets=(function(){
     return{tracks,ids:tracks.flatMap(t=>t.clips.map(c=>c.id)),name};
   }
 
+  /* tanpa seleksi banyak: ambil SEMUA clip non-media di project; kalau 2+ clip dipilih: hanya yang dipilih */
   function save(){
     const p=P();if(!p)return;
-    const ids=T().selectedIds();
-    if(!ids.length){toast('Pilih clip dulu (bisa banyak clip sekaligus)');return}
-    const first=T().selectedClip(),def=(first&&first.c.text&&String(first.c.text.content).split('\n')[0].slice(0,24))||'Preset saya';
-    const name=prompt('Nama preset:',def);
+    const sel=T().selectedIds(),all=sel.length<2,ids=all?p.tracks.flatMap(tr=>tr.clips.map(c=>c.id)):sel;
+    if(!ids.length){toast('Belum ada layer di project ini');return}
+    const first=p.tracks.flatMap(tr=>tr.clips).find(c=>ids.includes(c.id)&&c.text),def=(first&&String(first.text.content).split('\n')[0].slice(0,24))||'Preset saya';
+    const name=prompt('Nama preset ('+(all?'semua layer di project':sel.length+' layer terpilih')+'):',def);
     if(name===null)return;
     const r=pack(p,ids,name.trim()||def);
-    if(!r.o){toast('Preset tidak bisa berisi clip media. Pilih teks, bentuk, vektor, atau grup');return}
+    if(!r.o){toast('Tidak ada layer yang bisa disimpan. Preset hanya untuk teks, bentuk, vektor, dan grup (bukan video, gambar, audio)');return}
     const a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob([JSON.stringify(r.o)],{type:'application/json'}));
     a.download=(r.o.name.replace(/[^\w\- ]+/g,'').trim()||'preset')+'.apkpreset.json';
@@ -66,9 +68,9 @@ APK.presets=(function(){
   async function load(file){
     const p=P();if(!p||!file)return;
     let o;
-    try{o=JSON.parse(await file.text())}catch(_){toast('File preset tidak valid');return}
+    try{o=JSON.parse(await file.text())}catch(_){toast('File preset tidak valid: '+file.name);return}
     const r=unpack(o,APK.preview.time);
-    if(!r){toast('File ini bukan preset APK EDITING yang valid');return}
+    if(!r){toast('Bukan preset APK EDITING yang valid: '+file.name);return}
     APK.history.record();
     p.tracks.unshift(...r.tracks);
     T().select(r.ids[0]);
@@ -78,14 +80,14 @@ APK.presets=(function(){
   }
 
   function init(){
-    const bar=document.querySelector('.tl-bar'),after=$('tl-group');
-    if(!bar||!after)return;
+    const anchor=$('btn-mode');
+    if(!anchor)return;
     const mk=(id,txt,title,fn)=>{const b=document.createElement('button');b.className='btn';b.id=id;b.textContent=txt;b.title=title;b.onclick=fn;return b};
-    const b1=mk('tl-preset-save','⬇ Simpan preset','Simpan clip terpilih (dengan animasinya) menjadi file preset',save);
-    const b2=mk('tl-preset-open','⬆ Buka preset','Masukkan file preset ke timeline di posisi playhead (hasilnya bisa diedit)',()=>$('file-preset').click());
-    after.after(b1,b2);
-    const f=document.createElement('input');f.type='file';f.id='file-preset';f.hidden=true;f.accept='.json,.apkpreset';
-    f.onchange=e=>{const fl=e.target.files[0];e.target.value='';load(fl)};
+    const b1=mk('btn-preset-save','⬇ Preset','Simpan SEMUA layer project jadi file preset sekali klik (pilih 2 clip atau lebih jika hanya ingin sebagian)',save);
+    const b2=mk('btn-preset-open','⬆ Preset','Buka file preset (bisa pilih beberapa file); layer masuk di posisi playhead dan bisa diedit',()=>$('file-preset').click());
+    anchor.before(b1,b2);
+    const f=document.createElement('input');f.type='file';f.id='file-preset';f.hidden=true;f.multiple=true;f.accept='.json,.apkpreset';
+    f.onchange=async e=>{const fl=[...e.target.files];e.target.value='';for(const x of fl)await load(x)};
     document.body.appendChild(f);
   }
   init();

@@ -1,6 +1,6 @@
 # APK EDITING
 
-Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v9** (sistem utama lengkap, ditambah keyframe, teks, bentuk, stiker, chroma key, mask, dan tools audio; layout responsif desktop dan ponsel).
+Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v10** (sistem inti ala Alight Motion / CapCut: gizmo, multi-select, salin-tempel, kunci layer, kurva bezier, gradien, bayangan). Efek, transisi, dan filter sengaja belum dibuat.
 
 ## Buka di web
 
@@ -12,33 +12,30 @@ https://byhasstudio.github.io/apk-editing/
 
 - Halaman utama: project terakhir, tanggal edit, buka, hapus
 - Project baru: nama, rasio aspek, resolusi, FPS
-- Simpan manual (Ctrl+S), autosave 4 detik, indikator "Belum disimpan"
-- Penyimpanan IndexedDB; simpan/buka project dari file `.apkedit.json`
-- Import media (MP4, MOV, WEBM, MP3, WAV, PNG, JPG, JPEG, WEBP) lewat tombol atau drag and drop, dengan thumbnail, durasi, dan ukuran file
-- Preview canvas: play, pause, stop, volume, fullscreen, rasio aspek, waktu playback
-- Timeline multi-track (video, audio, gambar): geser, trim, split, duplikat, hapus, urutan layer, mute track, zoom, scroll, snap
-- Waveform pada clip audio
-- Panel properti clip: waktu, durasi, volume, posisi X/Y, scale, opacity, rotasi
-- Keyframe animasi untuk posisi, scale, opacity, rotasi, volume, dengan kurva easing (linear, halus, ease in/out, overshoot, bounce, hold)
-- Teks / judul: font, ukuran, warna, outline, latar, rata teks
-- **Bentuk** (persegi, persegi membulat, lingkaran, segitiga, belah ketupat, bintang, hati): isi, garis, ukuran, bisa dianimasikan dengan keyframe
-- **Stiker emoji** di timeline
-- **Chroma key**: hapus warna latar (green screen) dengan toleransi, kehalusan tepi, dan pipet warna dari preview (Chrome/Edge)
-- **Mask**: potong clip dengan bentuk, atur posisi, ukuran, tepi lembut, dan balik mask
-- Mode blend dan balik horizontal/vertikal
-- **Kecepatan** clip (10% sampai 800%) dan **putar mundur** untuk video
-- **Tools audio**: fade in, fade out, bisukan clip, dan **Pisah audio** dari clip video ke track audio
+- Simpan manual (Ctrl+S), autosave 4 detik; penyimpanan IndexedDB; simpan/buka file `.apkedit.json`
+- Import media (MP4, MOV, WEBM, MP3, WAV, PNG, JPG, JPEG, WEBP) lewat tombol atau drag and drop
+- Preview canvas: play, pause, stop, volume, fullscreen, rasio aspek
+- Timeline multi-track: geser, trim, split, duplikat, hapus, urutan layer, mute, zoom, snap, waveform
+- Teks, bentuk, dan stiker; chroma key, mask, blend, flip, kecepatan, putar mundur, fade audio
+- Keyframe animasi (x, y, scale, opacity, rotasi, volume) dengan easing bawaan
 - Undo/redo (hingga 100 langkah)
-- Shortcut: Space, Delete, Ctrl+Z, Ctrl+Y, Ctrl+S, Ctrl+D, S (split), T (teks), K (keyframe), [ dan ] (loncat keyframe), panah kiri/kanan, Home, End
-- Export video: pilih format (MP4 jika browser mendukung, selain itu WebM), resolusi, FPS, dan kualitas; audio ikut ter-mix. Berjalan real-time lewat MediaRecorder, jadi lamanya sama dengan durasi timeline dan tab harus tetap terlihat
-- Layout responsif: di layar kecil, preview tampil di atas dan area bawah berganti lewat tab Timeline / Media / Properti
+- Export video (MP4 jika didukung browser, selain itu WebM) dengan audio ter-mix
 
-## Catatan
+### Baru di v10
 
-- Putar mundur bekerja dengan loncat frame, jadi preview dan hasil export bisa terlihat kurang mulus; audio clip yang diputar mundur dibisukan.
-- Chroma key dan mask diproses di canvas perantara (maksimal 1280 px sisi terpanjang), jadi clip 4K akan sedikit turun ketajamannya saat memakai efek ini.
-- Tepi lembut mask memakai `ctx.filter`, yang belum didukung Safari.
-- Efek, transisi, filter, dan preset belum dibuat (tahap berikutnya). Export belum memakai FFmpeg, jadi dukungan MP4 bergantung pada browser (Chrome terbaru umumnya mendukung).
+- **Gizmo di preview**: klik objek lalu geser, tarik sudut untuk scale, tarik titik bulat untuk memutar (Shift = kelipatan 15°, Alt = matikan snap ke tengah)
+- **Multi-select**: Shift/Ctrl + klik, atau tombol Pilih banyak di ponsel; geser, duplikat, hapus, dan split banyak clip sekaligus; Ctrl+A pilih semua
+- **Salin / Potong / Tempel** (Ctrl+C / X / V atau tombol) di posisi playhead
+- **Kunci dan sembunyikan layer** per track (ikon gembok dan mata)
+- **Graph editor** kurva bezier kustom untuk easing keyframe
+- **Gradien warna, bayangan, dan stroke** untuk teks dan bentuk
+- **Mode Sederhana / Lanjutan** (tombol di atas) untuk menyembunyikan fitur rumit
+- **Tooltip** di semua tombol dan **tutorial singkat** saat pertama membuka editor (tombol ? untuk membuka lagi)
+- **Export PNG**: simpan frame di posisi playhead (resolusi mengikuti preview, maks. 1280 px sisi terpanjang)
+
+## Rencana berikutnya
+
+Motion path, parent / grup layer, pen tool (vektor), export GIF dan hanya audio, lalu efek dan transisi.
 
 ## Menjalankan lokal
 

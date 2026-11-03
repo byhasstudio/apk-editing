@@ -1,0 +1,15 @@
+/* Keyframe: kontrol di panel properti dan penanda di timeline */
+.pr-f{margin-top:10px;font-size:12px;color:var(--dim)}
+.pr-lab{display:flex;justify-content:space-between;align-items:center}
+.kf-ctl{display:flex;gap:2px}
+.kf-ctl button{background:none;border:0;color:var(--dim);cursor:pointer;padding:0 4px;font-size:13px;line-height:1}
+.kf-ctl button:hover{color:var(--text)}
+.kf-ctl .kf-d.anim,.kf-ctl .kf-d.on{color:var(--accent)}
+.kf-title{margin-top:16px}
+.kf-bar{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.kf-bar .btn{padding:3px 8px;font-size:12px}
+.kf-hint{margin-top:8px;font-size:11px;color:var(--dim);line-height:1.4}
+#panel-props select{display:block;width:100%;margin-top:4px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 7px;font:inherit}
+#panel-props select:disabled{opacity:.5}
+.clip .kfm{position:absolute;bottom:3px;width:8px;height:8px;margin-left:-4px;background:#ffd24a;border:1px solid rgba(0,0,0,.55);transform:rotate(45deg);cursor:ew-resize;z-index:3;font-style:normal}
+.clip .kfm:hover{background:#fff}

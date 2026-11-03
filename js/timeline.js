@@ -1,4 +1,4 @@
-/* Timeline: track, clip, move, trim, split, duplicate, delete, zoom, snap, layer */
+/* Timeline: track, clip, move, trim, split, duplicate, delete, zoom, snap, layer, penanda keyframe */
 window.APK=window.APK||{};
 APK.timeline=(function(){
   const HEAD=132,MIN=0.1,LABEL={video:'Video',audio:'Audio',image:'Gambar'};
@@ -13,6 +13,7 @@ APK.timeline=(function(){
   function findClip(id){for(const tr of P().tracks){const c=tr.clips.find(c=>c.id===id);if(c)return{tr,c}}return null}
   function endTime(){let d=0;for(const tr of P().tracks)for(const c of tr.clips)d=Math.max(d,c.start+c.dur);return d}
   function changed(){APK.project.markDirty();render();APK.preview.refresh()}
+  const kfMarks=c=>APK.kf.times(c).filter(t=>t>=-1e-6&&t<=c.dur+1e-6).map(t=>`<em class="kfm" data-t="${t}" style="left:${t*pps}px" title="Keyframe ${t.toFixed(2)} dtk (geser untuk memindah)"></em>`).join('');
 
   function load(){const p=P();if(!p.tracks.length)p.tracks=[mkTrack('video'),mkTrack('audio')];sel=null;render()}
   function setPlayhead(t){
@@ -28,7 +29,7 @@ APK.timeline=(function(){
     let ticks='';for(let s=0;s<=total;s+=step)ticks+=`<span class="tick" style="left:${s*pps}px">${APK.preview.fmt(s,true)}</span>`;
     const rows=p.tracks.map((tr,i)=>{
       const clips=tr.clips.map(c=>{const m=media(c.mediaId);
-        return `<div class="clip ${tr.kind}${c.id===sel?' sel':''}" data-id="${c.id}" style="left:${c.start*pps}px;width:${Math.max(3,c.dur*pps)}px" title="${esc(m?m.name:'')}"><i class="h l"></i>${tr.kind==='audio'?`<canvas class="wf" data-c="${c.id}"></canvas>`:''}<span>${esc(m?m.name:'(media hilang)')}</span><i class="h r"></i></div>`}).join('');
+        return `<div class="clip ${tr.kind}${c.id===sel?' sel':''}" data-id="${c.id}" style="left:${c.start*pps}px;width:${Math.max(3,c.dur*pps)}px" title="${esc(m?m.name:'')}"><i class="h l"></i>${tr.kind==='audio'?`<canvas class="wf" data-c="${c.id}"></canvas>`:''}<span>${esc(m?m.name:'(media hilang)')}</span>${kfMarks(c)}<i class="h r"></i></div>`}).join('');
       return `<div class="tl-row"><div class="tl-head"><b title="${esc(tr.name)}">${esc(tr.name)}</b><span class="tl-btns">
         <button data-act="up" data-t="${tr.id}" title="Layer naik" ${i===0?'disabled':''}>▲</button>
         <button data-act="down" data-t="${tr.id}" title="Layer turun" ${i===p.tracks.length-1?'disabled':''}>▼</button>
@@ -71,7 +72,14 @@ APK.timeline=(function(){
     if(ce){
       const f=findClip(ce.dataset.id);if(!f)return;
       sel=f.c.id;
-      drag={mode:e.target.classList.contains('l')?'trimL':e.target.classList.contains('r')?'trimR':'move',id:f.c.id,x0:e.clientX,o:{...f.c},snap:APK.history.snapshot()};
+      const km=e.target.closest('.kfm');
+      if(km){
+        const from=parseFloat(km.dataset.t);
+        drag={mode:'kf',id:f.c.id,x0:e.clientX,from,kf0:APK.kf.clone(f.c.kf||{}),snap:APK.history.snapshot()};
+        root.setPointerCapture(e.pointerId);
+        APK.preview.seek(f.c.start+from);render();return;
+      }
+      drag={mode:e.target.classList.contains('l')?'trimL':e.target.classList.contains('r')?'trimR':'move',id:f.c.id,x0:e.clientX,o:{...f.c},kf0:f.c.kf?APK.kf.clone(f.c.kf):null,snap:APK.history.snapshot()};
       root.setPointerCapture(e.pointerId);render();return;
     }
     if(e.target.closest('#tl-ruler')){drag={mode:'seek'};root.setPointerCapture(e.pointerId);seekTo(e);return}
@@ -80,6 +88,16 @@ APK.timeline=(function(){
   function move(e){
     if(!drag)return;
     if(drag.mode==='seek'){seekTo(e);return}
+    if(drag.mode==='kf'){
+      const kf=findClip(drag.id);if(!kf)return;
+      let to=drag.from+(e.clientX-drag.x0)/pps;
+      const b=snapEdge(kf.c.start+to,[APK.preview.time,kf.c.start,kf.c.start+kf.c.dur]);
+      if(b)to=b.p-kf.c.start;
+      to=Math.min(Math.max(to,0),kf.c.dur);
+      APK.kf.move(kf.c,drag.kf0,drag.from,to);
+      drag.changed=Math.abs(to-drag.from)>1e-4;
+      render();APK.preview.seek(kf.c.start+to);return;
+    }
     const f=findClip(drag.id);if(!f)return;
     const c=f.c,o=drag.o,m=media(c.mediaId),dx=(e.clientX-drag.x0)/pps,pts=snapPts(c.id);
     if(drag.mode==='move'){
@@ -99,7 +117,9 @@ APK.timeline=(function(){
       let prevEnd=0;for(const x of f.tr.clips)if(x.id!==c.id&&x.start<o.start+1e-6)prevEnd=Math.max(prevEnd,x.start+x.dur);
       const lo=Math.max(prevEnd,m&&m.type!=='image'?o.start-o.in:0);
       ns=Math.min(Math.max(ns,lo),o.start+o.dur-MIN);
-      c.start=ns;c.in=o.in+(ns-o.start);c.dur=o.dur-(ns-o.start);drag.changed=true;render();
+      c.start=ns;c.in=o.in+(ns-o.start);c.dur=o.dur-(ns-o.start);
+      if(drag.kf0)c.kf=APK.kf.shift(drag.kf0,-(ns-o.start));
+      drag.changed=true;render();
     }else{
       let ne=o.start+o.dur+dx;const b=snapEdge(ne,pts);if(b)ne=b.p;
       let hi=Infinity;for(const x of f.tr.clips)if(x.id!==c.id&&x.start>=o.start+o.dur-1e-6)hi=Math.min(hi,x.start);
@@ -142,6 +162,7 @@ APK.timeline=(function(){
     if(t<=c.start+MIN||t>=c.start+c.dur-MIN){tt('Taruh playhead di dalam clip');return}
     APK.history.record();
     const d=t-c.start,n={...c,id:uid('c_'),props:{...c.props},start:t,in:c.in+d,dur:c.dur-d};
+    if(c.kf){const sp=APK.kf.split(c,d);c.kf=sp.left;n.kf=sp.right}
     c.dur=d;f.tr.clips.push(n);sel=n.id;changed();
   }
   function duplicate(){
@@ -150,6 +171,7 @@ APK.timeline=(function(){
     const c=f.c;let s=c.start+c.dur;
     if(!free(f.tr,s,c.dur,null))s=f.tr.clips.reduce((a,x)=>Math.max(a,x.start+x.dur),0);
     const n={...c,id:uid('c_'),props:{...c.props},start:s};
+    if(c.kf)n.kf=APK.kf.clone(c.kf);
     f.tr.clips.push(n);sel=n.id;changed();
   }
   function del(){
@@ -192,5 +214,5 @@ APK.timeline=(function(){
     $('tl-snap').onclick=e=>{snapOn=!snapOn;e.currentTarget.classList.toggle('on',snapOn)};
     $('tl-addtrack').onchange=e=>{if(e.target.value&&P())addTrack(e.target.value);e.target.value=''};
   }
-  return{init,load,render,setPlayhead,addMedia,dropMedia,split,duplicate,del,restore,selectedClip,touch,setTiming,get selected(){return sel}};
+  return{init,load,render,setPlayhead,addMedia,dropMedia,split,duplicate,del,restore,selectedClip,touch,setTiming,commit:changed,get selected(){return sel}};
 })();

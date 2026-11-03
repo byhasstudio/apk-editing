@@ -3,18 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache">
 <title>APK EDITING</title>
-<link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/components.css">
-<link rel="stylesheet" href="css/home.css">
-<link rel="stylesheet" href="css/editor.css">
-<link rel="stylesheet" href="css/timeline.css">
-<link rel="stylesheet" href="css/keyframes.css">
+<link rel="stylesheet" href="css/style.css?v=6">
+<link rel="stylesheet" href="css/components.css?v=6">
+<link rel="stylesheet" href="css/home.css?v=6">
+<link rel="stylesheet" href="css/editor.css?v=6">
+<link rel="stylesheet" href="css/timeline.css?v=6">
+<link rel="stylesheet" href="css/keyframes.css?v=6">
 </head>
 <body>
 <section id="home" class="view">
   <header class="home-head">
-    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO</small></div></div>
+    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO · v6 keyframe</small></div></div>
     <div class="actions"><button class="btn" id="btn-open">Buka Project</button><button class="btn primary" id="btn-new">Project Baru</button></div>
   </header>
   <main class="home-main"><h2>Project terakhir</h2><div id="project-list" class="project-grid"></div></main>
@@ -38,7 +39,7 @@
     <label class="meta">Vol <input type="range" id="pv-vol" min="0" max="1" step="0.05" value="1"></label>
     <select id="pv-aspect" title="Rasio aspek"><option>16:9</option><option>9:16</option><option>1:1</option><option>4:3</option><option>21:9</option></select>
     <button class="btn" id="pv-full" title="Layar penuh">⛶</button></div></div>
-    <aside class="panel" id="panel-props"><h3>Properti</h3><p class="empty">Pilih clip di timeline untuk melihat properti.</p></aside>
+    <aside class="panel" id="panel-props"><h3>Properti</h3><p class="empty">Pilih clip di timeline untuk melihat properti dan keyframe animasi.</p></aside>
   </div>
   <div class="panel timeline" id="panel-timeline"><div class="tl-bar">
     <button class="btn" id="tl-split" title="Split di playhead (S)">Split</button><button class="btn" id="tl-dup" title="Duplikat (Ctrl+D)">Duplikat</button><button class="btn danger" id="tl-del" title="Hapus (Delete)">Hapus</button>
@@ -74,17 +75,17 @@
 <input type="file" id="file-open" accept=".json,.apkedit" hidden>
 <div id="toast" class="toast" role="status"></div>
 
-<script src="js/db.js"></script>
-<script src="js/history.js"></script>
-<script src="js/keyframes.js"></script>
-<script src="js/project.js"></script>
-<script src="js/media.js"></script>
-<script src="js/preview.js"></script>
-<script src="js/waveform.js"></script>
-<script src="js/properties.js"></script>
-<script src="js/timeline.js"></script>
-<script src="js/keyboard.js"></script>
-<script src="js/export.js"></script>
-<script src="js/app.js"></script>
+<script src="js/db.js?v=6"></script>
+<script src="js/history.js?v=6"></script>
+<script src="js/keyframes.js?v=6"></script>
+<script src="js/project.js?v=6"></script>
+<script src="js/media.js?v=6"></script>
+<script src="js/preview.js?v=6"></script>
+<script src="js/waveform.js?v=6"></script>
+<script src="js/properties.js?v=6"></script>
+<script src="js/timeline.js?v=6"></script>
+<script src="js/keyboard.js?v=6"></script>
+<script src="js/export.js?v=6"></script>
+<script src="js/app.js?v=6"></script>
 </body>
 </html>

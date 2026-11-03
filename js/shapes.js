@@ -3,7 +3,8 @@ window.APK=window.APK||{};
 APK.shapes=(function(){
   const TYPES=[['rect','Persegi'],['rounded','Persegi membulat'],['ellipse','Lingkaran / elips'],['triangle','Segitiga'],['diamond','Belah ketupat'],['star','Bintang'],['heart','Hati']];
   const STICKERS=['😀','😂','🥰','😎','🤩','😭','😡','🤔','👍','👎','👏','🙏','🔥','⭐','❤️','💯','🎉','✨','👑','🌈','⚡','💥','🎵','🎬','📌','✅','❌','⚠️','➡️','⬅️','⬆️','⬇️','💬','🔔','📷','🎁'];
-  const DEF={type:'rect',w:400,h:400,fillOn:true,fill:'#ff6b6b',stroke:'#ffffff',strokeW:0,radius:60};
+  const DEF={type:'rect',w:400,h:400,fillOn:true,fill:'#ff6b6b',stroke:'#ffffff',strokeW:0,radius:60,
+    gradOn:false,fill2:'#4dabf7',gradAngle:90,shadowOn:false,shadowColor:'#000000',shadowBlur:16,shadowX:6,shadowY:6};
   const label=t=>(TYPES.find(x=>x[0]===t)||TYPES[0])[1];
   const make=type=>Object.assign({},DEF,{type:type||'rect'});
   /* path bentuk berpusat di (0,0) dengan lebar w dan tinggi h */
@@ -34,18 +35,28 @@ APK.shapes=(function(){
     else{ctx.rect(x,y,w,h)}
     ctx.closePath();
   }
-  /* gambar klip bentuk; pr = properti hasil keyframe (x, y, scale, opacity, rotation) */
+  /* gambar klip bentuk; pr = properti hasil keyframe. Mengembalikan ukuran kotak bentuk (sebelum scale). */
   function draw(ctx,c,pr,W,H){
-    const s=Object.assign({},DEF,c.shape);
+    const s=Object.assign({},DEF,c.shape),fx=APK.fx;
+    const m=ctx.getTransform(),K0=Math.hypot(m.a,m.b)||1;
     ctx.save();
     ctx.globalAlpha=Math.min(1,Math.max(0,pr.opacity));
     ctx.globalCompositeOperation=c.blend||'source-over';
     ctx.translate(W/2+pr.x,H/2+pr.y);ctx.rotate(pr.rotation*Math.PI/180);
-    const k=Math.max(0,pr.scale);ctx.scale(k*(c.flipX?-1:1),k*(c.flipY?-1:1));
+    const k=Math.max(0,pr.scale),kk=K0*k;ctx.scale(k*(c.flipX?-1:1),k*(c.flipY?-1:1));
     path(ctx,s.type,s.w,s.h,s.radius);
-    if(s.fillOn){ctx.fillStyle=s.fill;ctx.fill()}
-    if(s.strokeW>0){ctx.lineWidth=s.strokeW;ctx.strokeStyle=s.stroke;ctx.lineJoin='round';ctx.stroke()}
+    if(s.fillOn){
+      fx.shadow(ctx,s.shadowOn,s,kk);
+      ctx.fillStyle=s.gradOn?fx.grad(ctx,s.fill,s.fill2,s.gradAngle,s.w/2,s.h/2):s.fill;
+      ctx.fill();fx.shadow(ctx,false,s,kk);
+    }
+    if(s.strokeW>0){
+      fx.shadow(ctx,s.shadowOn&&!s.fillOn,s,kk);
+      ctx.lineWidth=s.strokeW;ctx.strokeStyle=s.stroke;ctx.lineJoin='round';ctx.stroke();
+      fx.shadow(ctx,false,s,kk);
+    }
     ctx.restore();
+    return{w:s.w,h:s.h};
   }
   return{TYPES,STICKERS,DEF,label,make,path,draw};
 })();

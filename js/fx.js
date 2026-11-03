@@ -1,4 +1,4 @@
-/* Efek klip: chroma key (hapus warna latar) dan mask bentuk, diproses di canvas perantara.
+/* Efek klip: chroma key (hapus warna latar), mask bentuk, serta bantuan gradien dan bayangan.
    Data per clip: clip.chroma = {on,color,sim,smooth} ; clip.mask = {on,type,x,y,w,h,feather,invert} (satuan persen) */
 window.APK=window.APK||{};
 APK.fx=(function(){
@@ -54,5 +54,17 @@ APK.fx=(function(){
     }catch(_){return null}
     return cv;
   }
-  return{DEF,process};
+  /* gradien linear dua warna untuk kotak berukuran 2*hw x 2*hh yang berpusat di (0,0); deg 0 = kiri ke kanan, 90 = atas ke bawah */
+  function grad(ctx,c1,c2,deg,hw,hh){
+    const a=deg*Math.PI/180,dx=Math.cos(a),dy=Math.sin(a),r=Math.abs(dx*hw)+Math.abs(dy*hh)||1;
+    const gr=ctx.createLinearGradient(-dx*r,-dy*r,dx*r,dy*r);
+    gr.addColorStop(0,c1);gr.addColorStop(1,c2);
+    return gr;
+  }
+  /* bayangan canvas tidak ikut transform, jadi ukurannya dikali k (skala canvas * skala objek) */
+  function shadow(ctx,on,o,k){
+    if(on){ctx.shadowColor=o.shadowColor;ctx.shadowBlur=o.shadowBlur*k;ctx.shadowOffsetX=o.shadowX*k;ctx.shadowOffsetY=o.shadowY*k}
+    else{ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetX=0;ctx.shadowOffsetY=0}
+  }
+  return{DEF,process,grad,shadow};
 })();

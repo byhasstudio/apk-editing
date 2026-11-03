@@ -1,4 +1,5 @@
-/* Panel properti clip: keyframe animasi, kecepatan, putar mundur, blend, flip, teks, bentuk, chroma key, mask, dan fade audio */
+/* Panel properti clip: keyframe animasi + grafik kurva bezier, kecepatan, putar mundur, blend, flip, teks, bentuk,
+   gradien dan bayangan, chroma key, mask, dan fade audio */
 window.APK=window.APK||{};
 APK.properties=(function(){
   const $=id=>document.getElementById(id),panel=$('panel-props');
@@ -11,40 +12,52 @@ APK.properties=(function(){
   /* atribut data-xx pada kontrol -> properti objek di clip, dan nilai bawaannya */
   const GROUP={tx:'text',sh:'shape',ck:'chroma',mk:'mask'},GK=Object.keys(GROUP);
   const DG={tx:()=>APK.text.DEF,sh:()=>APK.shapes.DEF,ck:()=>APK.fx.DEF.chroma,mk:()=>APK.fx.DEF.mask};
-  let shown=null,editing=false,spanRef=0;
+  const GPAD=14;
+  let shown=null,editing=false,spanRef=0,gd=null;
   const rnd=v=>Math.round(v*100)/100;
   const rel=s=>Math.min(Math.max(APK.preview.time-s.c.start,0),s.c.dur);
   const typeOf=s=>s.c.text?'text':s.c.shape?'shape':(s.tr&&s.tr.kind==='audio'?'audio':(s.m?s.m.type:'video'));
+  const keyOf=s=>s.c.id+(s.tr&&s.tr.locked?':L':'');
   const shapeOpts=()=>APK.shapes.TYPES.map(t=>`<option value="${t[0]}">${t[1]}</option>`).join('');
+  /* bagian gradien + bayangan, dipakai untuk teks (g=tx) dan bentuk (g=sh) */
+  const gs=(g,c2)=>`<div class="adv"><h3 class="kf-title">Gradien &amp; bayangan</h3>
+    <div class="tx-row"><label title="Warnai objek dengan dua warna yang memudar"><input type="checkbox" data-${g}="gradOn">Gradien warna</label></div>
+    <label>Warna kedua<input type="color" data-${g}="${c2}"></label>
+    <label>Arah gradien (°)<input type="range" data-${g}="gradAngle" min="0" max="360" step="1"></label>
+    <div class="tx-row"><label title="Tambah bayangan di belakang objek"><input type="checkbox" data-${g}="shadowOn">Bayangan</label></div>
+    <label>Warna bayangan<input type="color" data-${g}="shadowColor"></label>
+    <label>Blur bayangan<input type="range" data-${g}="shadowBlur" min="0" max="100" step="1"></label>
+    <label>Geser bayangan X<input type="range" data-${g}="shadowX" min="-100" max="100" step="1"></label>
+    <label>Geser bayangan Y<input type="range" data-${g}="shadowY" min="-100" max="100" step="1"></label></div>`;
 
   function build(s){
-    const type=typeOf(s),K=APK.kf,T=APK.text;
-    const rows=F.filter(f=>f[5].includes(type)).map(f=>`<div class="pr-f"><div class="pr-lab"><span>${f[1]}</span><span class="kf-ctl"><button type="button" data-kfgo="-1" data-kp="${f[0]}" title="Keyframe sebelumnya">◀</button><button type="button" class="kf-d" data-kf="${f[0]}" title="Tambah/hapus keyframe di playhead">◇</button><button type="button" data-kfgo="1" data-kp="${f[0]}" title="Keyframe berikutnya">▶</button></span></div><div class="pr-row"><input type="range" data-p="${f[0]}" min="${f[2]}" max="${f[3]}" step="1"><input type="number" data-p="${f[0]}" min="${f[2]}" max="${f[3]}" step="1"></div></div>`).join('');
-    const opts=Object.keys(K.EASE).map(k=>`<option value="${k}">${K.EASE[k].l}</option>`).join('');
-    const speed=type==='video'||type==='audio'?`<label>Kecepatan (%)<input type="number" data-sp="1" min="10" max="800" step="5"></label>`:'';
+    const type=typeOf(s),K=APK.kf,T=APK.text,locked=!!(s.tr&&s.tr.locked);
+    const rows=F.filter(f=>f[5].includes(type)).map(f=>`<div class="pr-f"><div class="pr-lab"><span>${f[1]}</span><span class="kf-ctl"><button type="button" data-kfgo="-1" data-kp="${f[0]}" title="Loncat ke keyframe sebelumnya">◀</button><button type="button" class="kf-d" data-kf="${f[0]}" title="Tambah / hapus keyframe di posisi playhead">◇</button><button type="button" data-kfgo="1" data-kp="${f[0]}" title="Loncat ke keyframe berikutnya">▶</button></span></div><div class="pr-row"><input type="range" data-p="${f[0]}" min="${f[2]}" max="${f[3]}" step="1"><input type="number" data-p="${f[0]}" min="${f[2]}" max="${f[3]}" step="1"></div></div>`).join('');
+    const opts=Object.keys(K.EASE).map(k=>`<option value="${k}">${K.EASE[k].l}</option>`).join('')+'<option value="custom">Kustom (grafik bezier)</option>';
+    const speed=type==='video'||type==='audio'?`<label title="100% = normal, 200% = 2x lebih cepat">Kecepatan (%)<input type="number" data-sp="1" min="10" max="800" step="5"></label>`:'';
     const rev=type==='video'?`<div class="tx-row"><label><input type="checkbox" data-cp="reverse">Putar mundur (audio dibisukan)</label></div>`:'';
     const aud=type==='video'||type==='audio'?`<h3 class="kf-title">Audio</h3>
-      <label>Fade in (detik)<input type="number" data-cp="fadeIn" min="0" step="0.1"></label>
-      <label>Fade out (detik)<input type="number" data-cp="fadeOut" min="0" step="0.1"></label>
+      <label title="Suara naik pelan di awal clip">Fade in (detik)<input type="number" data-cp="fadeIn" min="0" step="0.1"></label>
+      <label title="Suara turun pelan di akhir clip">Fade out (detik)<input type="number" data-cp="fadeOut" min="0" step="0.1"></label>
       <div class="tx-row"><label><input type="checkbox" data-cp="mute">Bisukan clip ini</label></div>`:'';
-    const vis=type!=='audio'?`<h3 class="kf-title">Tampilan</h3>
+    const vis=type!=='audio'?`<div class="adv"><h3 class="kf-title">Tampilan</h3>
       <label>Mode blend<select data-cp="blend">${BLEND.map(b=>`<option value="${b[0]}">${b[1]}</option>`).join('')}</select></label>
-      <div class="tx-row"><label><input type="checkbox" data-cp="flipX">Balik horizontal</label><label><input type="checkbox" data-cp="flipY">Balik vertikal</label></div>`:'';
+      <div class="tx-row"><label><input type="checkbox" data-cp="flipX">Balik horizontal</label><label><input type="checkbox" data-cp="flipY">Balik vertikal</label></div></div>`:'';
     const media=type==='video'||type==='image';
-    const chroma=media?`<h3 class="kf-title">Chroma key (hapus warna latar)</h3>
+    const chroma=media?`<div class="adv"><h3 class="kf-title">Chroma key (hapus warna latar)</h3>
       <div class="tx-row"><label><input type="checkbox" data-ck="on">Aktifkan</label></div>
       <label>Warna latar<input type="color" data-ck="color"></label>
       ${window.EyeDropper?'<button type="button" class="btn" data-pick="1" style="margin-top:8px">Ambil warna dari preview</button>':''}
-      <label>Toleransi (%)<input type="range" data-ck="sim" min="0" max="100" step="1"></label>
-      <label>Kehalusan tepi (%)<input type="range" data-ck="smooth" min="0" max="100" step="1"></label>`:'';
-    const mask=media?`<h3 class="kf-title">Mask (potong bentuk)</h3>
+      <label title="Makin besar, makin banyak warna yang mirip ikut dihapus">Toleransi (%)<input type="range" data-ck="sim" min="0" max="100" step="1"></label>
+      <label>Kehalusan tepi (%)<input type="range" data-ck="smooth" min="0" max="100" step="1"></label></div>`:'';
+    const mask=media?`<div class="adv"><h3 class="kf-title">Mask (potong bentuk)</h3>
       <div class="tx-row"><label><input type="checkbox" data-mk="on">Aktifkan</label><label><input type="checkbox" data-mk="invert">Balik mask</label></div>
       <label>Bentuk mask<select data-mk="type">${shapeOpts()}</select></label>
       <label>Posisi X (%)<input type="range" data-mk="x" min="-100" max="100" step="1"></label>
       <label>Posisi Y (%)<input type="range" data-mk="y" min="-100" max="100" step="1"></label>
       <label>Lebar (%)<input type="range" data-mk="w" min="1" max="200" step="1"></label>
       <label>Tinggi (%)<input type="range" data-mk="h" min="1" max="200" step="1"></label>
-      <label>Tepi lembut (%)<input type="range" data-mk="feather" min="0" max="100" step="1"></label>`:'';
+      <label>Tepi lembut (%)<input type="range" data-mk="feather" min="0" max="100" step="1"></label></div>`:'';
     const txt=type==='text'?`<h3 class="kf-title">Teks</h3>
       <label>Isi teks<textarea data-tx="content" rows="3"></textarea></label>
       <label>Font<select data-tx="font">${T.FONTS.map(f=>`<option value="${esc(f[1])}">${f[0]}</option>`).join('')}</select></label>
@@ -55,7 +68,7 @@ APK.properties=(function(){
       <label>Warna outline<input type="color" data-tx="stroke"></label>
       <label>Tebal outline (px)<input type="number" data-tx="strokeW" min="0" max="100" step="1"></label>
       <div class="tx-row"><label><input type="checkbox" data-tx="bgOn">Latar belakang</label></div>
-      <label>Warna latar<input type="color" data-tx="bg"></label>`:'';
+      <label>Warna latar<input type="color" data-tx="bg"></label>${gs('tx','color2')}`:'';
     const shp=type==='shape'?`<h3 class="kf-title">Bentuk</h3>
       <label>Jenis bentuk<select data-sh="type">${shapeOpts()}</select></label>
       <label>Lebar (px)<input type="number" data-sh="w" min="1" max="5000" step="1"></label>
@@ -64,16 +77,41 @@ APK.properties=(function(){
       <div class="tx-row"><label><input type="checkbox" data-sh="fillOn">Isi warna</label></div>
       <label>Warna isi<input type="color" data-sh="fill"></label>
       <label>Warna garis<input type="color" data-sh="stroke"></label>
-      <label>Tebal garis (px)<input type="number" data-sh="strokeW" min="0" max="200" step="1"></label>`:'';
+      <label>Tebal garis (px)<input type="number" data-sh="strokeW" min="0" max="200" step="1"></label>${gs('sh','fill2')}`:'';
     const name=type==='text'?(s.c.stk?'Stiker':'Klip teks'):type==='shape'?'Klip bentuk':(s.m?s.m.name:'(media hilang)');
-    panel.innerHTML=`<h3>Properti</h3><div class="pr-name" title="${esc(name)}">${esc(name)}</div>
+    panel.innerHTML=`<h3>Properti</h3><div class="pr-name" title="${esc(name)}">${esc(name)}</div>${locked?'<p class="lock-note">Layer ini terkunci. Klik ikon gembok di timeline untuk membuka kunci.</p>':''}
+      <fieldset${locked?' disabled':''}>
       <label>Waktu mulai (detik)<input type="number" data-t="start" min="0" step="0.01"></label>
       <label>Durasi (detik)<input type="number" data-t="dur" min="0.1" step="0.01"></label>
       <label>Waktu selesai (detik)<input type="number" data-end readonly></label>${speed}${rev}${aud}${txt}${shp}${vis}${chroma}${mask}
       <h3 class="kf-title">Keyframe animasi</h3>
       <div class="kf-bar"><button type="button" class="btn" data-kfall="add" title="Keyframe semua properti di playhead (K)">◆ Semua</button><button type="button" class="btn" data-kfall="del" title="Hapus keyframe di playhead">Hapus di playhead</button><button type="button" class="btn" data-kfall="clear" title="Hapus semua animasi clip ini">Reset</button></div>
-      <label>Kurva animasi (keyframe di playhead)<select id="kf-ease" disabled>${opts}</select></label>
-      <p class="kf-hint">Klik ◇ di samping properti untuk membuat keyframe di posisi playhead. Setelah properti beranimasi, mengubah nilainya otomatis membuat keyframe. Geser penanda kuning di clip untuk memindah waktunya. Pintasan: K (keyframe semua), [ dan ] (loncat keyframe).</p>${rows}`;
+      <div class="adv"><label>Kurva animasi (keyframe di playhead)<select id="kf-ease" disabled>${opts}</select></label>
+      <canvas id="kf-graph" class="kf-graph" width="220" height="160" title="Seret dua titik putih untuk membuat kurva sendiri"></canvas>
+      <p class="kf-hint">Seret dua titik putih untuk mengatur kecepatan gerak antar keyframe: kurva curam = cepat, mendatar = pelan.</p></div>
+      <p class="kf-hint">Klik ◇ di samping properti untuk membuat keyframe di posisi playhead. Setelah properti beranimasi, mengubah nilainya otomatis membuat keyframe. Geser penanda kuning di clip untuk memindah waktunya. Pintasan: K (keyframe semua), [ dan ] (loncat keyframe).</p>${rows}</fieldset>`;
+  }
+  const gx=(cv,x)=>GPAD+x*(cv.width-GPAD*2),gy=(cv,y)=>GPAD+(1-(y+0.5)/2)*(cv.height-GPAD*2);
+  const gix=(cv,px)=>(px-GPAD)/(cv.width-GPAD*2),giy=(cv,py)=>(1-(py-GPAD)/(cv.height-GPAD*2))*2-0.5;
+  function drawGraph(s){
+    const cv=$('kf-graph');if(!cv)return;
+    const g=cv.getContext('2d'),K=APK.kf,ez=K.easeAt(s.c,rel(s)),w=cv.width,h=cv.height;
+    g.clearRect(0,0,w,h);
+    g.strokeStyle='#2c313c';g.lineWidth=1;
+    g.strokeRect(gx(cv,0),gy(cv,1),gx(cv,1)-gx(cv,0),gy(cv,0)-gy(cv,1));
+    if(!ez){g.fillStyle='#8b93a3';g.font='12px system-ui,sans-serif';g.textAlign='center';g.fillText('Taruh playhead tepat di keyframe',w/2,h/2);return}
+    const f=K.easeFn(ez);
+    g.strokeStyle='#7f8cff';g.lineWidth=2;g.beginPath();
+    for(let i=0;i<=60;i++){const x=i/60,y=f(x);i?g.lineTo(gx(cv,x),gy(cv,y)):g.moveTo(gx(cv,x),gy(cv,y))}
+    g.stroke();
+    const bz=K.bezOf(ez);
+    if(bz){
+      g.strokeStyle='#8b93a3';g.lineWidth=1;g.beginPath();
+      g.moveTo(gx(cv,0),gy(cv,0));g.lineTo(gx(cv,bz[0]),gy(cv,bz[1]));
+      g.moveTo(gx(cv,1),gy(cv,1));g.lineTo(gx(cv,bz[2]),gy(cv,bz[3]));g.stroke();
+      g.fillStyle='#fff';
+      for(const[x,y] of [[bz[0],bz[1]],[bz[2],bz[3]]]){g.beginPath();g.arc(gx(cv,x),gy(cv,y),6,0,Math.PI*2);g.fill()}
+    }
   }
   function fill(s,force){
     const c=s.c,K=APK.kf,r=rel(s),pr=K.props(c,r);
@@ -102,23 +140,25 @@ APK.properties=(function(){
       b.textContent=on?'◆':'◇';b.classList.toggle('on',on);b.classList.toggle('anim',K.animated(c,p));
     });
     const se=$('kf-ease');
-    if(se&&document.activeElement!==se){const ez=K.easeAt(c,r);se.disabled=!ez;se.value=ez||'inout'}
+    if(se&&document.activeElement!==se){const ez=K.easeAt(c,r);se.disabled=!ez;se.value=ez?(String(ez).indexOf('bz:')===0?'custom':ez):'inout'}
+    drawGraph(s);
   }
   function refresh(force){
     const s=APK.timeline.selectedClip();
     if(!s){if(shown!==null){panel.innerHTML='<h3>Properti</h3><p class="empty">Pilih clip di timeline untuk melihat properti dan keyframe animasi.</p>';shown=null}return}
-    if(shown!==s.c.id){build(s);shown=s.c.id}
+    const k=keyOf(s);
+    if(shown!==k){build(s);shown=k}
     fill(s,force);
   }
   /* dipanggil tiap frame preview: nilai properti beranimasi ikut playhead */
   function tick(){
     if(shown===null)return;
     const s=APK.timeline.selectedClip();
-    if(!s||s.c.id!==shown||!APK.kf.animated(s.c))return;
+    if(!s||keyOf(s)!==shown||!APK.kf.animated(s.c))return;
     fill(s,false);
   }
   function addAll(){
-    const s=APK.timeline.selectedClip();if(!s)return;
+    const s=APK.timeline.selectedClip();if(!s||s.tr.locked)return;
     const K=APK.kf,r=rel(s),list=typeOf(s)==='audio'?['volume']:K.VISUAL;
     APK.history.record();
     list.forEach(p=>K.setKey(s.c,p,r,K.value(s.c,p,r)));
@@ -131,7 +171,7 @@ APK.properties=(function(){
   }
 
   panel.addEventListener('input',e=>{
-    const el=e.target,s=APK.timeline.selectedClip(),d=el.dataset;if(!s)return;
+    const el=e.target,s=APK.timeline.selectedClip(),d=el.dataset;if(!s||s.tr.locked)return;
     const g=GK.find(k=>k in d);
     if(g||d.cp){
       const num=el.type==='number'||el.type==='range';
@@ -169,7 +209,12 @@ APK.properties=(function(){
   panel.addEventListener('change',e=>{
     if(e.target.id==='kf-ease'){
       const s=APK.timeline.selectedClip();
-      if(s){APK.history.record();APK.kf.setEase(s.c,rel(s),e.target.value);APK.timeline.commit()}
+      if(s&&!s.tr.locked){
+        const K=APK.kf,r=rel(s);let v=e.target.value;
+        APK.history.record();
+        if(v==='custom')v=K.fmtBz(K.bezOf(K.easeAt(s.c,r))||[.45,0,.55,1]);
+        K.setEase(s.c,r,v);APK.timeline.commit();
+      }
       return;
     }
     editing=false;spanRef=0;
@@ -179,7 +224,7 @@ APK.properties=(function(){
   });
   panel.addEventListener('click',e=>{
     const b=e.target.closest('button'),s=APK.timeline.selectedClip();
-    if(!b||!s)return;
+    if(!b||!s||s.tr.locked)return;
     const K=APK.kf,c=s.c,r=rel(s);
     if(b.dataset.kf){
       const p=b.dataset.kf;APK.history.record();
@@ -198,5 +243,29 @@ APK.properties=(function(){
       }).catch(()=>{});
     }
   });
+  /* editor grafik kurva bezier */
+  panel.addEventListener('pointerdown',e=>{
+    if(e.target.id!=='kf-graph')return;
+    const s=APK.timeline.selectedClip();if(!s||s.tr.locked)return;
+    const K=APK.kf,ez=K.easeAt(s.c,rel(s)),bz=ez&&K.bezOf(ez);if(!bz)return;
+    const cv=e.target,r=cv.getBoundingClientRect(),k=cv.width/r.width,px=(e.clientX-r.left)*k,py=(e.clientY-r.top)*k;
+    let bi=-1,bd=18;
+    [[bz[0],bz[1]],[bz[2],bz[3]]].forEach((p,i)=>{const dd=Math.hypot(gx(cv,p[0])-px,gy(cv,p[1])-py);if(dd<bd){bd=dd;bi=i}});
+    if(bi<0)return;
+    gd={i:bi,bz:bz.slice(),moved:false};
+    cv.setPointerCapture(e.pointerId);e.preventDefault();
+  });
+  panel.addEventListener('pointermove',e=>{
+    if(!gd)return;
+    const s=APK.timeline.selectedClip(),cv=$('kf-graph');if(!s||!cv){gd=null;return}
+    const r=cv.getBoundingClientRect(),k=cv.width/r.width,px=(e.clientX-r.left)*k,py=(e.clientY-r.top)*k;
+    gd.bz[gd.i*2]=Math.min(1,Math.max(0,gix(cv,px)));
+    gd.bz[gd.i*2+1]=Math.min(1.5,Math.max(-0.5,giy(cv,py)));
+    if(!gd.moved){APK.history.record();gd.moved=true}
+    APK.kf.setEase(s.c,rel(s),APK.kf.fmtBz(gd.bz));
+    APK.timeline.touch();drawGraph(s);
+  });
+  const gend=()=>{if(!gd)return;gd=null;refresh(true)};
+  panel.addEventListener('pointerup',gend);panel.addEventListener('pointercancel',gend);
   return{refresh,tick,addAll,jump};
 })();

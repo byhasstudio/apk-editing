@@ -1,5 +1,5 @@
 /* Keyframe: animasi properti clip (x, y, scale, opacity, rotation, volume) dengan easing.
-   Data per clip: clip.kf = { x:[{t,v,e}], ... } ; t = detik relatif terhadap awal clip, e = nama easing */
+   Data per clip: clip.kf = { x:[{t,v,e}], ... } ; t = detik relatif terhadap awal clip, e = nama easing atau 'bz:x1,y1,x2,y2' (kurva bezier kustom) */
 window.APK=window.APK||{};
 APK.kf=(function(){
   const PROPS=['x','y','scale','opacity','rotation','volume'];
@@ -20,6 +20,34 @@ APK.kf=(function(){
     bounce:{l:'Bounce (memantul)',f:bounce},
     hold:{l:'Hold (tahan, lompat)',f:t=>t<1?0:1}
   };
+  /* kurva bezier kubik seperti CSS cubic-bezier(x1,y1,x2,y2) */
+  const bez=(x1,y1,x2,y2)=>{
+    const cx=3*x1,bx=3*(x2-x1)-cx,ax=1-cx-bx,cy=3*y1,by=3*(y2-y1)-cy,ay=1-cy-by;
+    const X=s=>((ax*s+bx)*s+cx)*s,Y=s=>((ay*s+by)*s+cy)*s,dX=s=>(3*ax*s+2*bx)*s+cx;
+    return t=>{
+      if(t<=0)return 0;if(t>=1)return 1;
+      let s=t;
+      for(let i=0;i<8;i++){const e=X(s)-t;if(Math.abs(e)<1e-5)return Y(s);const d=dX(s);if(Math.abs(d)<1e-6)break;s-=e/d}
+      let lo=0,hi=1;s=t;
+      for(let i=0;i<30;i++){const x=X(s);if(Math.abs(x-t)<1e-5)break;if(t>x)lo=s;else hi=s;s=(lo+hi)/2}
+      return Y(s);
+    };
+  };
+  const BZC=new Map();
+  const parseBz=e=>{if(typeof e!=='string'||e.slice(0,3)!=='bz:')return null;const a=e.slice(3).split(',').map(Number);return a.length===4&&a.every(isFinite)?a:null};
+  /* perkiraan bezier untuk easing bawaan, dipakai sebagai titik awal di editor grafik */
+  const APPROX={linear:[0,0,1,1],inout:[.45,0,.55,1],in:[.32,0,.67,0],out:[.33,1,.68,1],back:[.34,1.56,.64,1]};
+  const bezOf=e=>parseBz(e)||APPROX[e]||null;
+  const fmtBz=a=>'bz:'+a.map(v=>Math.round(v*1000)/1000).join(',');
+  function easeFn(e){
+    const a=parseBz(e);
+    if(a){
+      let f=BZC.get(e);
+      if(!f){if(BZC.size>200)BZC.clear();f=bez(a[0],a[1],a[2],a[3]);BZC.set(e,f)}
+      return f;
+    }
+    return(EASE[e]||EASE.linear).f;
+  }
   const eps=()=>{const p=APK.project.current;return Math.max(0.005,0.5/((p&&p.fps)||30))};
   const arr=(c,p)=>c.kf&&c.kf[p]&&c.kf[p].length?c.kf[p]:null;
   const find=(a,rel,e)=>a.findIndex(k=>Math.abs(k.t-rel)<=e);
@@ -31,7 +59,7 @@ APK.kf=(function(){
     if(rel<=a[0].t)return a[0].v;
     const L=a[a.length-1];if(rel>=L.t)return L.v;
     let i=0;while(i<a.length-2&&rel>=a[i+1].t)i++;
-    const k0=a[i],k1=a[i+1],u=(rel-k0.t)/(k1.t-k0.t),f=(EASE[k0.e]||EASE.linear).f;
+    const k0=a[i],k1=a[i+1],u=(rel-k0.t)/(k1.t-k0.t),f=easeFn(k0.e);
     return k0.v+(k1.v-k0.v)*f(u);
   }
   function props(c,rel){
@@ -111,5 +139,5 @@ APK.kf=(function(){
     }
     return{left:L,right:R};
   }
-  return{PROPS,VISUAL,DEF,EASE,value,props,animated,hasKey,setKey,delKey,delAt,clear,times,step,easeAt,setEase,move,shift,split,clone};
+  return{PROPS,VISUAL,DEF,EASE,easeFn,bezOf,fmtBz,value,props,animated,hasKey,setKey,delKey,delAt,clear,times,step,easeAt,setEase,move,shift,split,clone};
 })();

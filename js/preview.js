@@ -2,9 +2,11 @@
 window.APK=window.APK||{};
 APK.preview=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
-  let canvas,ctx,t=0,playing=false,base=0,t0=0,raf=0,vol=1,K=1,hook=null,onEnd=null;
-  const els=new Map();
+  let canvas,ctx,t=0,playing=false,base=0,t0=0,raf=0,vol=1,K=1,hook=null,onEnd=null,exporting=false;
+  const els=new Map(),bmap=new Map();
   const mediaOf=id=>P().media.find(m=>m.id===id);
+  /* kotak objek di koordinat project (dipakai gizmo untuk memilih dan memindah objek) */
+  const mark=(id,pr,W,H,w,h)=>bmap.set(id,{cx:W/2+pr.x,cy:H/2+pr.y,w,h,rot:pr.rotation});
   function fmt(s,short){s=Math.max(0,s);const m=Math.floor(s/60);
     return short?m+':'+String(Math.floor(s%60)).padStart(2,'0'):String(m).padStart(2,'0')+':'+(s%60).toFixed(2).padStart(5,'0')}
   function duration(){let d=0;if(!P())return 0;for(const tr of P().tracks)for(const c of tr.clips)d=Math.max(d,c.start+c.dur);return d}
@@ -28,6 +30,7 @@ APK.preview=(function(){
   }
   function frame(){
     const p=P(),W=p.width,H=p.height;
+    bmap.clear();
     ctx.setTransform(K,0,0,K,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
     ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
     const live=new Set();
@@ -35,6 +38,10 @@ APK.preview=(function(){
     for(const id of [...els.keys()])if(!live.has(id))release(id);
     for(let i=p.tracks.length-1;i>=0;i--){
       const tr=p.tracks[i];
+      if(tr.hidden){
+        for(const c of tr.clips){const e=els.get(c.id);if(e&&e.type!=='image'&&!e.el.paused)e.el.pause()}
+        continue;
+      }
       for(const c of tr.clips){
         const active=t>=c.start&&t<c.start+c.dur-1e-6;
         if(!active){
@@ -43,8 +50,14 @@ APK.preview=(function(){
             if(t<c.start-5||t>c.start+c.dur+5)release(c.id)}
           continue;
         }
-        if(c.text){APK.text.draw(ctx,c,APK.kf.props(c,t-c.start),W,H);continue}
-        if(c.shape){APK.shapes.draw(ctx,c,APK.kf.props(c,t-c.start),W,H);continue}
+        if(c.text){
+          const pr=APK.kf.props(c,t-c.start),sc=Math.max(0,pr.scale),b=APK.text.draw(ctx,c,pr,W,H);
+          mark(c.id,pr,W,H,b.w*sc,b.h*sc);continue;
+        }
+        if(c.shape){
+          const pr=APK.kf.props(c,t-c.start),sc=Math.max(0,pr.scale),b=APK.shapes.draw(ctx,c,pr,W,H);
+          mark(c.id,pr,W,H,b.w*sc,b.h*sc);continue;
+        }
         const e=getEl(c);if(!e||!e.ready)continue;
         const pr=APK.kf.props(c,t-c.start),sp=Math.min(16,Math.max(0.0625,c.speed||1)),
           rev=!!c.reverse&&e.type==='video'&&tr.kind!=='audio',
@@ -74,6 +87,7 @@ APK.preview=(function(){
         const w=e.type==='image'?e.el.naturalWidth:e.el.videoWidth,h=e.type==='image'?e.el.naturalHeight:e.el.videoHeight;
         if(!w||!h)continue;
         const s=Math.min(W/w,H/h)*Math.max(0,pr.scale),fxc=APK.fx.process(e.el,w,h,c);
+        mark(c.id,pr,W,H,w*s,h*s);
         ctx.save();
         ctx.globalAlpha=Math.min(1,Math.max(0,pr.opacity));
         ctx.globalCompositeOperation=c.blend||'source-over';
@@ -91,6 +105,7 @@ APK.preview=(function(){
     $('pv-time').textContent=fmt(t)+' / '+fmt(duration());
     APK.timeline.setPlayhead(t);
     if(APK.properties&&APK.properties.tick)APK.properties.tick();
+    if(APK.gizmo)APK.gizmo.draw();
   }
   function loop(){
     if(!playing)return;
@@ -122,8 +137,8 @@ APK.preview=(function(){
     canvas.width=Math.round(p.width*K);canvas.height=Math.round(p.height*K);
     $('project-meta').textContent=`${p.width}×${p.height} · ${p.fps} fps · ${p.aspect}`;
   }
-  function beginExport(w,h,hk,cb){unload();hook=hk;onEnd=cb;K=w/P().width;canvas.width=w;canvas.height=h;draw()}
-  function endExport(){unload();hook=null;onEnd=null;resize();draw()}
+  function beginExport(w,h,hk,cb){exporting=true;unload();hook=hk;onEnd=cb;K=w/P().width;canvas.width=w;canvas.height=h;draw()}
+  function endExport(){exporting=false;unload();hook=null;onEnd=null;resize();draw()}
   function init(){
     canvas=$('pv-canvas');ctx=canvas.getContext('2d');
     $('pv-play').onclick=toggle;$('pv-stop').onclick=stop;
@@ -133,6 +148,6 @@ APK.preview=(function(){
   }
   function load(){t=0;playing=false;$('pv-aspect').value=P().aspect;$('pv-play').textContent='▶';resize();draw()}
   function unload(){playing=false;cancelAnimationFrame(raf);for(const id of [...els.keys()])release(id)}
-  return{init,load,unload,beginExport,endExport,refresh:draw,seek,play,pause,toggle,stop,fmt,
-    get time(){return t},get playing(){return playing},get duration(){return duration()}};
+  return{init,load,unload,beginExport,endExport,refresh:draw,seek,play,pause,toggle,stop,fmt,bounds:id=>bmap.get(id),
+    get exporting(){return exporting},get time(){return t},get playing(){return playing},get duration(){return duration()}};
 })();

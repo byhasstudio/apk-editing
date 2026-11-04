@@ -84,8 +84,8 @@ APK.fxclip=(function(){
      Pola kekuatan sepanjang clip (supaya tidak kaget): DIAM sebentar di awal, lalu NAIK PELAN sampai puncak, lalu MEREDA sampai akhir clip.
      "Awal pelan" mengatur panjang bagian diam dan naik (0 = langsung kuat di awal clip, seperti versi lama; 100 = diam 15% dan naik 45% dari panjang clip).
      "Peredam" mengatur seberapa kuat gelombang mereda setelah puncak sampai akhir clip (0 = tetap kuat sampai akhir).
-     Semuanya mengikuti PANJANG CLIP, jadi clip yang diperpanjang = gelombang lebih lama. Di-zoom tipis seperti Getar supaya tepi tidak bolong
-     (zoom ikut kekuatan, jadi saat diam tidak ada lonjakan zoom). */
+     Semuanya mengikuti PANJANG CLIP, jadi clip yang diperpanjang = gelombang lebih lama.
+     TIDAK ada zoom in/out: tepi yang kosong akibat strip bergeser ditutup dengan sambungan dari sisi seberang (membungkus, seperti Glitch). */
   function waveFx(dir){
     return function(g,w,h,p,tm,opaque,rel,dur){
       let env=1;
@@ -98,15 +98,14 @@ APK.fxclip=(function(){
       const A=p.amt/100*0.08*w*env;
       if(A<0.3)return;
       const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
-      const ph=dir*rel*1.3*(p.spd/50),st=Math.max(1,Math.round(h/320)),z=1+2*A/w;
+      const ph=dir*rel*1.3*(p.spd/50),st=Math.max(1,Math.round(h/320));
       g.clearRect(0,0,w,h);
       if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
-      g.save();g.translate(w/2,h/2);g.scale(z,z);g.translate(-w/2,-h/2);
       for(let y=0;y<h;y+=st){
         const hh=Math.min(st,h-y),dx=dir*A*Math.sin(2*Math.PI*(p.cnt*(y+hh/2)/h-ph));
         g.drawImage(S.canvas,0,y,w,hh,dx,y,w,hh);
+        g.drawImage(S.canvas,0,y,w,hh,dx>0?dx-w:dx+w,y,w,hh);   /* menutup tepi yang kosong dengan sisi seberang */
       }
-      g.restore();
     };
   }
 

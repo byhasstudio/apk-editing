@@ -80,13 +80,21 @@ APK.fxclip=(function(){
      Tiap strip horizontal tipis digeser ke kiri/kanan mengikuti gelombang sinus, sehingga gambar meliuk seperti riak (tetap ke samping).
      Gelombang: merambat TURUN. Gelombang Balik: merambat NAIK dan simpangannya berlawanan arah (dir = -1).
      Nilai bawaan diukur dari video referensi (detik 3,5-5): simpangan puncak sekitar 4-7% lebar layar, sekitar 1 gelombang per tinggi layar,
-     merambat sekitar 1,3 putaran per detik, dan mereda sekitar 0,8 detik setelah mulai.
-     Peredaman mengikuti PANJANG CLIP: gelombang paling kuat di awal clip dan mereda sampai akhir clip, jadi clip yang diperpanjang = gelombang lebih lama.
-     Peredam 0 = gelombang terus berjalan tanpa mereda. Di-zoom tipis seperti Getar supaya tepi tidak bolong. */
+     dan merambat sekitar 1,3 putaran per detik.
+     Pola kekuatan sepanjang clip (supaya tidak kaget): DIAM sebentar di awal, lalu NAIK PELAN sampai puncak, lalu MEREDA sampai akhir clip.
+     "Awal pelan" mengatur panjang bagian diam dan naik (0 = langsung kuat di awal clip, seperti versi lama; 100 = diam 15% dan naik 45% dari panjang clip).
+     "Peredam" mengatur seberapa kuat gelombang mereda setelah puncak sampai akhir clip (0 = tetap kuat sampai akhir).
+     Semuanya mengikuti PANJANG CLIP, jadi clip yang diperpanjang = gelombang lebih lama. Di-zoom tipis seperti Getar supaya tepi tidak bolong
+     (zoom ikut kekuatan, jadi saat diam tidak ada lonjakan zoom). */
   function waveFx(dir){
     return function(g,w,h,p,tm,opaque,rel,dur){
-      const u=dur>0?Math.min(1,rel/dur):0;
-      const env=p.dec>0?Math.exp(-u*p.dec/100*5):1;
+      let env=1;
+      if(dur>0){
+        const u=Math.min(1,rel/dur),a=p.atk/100,s0=a*0.15,rise=a*0.45,pk=s0+rise;
+        if(u<s0)env=0;
+        else if(u<pk){const x=(u-s0)/rise;env=x*x*(3-2*x)}
+        if(p.dec>0&&u>pk)env*=Math.exp(-((u-pk)/Math.max(1e-6,1-pk))*p.dec/100*5);
+      }
       const A=p.amt/100*0.08*w*env;
       if(A<0.3)return;
       const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
@@ -102,7 +110,7 @@ APK.fxclip=(function(){
     };
   }
 
-  const WP=[['amt','Kekuatan',0,100,60],['cnt','Jumlah gelombang',1,8,1],['spd','Kecepatan',10,100,50],['dec','Peredam (mereda sepanjang clip, 0 = terus bergelombang)',0,100,70]];
+  const WP=[['amt','Kekuatan',0,100,60],['cnt','Jumlah gelombang',1,8,1],['spd','Kecepatan',10,100,50],['atk','Awal pelan (0 = langsung kuat, makin besar makin lama diam dan naik pelan)',0,100,60],['dec','Peredam (mereda sampai akhir clip, 0 = tetap kuat)',0,100,70]];
   const LIST=[
     {id:'glitch',name:'Glitch RGB',desc:'Layar pecah dan warnanya terpisah',
       params:[['amt','Kekuatan',0,100,60],['spd','Kecepatan',10,100,50]],apply:glitch},

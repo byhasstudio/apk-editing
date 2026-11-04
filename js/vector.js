@@ -124,9 +124,8 @@ APK.vector=(function(){
     ctx.save();
     ctx.globalAlpha=clamp(pr.opacity,0,1);
     ctx.globalCompositeOperation=c.blend||'source-over';
-    ctx.translate(W/2+pr.x,H/2+pr.y);ctx.rotate(pr.rotation*Math.PI/180);
     const k=Math.max(0,pr.scale),kk=K0*k;
-    ctx.scale(k*(c.flipX?-1:1),k*(c.flipY?-1:1));
+    APK.layers.xf(ctx,c,pr,W,H,k);
     let shDone=false;
     for(const raw of v.st||[]){
       if(!raw||raw.on===false)continue;
@@ -165,10 +164,14 @@ APK.vector=(function(){
   function xf(c){
     const v=view(),L=APK.layers;L.begin();
     const pr=L.props(c,APK.preview.time),k=Math.max(1e-3,pr.scale),a=pr.rotation*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
-    const fx=c.flipX?-1:1,fy=c.flipY?-1:1,cx=v.ox+(v.W/2+pr.x)*v.pu,cy=v.oy+(v.H/2+pr.y)*v.pu,u=k*v.pu;
+    const g=n=>Math.abs(n)<1e-4?(n<0?-1e-4:1e-4):n;
+    const sx=g(k*(pr.sx==null?1:pr.sx)*(c.flipX?-1:1)),sy=g(k*(pr.sy==null?1:pr.sy)*(c.flipY?-1:1));
+    const an=c.anchor||{x:0,y:0},ax=+an.x||0,ay=+an.y||0,cx=v.ox+(v.W/2+pr.x)*v.pu,cy=v.oy+(v.H/2+pr.y)*v.pu,u=v.pu;
+    const tn=d=>Math.tan(Math.max(-80,Math.min(80,d||0))*Math.PI/180),tx=tn(pr.skx),ty=tn(pr.sky),det=(1-tx*ty)||1e-6;
+    /* sama dengan urutan APK.layers.xf: titik pusat -> putar -> miring -> regang -> balik */
     return{
-      to:(x,y)=>{const X=x*fx*u,Y=y*fy*u;return[cx+X*ca-Y*sa,cy+X*sa+Y*ca]},
-      from:(sx,sy)=>{const dx=sx-cx,dy=sy-cy;return[(dx*ca+dy*sa)/u*fx,(-dx*sa+dy*ca)/u*fy]}
+      to:(x,y)=>{const X=(x-ax)*sx,Y=(y-ay)*sy,X2=X+tx*Y,Y2=ty*X+Y;return[cx+(X2*ca-Y2*sa+ax)*u,cy+(X2*sa+Y2*ca+ay)*u]},
+      from:(px,py)=>{const dx=(px-cx)/u-ax,dy=(py-cy)/u-ay,ux=dx*ca+dy*sa,uy=-dx*sa+dy*ca;return[(ux-tx*uy)/det/sx+ax,(uy-ty*ux)/det/sy+ay]}
     };
   }
   const pos=e=>{const r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]};
@@ -546,5 +549,5 @@ APK.vector=(function(){
     const b=$('tl-pen');if(b)b.onclick=()=>{if(P())setPen(!pen)};
   }
   init();
-  return{build,extent,bz,splitSeg,setType,moveHandle,shapePts,draw,mkVec,mkItem,mkPt,setPen,get pen(){return pen}};
+  return{xf,build,extent,bz,splitSeg,setType,moveHandle,shapePts,draw,mkVec,mkItem,mkPt,setPen,get pen(){return pen}};
 })();

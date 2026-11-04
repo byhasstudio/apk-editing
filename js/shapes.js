@@ -42,8 +42,7 @@ APK.shapes=(function(){
     ctx.save();
     ctx.globalAlpha=Math.min(1,Math.max(0,pr.opacity));
     ctx.globalCompositeOperation=c.blend||'source-over';
-    ctx.translate(W/2+pr.x,H/2+pr.y);ctx.rotate(pr.rotation*Math.PI/180);
-    const k=Math.max(0,pr.scale),kk=K0*k;ctx.scale(k*(c.flipX?-1:1),k*(c.flipY?-1:1));
+    const k=Math.max(0,pr.scale),kk=K0*k;APK.layers.xf(ctx,c,pr,W,H,k);
     path(ctx,s.type,s.w,s.h,s.radius);
     if(s.fillOn){
       fx.shadow(ctx,s.shadowOn,s,kk);

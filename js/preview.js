@@ -6,7 +6,8 @@ APK.preview=(function(){
   const els=new Map(),bmap=new Map();
   const mediaOf=id=>P().media.find(m=>m.id===id);
   /* kotak objek di koordinat project (dipakai gizmo untuk memilih dan memindah objek) */
-  const mark=(id,pr,W,H,w,h)=>bmap.set(id,{cx:W/2+pr.x,cy:H/2+pr.y,w,h,rot:pr.rotation});
+  /* w dan h = ukuran dasar (sudah dikali scale); regang (sx, sy) dan titik pusat ikut dihitung di sini */
+  const mark=(c,pr,W,H,w,h)=>{const q=APK.layers.center(c,pr);bmap.set(c.id,{cx:W/2+q.x,cy:H/2+q.y,w:w*(pr.sx==null?1:pr.sx),h:h*(pr.sy==null?1:pr.sy),rot:pr.rotation})};
   function fmt(s,short){s=Math.max(0,s);const m=Math.floor(s/60);
     return short?m+':'+String(Math.floor(s%60)).padStart(2,'0'):String(m).padStart(2,'0')+':'+(s%60).toFixed(2).padStart(5,'0')}
   function duration(){let d=0;if(!P())return 0;for(const tr of P().tracks)for(const c of tr.clips)d=Math.max(d,c.start+c.dur);return d}
@@ -51,13 +52,16 @@ APK.preview=(function(){
             if(t<c.start-5||t>c.start+c.dur+5)release(c.id)}
           continue;
         }
+        const E=APK.effects;
         if(c.text){
-          const pr=APK.layers.props(c,t),sc=Math.max(0,pr.scale),b=APK.text.draw(ctx,c,pr,W,H);
-          mark(c.id,pr,W,H,b.w*sc,b.h*sc);continue;
+          const pr=APK.layers.props(c,t),sc=Math.max(0,pr.scale),q=E?E.begin(ctx,c,t,pr,W,H,K):pr,b=APK.text.draw(ctx,c,q,W,H);
+          if(E)E.end(ctx);
+          mark(c,pr,W,H,b.w*sc,b.h*sc);continue;
         }
         if(c.shape){
-          const pr=APK.layers.props(c,t),sc=Math.max(0,pr.scale),b=APK.shapes.draw(ctx,c,pr,W,H);
-          mark(c.id,pr,W,H,b.w*sc,b.h*sc);continue;
+          const pr=APK.layers.props(c,t),sc=Math.max(0,pr.scale),q=E?E.begin(ctx,c,t,pr,W,H,K):pr,b=APK.shapes.draw(ctx,c,q,W,H);
+          if(E)E.end(ctx);
+          mark(c,pr,W,H,b.w*sc,b.h*sc);continue;
         }
         const e=getEl(c);if(!e||!e.ready)continue;
         const pr=APK.layers.props(c,t),sp=Math.min(16,Math.max(0.0625,c.speed||1)),
@@ -87,16 +91,16 @@ APK.preview=(function(){
         if(tr.kind==='audio')continue;
         const w=e.type==='image'?e.el.naturalWidth:e.el.videoWidth,h=e.type==='image'?e.el.naturalHeight:e.el.videoHeight;
         if(!w||!h)continue;
-        const s=Math.min(W/w,H/h)*Math.max(0,pr.scale),fxc=APK.fx.process(e.el,w,h,c);
-        mark(c.id,pr,W,H,w*s,h*s);
+        const fit=Math.min(W/w,H/h),s=fit*Math.max(0,pr.scale),fxc=APK.fx.process(e.el,w,h,c);
+        mark(c,pr,W,H,w*s,h*s);
+        const q=E?E.begin(ctx,c,t,pr,W,H,K):pr;
         ctx.save();
-        ctx.globalAlpha=Math.min(1,Math.max(0,pr.opacity));
+        ctx.globalAlpha=Math.min(1,Math.max(0,q.opacity));
         ctx.globalCompositeOperation=c.blend||'source-over';
-        ctx.translate(W/2+pr.x,H/2+pr.y);
-        ctx.rotate(pr.rotation*Math.PI/180);
-        ctx.scale(c.flipX?-1:1,c.flipY?-1:1);
-        ctx.drawImage(fxc||e.el,-w*s/2,-h*s/2,w*s,h*s);
+        APK.layers.xf(ctx,c,q,W,H,Math.max(0,q.scale));
+        ctx.drawImage(fxc||e.el,-w*fit/2,-h*fit/2,w*fit,h*fit);
         ctx.restore();
+        if(E)E.end(ctx);
       }
     }
   }

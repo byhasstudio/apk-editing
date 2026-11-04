@@ -41,16 +41,48 @@ APK.fx=(function(){
     ctx.fill();
     ctx.restore();
   }
-  /* kembalikan canvas hasil olahan (chroma + mask) atau null bila clip tidak memakai efek */
+  /* efek piksel: glitch (potongan horizontal bergeser, acak stabil per 1/12 detik), pemisah RGB, dan vignette. f = clip.flt, tm = waktu (detik) */
+  function pixelFx(ctx,w,h,f,tm){
+    const gl=+f.glitch||0,rg=(+f.rgb||0)+gl*0.12,vg=+f.vig||0;
+    if(gl>0){
+      let seed=(Math.floor(tm*12)*2654435761)>>>0;
+      const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
+      const n=Math.round(1+gl/100*9);
+      for(let i=0;i<n;i++){
+        const y0=Math.floor(rnd()*h),hh=Math.max(2,Math.floor((0.01+rnd()*0.08)*h)),dx=Math.round((rnd()-.5)*2*gl/100*w*0.18),hc=Math.min(hh,h-y0);
+        if(hc<=0)continue;
+        const im=ctx.getImageData(0,y0,w,hc);ctx.clearRect(0,y0,w,hc);ctx.putImageData(im,dx,y0);ctx.putImageData(im,dx>0?dx-w:dx+w,y0);   /* membungkus ke sisi lain, tanpa celah */
+      }
+    }
+    if(rg>0.2){
+      const s=Math.max(1,Math.round(rg*w/1280)),img=ctx.getImageData(0,0,w,h),d=img.data,src=new Uint8ClampedArray(d);
+      for(let y=0;y<h;y++){
+        const row=y*w*4;
+        for(let x=0;x<w;x++){
+          const i=row+x*4,ir=row+Math.min(w-1,x+s)*4,ib=row+Math.max(0,x-s)*4;
+          d[i]=src[ir];d[i+2]=src[ib+2];
+          d[i+3]=Math.max(src[i+3],src[ir+3],src[ib+3]);
+        }
+      }
+      ctx.putImageData(img,0,0);
+    }
+    if(vg>0){
+      const r=Math.hypot(w,h)/2,gr=ctx.createRadialGradient(w/2,h/2,r*0.35,w/2,h/2,r);
+      gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,'rgba(0,0,0,'+Math.min(1,vg/100)+')');
+      ctx.save();ctx.globalCompositeOperation='source-atop';ctx.fillStyle=gr;ctx.fillRect(0,0,w,h);ctx.restore();
+    }
+  }
+  /* kembalikan canvas hasil olahan (chroma + mask + efek piksel) atau null bila clip tidak memakai efek */
   function process(el,w,h,c){
-    const ck=c.chroma&&c.chroma.on,mk=c.mask&&c.mask.on;
-    if(!ck&&!mk)return null;
+    const ck=c.chroma&&c.chroma.on,mk=c.mask&&c.mask.on,f=c.flt,px=!!f&&(f.vig>0||f.rgb>0||f.glitch>0);
+    if(!ck&&!mk&&!px)return null;
     const sc=Math.min(1,MAXD/Math.max(w,h)),cw=Math.max(1,Math.round(w*sc)),ch=Math.max(1,Math.round(h*sc));
     const ctx=layer(cw,ch);
     try{
       ctx.drawImage(el,0,0,cw,ch);
       if(ck)key(ctx,cw,ch,Object.assign({},DEF.chroma,c.chroma));
       if(mk)mask(ctx,cw,ch,Object.assign({},DEF.mask,c.mask));
+      if(px)pixelFx(ctx,cw,ch,f,APK.preview?APK.preview.time:0);
     }catch(_){return null}
     return cv;
   }

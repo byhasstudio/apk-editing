@@ -51,5 +51,29 @@ APK.layers=(function(){
     while(c&&n++<10){if(c.id===id)return true;c=c.parent?map.get(c.parent):null}
     return false;
   }
-  return{begin,props,local,frame,hasParent,toLocal,world,isDescendant};
+  /* Transformasi bersama semua jenis layer. Urutan: posisi -> titik pusat (anchor) -> putar -> miring -> regang/skala -> balik.
+     Titik pusat c.anchor={x,y} (px, relatif ke tengah objek) adalah poros putar dan skala. Tanpa anchor hasilnya sama persis dengan versi lama.
+     k = pengali skala (scale). Mengembalikan faktor skala akhir (sumbu x dan y) untuk bayangan. */
+  const rad=d=>d*Math.PI/180,tn=d=>Math.tan(rad(Math.max(-80,Math.min(80,d||0))));
+  function xf(ctx,c,pr,W,H,k){
+    const a=c.anchor||null,ax=a?+a.x||0:0,ay=a?+a.y||0:0;
+    const sx=(pr.sx==null?1:pr.sx)*(k==null?1:k),sy=(pr.sy==null?1:pr.sy)*(k==null?1:k);
+    ctx.translate(W/2+pr.x,H/2+pr.y);
+    if(ax||ay)ctx.translate(ax,ay);
+    ctx.rotate(rad(pr.rotation));
+    if(pr.skx||pr.sky)ctx.transform(1,tn(pr.sky),tn(pr.skx),1,0,0);
+    ctx.scale(sx*(c.flipX?-1:1),sy*(c.flipY?-1:1));
+    if(ax||ay)ctx.translate(-ax,-ay);
+    return{sx:Math.abs(sx),sy:Math.abs(sy)};
+  }
+  /* pusat objek di layar (offset dari tengah kanvas) setelah titik pusat/regang/miring; dipakai gizmo */
+  function center(c,pr){
+    const a=c.anchor;if(!a||(!a.x&&!a.y))return{x:pr.x,y:pr.y};
+    const k=pr.scale,sx=(pr.sx==null?1:pr.sx)*k*(c.flipX?-1:1),sy=(pr.sy==null?1:pr.sy)*k*(c.flipY?-1:1);
+    let vx=sx*(-a.x),vy=sy*(-a.y);
+    if(pr.skx||pr.sky){const nx=vx+tn(pr.skx)*vy,ny=tn(pr.sky)*vx+vy;vx=nx;vy=ny}
+    const r=rad(pr.rotation),cs=Math.cos(r),sn=Math.sin(r);
+    return{x:pr.x+a.x+vx*cs-vy*sn,y:pr.y+a.y+vx*sn+vy*cs};
+  }
+  return{begin,props,local,frame,hasParent,toLocal,world,isDescendant,xf,center};
 })();

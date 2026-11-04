@@ -1,6 +1,6 @@
 # APK EDITING
 
-Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v15** (sistem inti ala Alight Motion / CapCut: gizmo, multi-select, salin-tempel, kunci layer, kurva bezier, gradien, bayangan, motion path, parent/grup layer, pen tool dan layer vektor, preset). Efek, transisi, dan filter sengaja belum dibuat.
+Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v19** (sistem inti ala Alight Motion / CapCut: gizmo, multi-select, salin-tempel, kunci layer, kurva bezier, gradien, bayangan, motion path, parent/grup layer, pen tool dan layer vektor, preset). Efek, transisi, dan filter sengaja belum dibuat.
 
 ## Buka di web
 
@@ -46,6 +46,15 @@ https://byhasstudio.github.io/apk-editing/
 - **Bentuk dasar bisa diubah jadi path vektor** (tombol "Ubah jadi path vektor" di panel Properti, mode Lanjutan); isi, gradien, garis, dan bayangan ikut terbawa.
 - Layer vektor bisa di-keyframe untuk posisi, scale, opacity, dan rotasi, bisa jadi anak/induk, dan ikut ter-export seperti layer lainnya.
 - Data tersimpan di field opsional `clip.vec` (project lama tidak berubah dan tetap terbuka). Rincian format ada di komentar awal `js/vector.js`.
+
+### v19: regang, miring, titik pusat, animasi cepat, filter, transisi
+- **Panjangkan / pendekkan (regang)**: selain Scale yang membesarkan atau mengecilkan seragam, kini lebar dan tinggi bisa diubah terpisah. Di preview tarik **kotak kuning di tengah sisi** objek (kiri/kanan = lebar, atas/bawah = tinggi). Di panel Properti ada slider "Panjangkan / pendekkan lebar / tinggi (%)". Berlaku untuk video, gambar, teks, bentuk, dan vektor. Bisa di-keyframe dan ikut direkam oleh Kurva otomatis.
+- **Miring (skew)** horizontal dan vertikal (slider di Properti, bisa di-keyframe). Kotak pilihan di preview tetap persegi panjang biasa (tidak ikut miring), tapi hasil gambarnya benar.
+- **Titik pusat (anchor)**: poros putar dan zoom bisa digeser (X dan Y px dari tengah objek) di bagian "Titik pusat" panel Properti. Tidak di-keyframe. Tombol Reset mengembalikannya ke tengah.
+- **Animasi cepat**: di Properti pilih animasi masuk, keluar, atau loop (pop, zoom, geser dari 4 arah, jatuh memantul, putar, melebar/meninggi, miring, denyut, napas, goyang, melayang, memantul, berkedip, getar, berputar terus, dan lain-lain; 35 total). Hasilnya **keyframe biasa** yang tetap bisa diubah. Lama masuk, keluar, dan satu siklus loop bisa diatur. Memilih "tidak ada" menghapusnya dan mengembalikan nilai diam. Masuk, keluar, dan loop bisa dipakai bersamaan.
+- **Filter dan efek** (per clip, nilainya tetap): blur, kecerahan, kontras, saturasi, rona warna, hitam putih, sepia, negatif untuk semua jenis layer; **vignette, pemisah RGB, dan glitch** hanya untuk video dan gambar. Ada 8 preset filter (hitam putih, vintage, sinematik, cerah, dramatis, mimpi, glitch, negatif) dan "Hapus semua filter". Filter tidak bisa di-keyframe.
+- **Transisi** di awal dan akhir clip: memudar, geser 4 arah, zoom dari kecil/besar, putar, blur, wipe 4 arah, dan buka lingkaran (iris), dengan lama bisa diatur. Untuk transisi antar dua clip: beri clip pertama transisi keluar dan clip kedua transisi masuk, lalu letakkan berimpit atau bertumpuk di layer berbeda.
+- Semua di atas ikut tersimpan di project dan di file preset, dan ikut ter-export. Filter memakai `ctx.filter`, yang didukung Chrome, Edge, dan Firefox; di browser yang belum mendukung (Safari lama) efek filter diabaikan.
 
 ### Kurva otomatis (auto-keyframe, rekam langsung)
 - Tombol **⏺ Kurva otomatis** ada di bar timeline (setelah Grup). Nyalakan, lalu di preview muncul tombol **▶ Mulai**.

@@ -12,8 +12,7 @@ APK.text=(function(){
     ctx.save();
     ctx.globalAlpha=Math.min(1,Math.max(0,pr.opacity));
     ctx.globalCompositeOperation=c.blend||'source-over';
-    ctx.translate(W/2+pr.x,H/2+pr.y);ctx.rotate(pr.rotation*Math.PI/180);
-    const s=Math.max(0,pr.scale),kk=K0*s;ctx.scale(s*(c.flipX?-1:1),s*(c.flipY?-1:1));
+    const s=Math.max(0,pr.scale),kk=K0*s;APK.layers.xf(ctx,c,pr,W,H,s);
     ctx.font=`${tx.italic?'italic ':''}${tx.bold?'bold ':''}${tx.size}px ${tx.font}`;
     ctx.textBaseline='middle';ctx.textAlign=tx.align;
     const lh=tx.size*1.25,th=lh*lines.length,pad=tx.size*.3;

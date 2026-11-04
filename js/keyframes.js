@@ -2,9 +2,9 @@
    Data per clip: clip.kf = { x:[{t,v,e}], ... } ; t = detik relatif terhadap awal clip, e = nama easing atau 'bz:x1,y1,x2,y2' (kurva bezier kustom) */
 window.APK=window.APK||{};
 APK.kf=(function(){
-  const PROPS=['x','y','scale','opacity','rotation','volume'];
-  const VISUAL=['x','y','scale','opacity','rotation'];
-  const DEF={x:0,y:0,scale:1,opacity:1,rotation:0,volume:1};
+  const PROPS=['x','y','scale','opacity','rotation','volume','sx','sy','skx','sky'];
+  const VISUAL=['x','y','scale','opacity','rotation','sx','sy','skx','sky'];
+  const DEF={x:0,y:0,scale:1,opacity:1,rotation:0,volume:1,sx:1,sy:1,skx:0,sky:0};
   const DEFAULT_EASE='inout';
   const bounce=t=>{const n=7.5625,d=2.75;
     if(t<1/d)return n*t*t;

@@ -20,7 +20,7 @@ APK.timeline=(function(){
   const kfMarks=c=>APK.kf.times(c).filter(t=>t>=-1e-6&&t<=c.dur+1e-6).map(t=>`<em class="kfm" data-t="${t}" style="left:${t*pps}px" title="Keyframe ${t.toFixed(2)} dtk (geser untuk memindah)"></em>`).join('');
   const mkDrag=o=>{o.sl=$('tl-scroll').scrollLeft;return o};
   /* salin objek bersarang (teks, bentuk, chroma, mask) supaya clip hasil duplikat/split tidak berbagi data */
-  const copyExtra=(n,c)=>{for(const k of ['text','shape','chroma','mask'])if(c[k])n[k]={...c[k]};return n};
+  const copyExtra=(n,c)=>{for(const k of ['text','shape','chroma','mask','flt','tin','tout','anchor'])if(c[k])n[k]={...c[k]};return n};
 
   /* ===== Seleksi (bisa banyak clip). sel = clip utama (dipakai panel properti dan gizmo), msel = semua clip terpilih ===== */
   const one=id=>{sel=id||null;msel=new Set(id?[id]:[])};

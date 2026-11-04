@@ -24,6 +24,9 @@ APK.gizmo=(function(){
     const[lx,ly]=local(v,b,sx,sy),hw=b.w*v.pu/2,hh=b.h*v.pu/2,r=HR+5;
     if(Math.hypot(lx,ly+hh+28)<=r)return 'rot';
     for(const[cx,cy] of [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]])if(Math.hypot(lx-cx,ly-cy)<=r)return 'scale';
+    /* pegangan di tengah sisi: kiri/kanan = panjangkan/pendekkan lebar, atas/bawah = tinggi */
+    if(Math.hypot(lx-hw,ly)<=r||Math.hypot(lx+hw,ly)<=r)return 'sx';
+    if(Math.hypot(lx,ly-hh)<=r||Math.hypot(lx,ly+hh)<=r)return 'sy';
     return null;
   }
   /* objek paling atas di titik tersebut (track urutan pertama = layer paling atas) */
@@ -107,6 +110,9 @@ APK.gizmo=(function(){
       g.fillStyle='#fff';g.strokeStyle='#7f8cff';
       for(const[cx,cy] of [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]]){g.beginPath();g.rect(cx-HR*0.7,cy-HR*0.7,HR*1.4,HR*1.4);g.fill();g.stroke()}
       g.beginPath();g.arc(0,-hh-28,HR*0.75,0,Math.PI*2);g.fill();g.stroke();
+      g.fillStyle='#ffd166';g.strokeStyle='#7f8cff';
+      for(const[cx,cy] of [[-hw,0],[hw,0]]){g.beginPath();g.rect(cx-HR*0.4,cy-HR*0.9,HR*0.8,HR*1.8);g.fill();g.stroke()}
+      for(const[cx,cy] of [[0,-hh],[0,hh]]){g.beginPath();g.rect(cx-HR*0.9,cy-HR*0.4,HR*1.8,HR*0.8);g.fill();g.stroke()}
     }
     g.restore();
   }
@@ -139,6 +145,7 @@ APK.gizmo=(function(){
     const c=sc.c,r=rel(c),pr=APK.kf.props(c,r),[px,py]=toProj(v,sx,sy),b0=APK.preview.bounds(c.id),
       cx=b0?b0.cx:p.width/2+pr.x,cy=b0?b0.cy:p.height/2+pr.y,a0=Math.atan2(py-cy,px-cx);
     drag={mode,id,r,x0:pr.x,y0:pr.y,s0:pr.scale,rot0:pr.rotation,px,py,cx,cy,d0:Math.hypot(px-cx,py-cy)||1,last:a0,acc:0,moved:false,newKey:false,
+      b0:b0||null,l0:b0?local(v,b0,sx,sy):[1,1],st0x:pr.sx==null?1:pr.sx,st0y:pr.sy==null?1:pr.sy,
       pi,q0:mode==='mpt'?c.mp.pts[pi].slice():null};
     cv.setPointerCapture(e.pointerId);e.preventDefault();
   }
@@ -163,6 +170,10 @@ APK.gizmo=(function(){
     }else if(drag.mode==='mpt'){
       const d=APK.layers.toLocal(c,APK.preview.time,px-drag.px,py-drag.py);
       if(c.mp&&c.mp.pts[drag.pi])c.mp.pts[drag.pi]=[Math.round((drag.q0[0]+d.x)*10)/10,Math.round((drag.q0[1]+d.y)*10)/10];
+    }else if((drag.mode==='sx'||drag.mode==='sy')&&drag.b0){
+      /* regang satu sumbu: perbandingan jarak jari ke pusat (di sumbu objek) sekarang dibanding saat mulai */
+      const i=drag.mode==='sx'?0:1,l=local(v,drag.b0,sx,sy),ratio=Math.abs(l[i])/(Math.abs(drag.l0[i])||1);
+      set(c,drag.mode,Math.round(Math.min(20,Math.max(0.01,(i?drag.st0y:drag.st0x)*ratio))*1000)/1000);
     }else if(drag.mode==='scale'){
       const k=Math.hypot(px-drag.cx,py-drag.cy)/drag.d0;
       set(c,'scale',Math.min(10,Math.max(0.01,drag.s0*k)));
@@ -189,7 +200,7 @@ APK.gizmo=(function(){
     const[sx,sy]=pos(e),v=view(),sc=APK.timeline.selectedClip();let cur='default';
     if(sc&&!sc.tr.locked){
       if(sc.c.mp&&sc.c.mp.on&&sc.c.mp.pts&&sc.c.mp.pts.length>1&&hitPt(v,sc.c,sx,sy)>=0)cur='pointer';
-      if(cur==='default'){const b=APK.preview.bounds(sc.c.id);if(b){const h=hitHandle(v,b,sx,sy);if(h)cur=h==='rot'?'grab':'nwse-resize'}}
+      if(cur==='default'){const b=APK.preview.bounds(sc.c.id);if(b){const h=hitHandle(v,b,sx,sy);if(h)cur=h==='rot'?'grab':h==='sx'?'ew-resize':h==='sy'?'ns-resize':'nwse-resize'}}
     }
     if(cur==='default'&&pick(v,sx,sy))cur='move';
     cv.style.cursor=cur;

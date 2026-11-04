@@ -4,10 +4,12 @@ window.APK=window.APK||{};
 APK.properties=(function(){
   const $=id=>document.getElementById(id),panel=$('panel-props'),dock=$('curve-dock');
   const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const DEF={x:0,y:0,scale:1,opacity:1,rotation:0,volume:1};
+  const DEF={x:0,y:0,scale:1,opacity:1,rotation:0,volume:1,sx:1,sy:1,skx:0,sky:0};
   /* key, label, min, max, pengali tampilan, berlaku untuk */
   const F=[['volume','Volume (%)',0,100,100,'audio video'],['x','Posisi X (px)',-5000,5000,1,'video image text shape'],['y','Posisi Y (px)',-5000,5000,1,'video image text shape'],
-    ['scale','Scale (%)',1,500,100,'video image text shape'],['opacity','Opacity (%)',0,100,100,'video image text shape'],['rotation','Rotasi (°)',-360,360,1,'video image text shape']];
+    ['scale','Scale (%)',1,500,100,'video image text shape'],['opacity','Opacity (%)',0,100,100,'video image text shape'],['rotation','Rotasi (°)',-360,360,1,'video image text shape'],
+    ['sx','Panjangkan / pendekkan lebar (%)',1,1000,100,'video image text shape'],['sy','Panjangkan / pendekkan tinggi (%)',1,1000,100,'video image text shape'],
+    ['skx','Miring horizontal (°)',-80,80,1,'video image text shape'],['sky','Miring vertikal (°)',-80,80,1,'video image text shape']];
   const BLEND=[['source-over','Normal'],['multiply','Multiply'],['screen','Screen'],['overlay','Overlay'],['darken','Darken'],['lighten','Lighten'],['color-dodge','Color Dodge'],['color-burn','Color Burn'],['hard-light','Hard Light'],['soft-light','Soft Light'],['difference','Difference'],['exclusion','Exclusion'],['lighter','Tambah (Add)']];
   /* atribut data-xx pada kontrol -> properti objek di clip, dan nilai bawaannya */
   const GROUP={tx:'text',sh:'shape',ck:'chroma',mk:'mask'},GK=Object.keys(GROUP);
@@ -42,6 +44,10 @@ APK.properties=(function(){
     const vis=type!=='audio'?`<div class="adv"><h3 class="kf-title">Tampilan</h3>
       <label>Mode blend<select data-cp="blend">${BLEND.map(b=>`<option value="${b[0]}">${b[1]}</option>`).join('')}</select></label>
       <div class="tx-row"><label><input type="checkbox" data-cp="flipX">Balik horizontal</label><label><input type="checkbox" data-cp="flipY">Balik vertikal</label></div></div>`:'';
+    const anc=type!=='audio'?`<div class="adv"><h3 class="kf-title">Titik pusat (poros putar dan zoom)</h3>
+      <div class="pr-row"><label title="Geser poros ke kanan (+) atau kiri (-) dari tengah objek">X (px)<input type="number" data-an="x" step="1"></label><label title="Geser poros ke bawah (+) atau atas (-) dari tengah objek">Y (px)<input type="number" data-an="y" step="1"></label></div>
+      <div class="kf-bar"><button type="button" class="btn" data-anreset="1" title="Kembalikan poros ke tengah objek">Reset titik pusat</button></div></div>`:'';
+    const ext=APK.anim&&type!=='audio'?APK.anim.html(type):'',ext2=APK.effects?APK.effects.html(type):'';
     const media=type==='video'||type==='image';
     const chroma=media?`<div class="adv"><h3 class="kf-title">Chroma key (hapus warna latar)</h3>
       <div class="tx-row"><label><input type="checkbox" data-ck="on">Aktifkan</label></div>
@@ -82,11 +88,11 @@ APK.properties=(function(){
       <fieldset${locked?' disabled':''}>
       <label>Waktu mulai (detik)<input type="number" data-t="start" min="0" step="0.01"></label>
       <label>Durasi (detik)<input type="number" data-t="dur" min="0.1" step="0.01"></label>
-      <label>Waktu selesai (detik)<input type="number" data-end readonly></label>${speed}${rev}${aud}${txt}${shp}${vis}${chroma}${mask}
+      <label>Waktu selesai (detik)<input type="number" data-end readonly></label>${speed}${rev}${aud}${txt}${shp}${vis}${anc}${ext2}${chroma}${mask}
       <h3 class="kf-title">Keyframe animasi</h3>
       <div class="kf-bar"><button type="button" class="btn" data-kfall="add" title="Keyframe semua properti di playhead (K)">◆ Semua</button><button type="button" class="btn" data-kfall="del" title="Hapus keyframe di playhead">Hapus di playhead</button><button type="button" class="btn" data-kfall="clear" title="Hapus semua animasi clip ini">Reset</button></div>
       <p class="kf-hint adv">Grafik kurva kecepatan ada di tab Media, di bawah daftar media.</p>
-      <p class="kf-hint">Klik ◇ di samping properti untuk membuat keyframe di posisi playhead. Setelah properti beranimasi, mengubah nilainya otomatis membuat keyframe. Geser penanda kuning di clip untuk memindah waktunya. Pintasan: K (keyframe semua), [ dan ] (loncat keyframe).</p>${rows}</fieldset>`;
+      ${ext}<p class="kf-hint">Klik ◇ di samping properti untuk membuat keyframe di posisi playhead. Setelah properti beranimasi, mengubah nilainya otomatis membuat keyframe. Geser penanda kuning di clip untuk memindah waktunya. Pintasan: K (keyframe semua), [ dan ] (loncat keyframe).</p>${rows}</fieldset>`;
   }
   const gx=(cv,x)=>GPAD+x*(cv.width-GPAD*2),gy=(cv,y)=>GPAD+(1-(y+0.5)/2)*(cv.height-GPAD*2);
   const gix=(cv,px)=>(px-GPAD)/(cv.width-GPAD*2),giy=(cv,py)=>(1-(py-GPAD)/(cv.height-GPAD*2))*2-0.5;
@@ -115,6 +121,8 @@ APK.properties=(function(){
     panel.querySelectorAll('input,textarea,select').forEach(el=>{
       if(!force&&document.activeElement===el)return;
       const d=el.dataset;
+      if(d.an){el.value=rnd((c.anchor&&+c.anchor[d.an])||0);return}
+      if(APK.effects&&APK.effects.owns(el)){APK.effects.fill(el,c);return}
       if(d.p){const f=F.find(f=>f[0]===d.p);el.value=rnd(pr[f[0]]*f[4])}
       else if(d.t)el.value=rnd(d.t==='start'?c.start:c.dur);
       else if('end' in d)el.value=rnd(c.start+c.dur);
@@ -173,6 +181,13 @@ APK.properties=(function(){
 
   panel.addEventListener('input',e=>{
     const el=e.target,s=APK.timeline.selectedClip(),d=el.dataset;if(!s||s.tr.locked)return;
+    if(APK.effects&&APK.effects.owns(el))return;   /* dikelola modul efek */
+    if(d.an){
+      const v=parseFloat(el.value);if(!isFinite(v))return;
+      if(!editing){APK.history.record();editing=true}
+      s.c.anchor=Object.assign({x:0,y:0},s.c.anchor);s.c.anchor[d.an]=Math.max(-5000,Math.min(5000,v));
+      APK.timeline.touch();return;
+    }
     const g=GK.find(k=>k in d);
     if(g||d.cp){
       const num=el.type==='number'||el.type==='range';
@@ -221,6 +236,7 @@ APK.properties=(function(){
     const b=e.target.closest('button'),s=APK.timeline.selectedClip();
     if(!b||!s||s.tr.locked)return;
     const K=APK.kf,c=s.c,r=rel(s);
+    if(b.dataset.anreset){if(c.anchor){APK.history.record();delete c.anchor;APK.timeline.commit()}return}
     if(b.dataset.kf){
       const p=b.dataset.kf;APK.history.record();
       if(K.hasKey(c,p,r))K.delKey(c,p,r);else K.setKey(c,p,r,K.value(c,p,r));

@@ -6,7 +6,7 @@ APK.fxlib=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
   const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const mq=window.matchMedia?matchMedia('(max-width:900px)'):{matches:false};
-  const CW=240,CH=135,LOOP=1.8;   /* LOOP = detik per putaran pratinjau (efek yang mereda, seperti Gelombang, diulang dari awal) */
+  const CW=240,CH=135,LOOP=1.8;   /* LOOP = detik per putaran pratinjau (efek yang mereda, seperti Gelombang, diulang dari awal; dianggap sebagai clip sepanjang LOOP) */
   const imgs=new Map(),demos=[];
   let cards=[],raf=0,last=0;
   function toast(m){const t=$('toast');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),2800)}
@@ -56,7 +56,7 @@ APK.fxlib=(function(){
       const iw=s.im.naturalWidth||s.im.width,ih=s.im.naturalHeight||s.im.height;
       if(iw&&ih){const k=Math.max(w/iw,h/ih),dw=iw*k,dh=ih*k;g.drawImage(s.im,(w-dw)/2,(h-dh)/2,dw,dh)}
     }
-    APK.fxclip.run(g,c.fx,tm,true,tm%LOOP);
+    APK.fxclip.run(g,c.fx,tm,true,tm%LOOP,LOOP);
   }
   function build(){
     const grid=$('fx-grid'),src=sources();

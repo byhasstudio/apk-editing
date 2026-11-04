@@ -1,12 +1,12 @@
 /* Efek clip (ala CapCut): efek berdiri sendiri sebagai clip di timeline, terpisah dari media, jadi bisa digeser, dipotong,
    diperpanjang, dan diduplikat tanpa menyentuh media.
-   Data clip: clip.fx = { type:'glitch'|'shake'|'wave', p:{...} (hanya nilai yang diubah), targets?:[id clip] }
+   Data clip: clip.fx = { type:'glitch'|'shake'|'wave'|'wave2', p:{...} (hanya nilai yang diubah), targets?:[id clip] }
      tanpa targets : efek berlaku untuk SEMUA layer di bawah clip efek (track yang urutannya lebih belakang), selama durasi clip efek
      dengan targets: efek hanya berlaku untuk clip yang dipilih (video, gambar, teks, bentuk), selama durasi clip efek
    Preview menggambar efek lewat run(), targets(), layerBegin(), layerEnd(), jadi ikut ter-export.
    Panel Properti clip efek dibuat oleh panel() dan dipasang properties.js; add() dipanggil daftar efek (js/fxlib.js).
-   Menambah efek baru: tambahkan satu objek di LIST: id, name, desc, params (daftar [kunci, label, min, max, bawaan]) dan apply.
-   apply(g, w, h, p, tm, opaque, rel) mengubah isi kanvas g langsung. tm = waktu timeline, rel = detik sejak clip efek mulai. */
+   Menambah efek baru: tambahkan satu objek di LIST: id, name, desc, params (daftar [kunci, label, min, max, bawaan]), apply, dan len (opsional, lama clip baru).
+   apply(g, w, h, p, tm, opaque, rel, dur) mengubah isi kanvas g langsung. tm = waktu timeline, rel = detik sejak clip efek mulai, dur = lama clip efek. */
 window.APK=window.APK||{};
 APK.fxclip=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
@@ -14,7 +14,7 @@ APK.fxclip=(function(){
   const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   const clone=o=>JSON.parse(JSON.stringify(o));
-  const DUR=3;   /* lama clip efek baru (detik) */
+  const DUR=3;   /* lama clip efek baru (detik), kecuali efek punya len sendiri */
 
   /* ===== kanvas bantu untuk efek (dipakai bergantian, tidak pernah bersarang) ===== */
   const aux={};
@@ -76,34 +76,40 @@ APK.fxclip=(function(){
     put(pos(u),0.65);
   }
 
-  /* ===== efek 3: Gelombang =====
-     Tiap strip horizontal tipis digeser ke kiri/kanan mengikuti gelombang sinus yang merambat turun, sehingga gambar meliuk seperti riak.
+  /* ===== efek 3 dan 4: Gelombang dan Gelombang Balik =====
+     Tiap strip horizontal tipis digeser ke kiri/kanan mengikuti gelombang sinus, sehingga gambar meliuk seperti riak (tetap ke samping).
+     Gelombang: merambat TURUN. Gelombang Balik: merambat NAIK dan simpangannya berlawanan arah (dir = -1).
      Nilai bawaan diukur dari video referensi (detik 3,5-5): simpangan puncak sekitar 4-7% lebar layar, sekitar 1 gelombang per tinggi layar,
-     merambat turun sekitar 1,3 putaran per detik, dan mereda dalam sekitar 0,8 detik sejak efek mulai (rel).
+     merambat sekitar 1,3 putaran per detik, dan mereda sekitar 0,8 detik setelah mulai.
+     Peredaman mengikuti PANJANG CLIP: gelombang paling kuat di awal clip dan mereda sampai akhir clip, jadi clip yang diperpanjang = gelombang lebih lama.
      Peredam 0 = gelombang terus berjalan tanpa mereda. Di-zoom tipis seperti Getar supaya tepi tidak bolong. */
-  function wave(g,w,h,p,tm,opaque,rel){
-    const env=p.dec>0?Math.exp(-rel*p.dec/100*6):1;
-    const A=p.amt/100*0.08*w*env;
-    if(A<0.3)return;
-    const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
-    const ph=rel*1.3*(p.spd/50),st=Math.max(1,Math.round(h/320)),z=1+2*A/w;
-    g.clearRect(0,0,w,h);
-    if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
-    g.save();g.translate(w/2,h/2);g.scale(z,z);g.translate(-w/2,-h/2);
-    for(let y=0;y<h;y+=st){
-      const hh=Math.min(st,h-y),dx=A*Math.sin(2*Math.PI*(p.cnt*(y+hh/2)/h-ph));
-      g.drawImage(S.canvas,0,y,w,hh,dx,y,w,hh);
-    }
-    g.restore();
+  function waveFx(dir){
+    return function(g,w,h,p,tm,opaque,rel,dur){
+      const u=dur>0?Math.min(1,rel/dur):0;
+      const env=p.dec>0?Math.exp(-u*p.dec/100*5):1;
+      const A=p.amt/100*0.08*w*env;
+      if(A<0.3)return;
+      const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
+      const ph=dir*rel*1.3*(p.spd/50),st=Math.max(1,Math.round(h/320)),z=1+2*A/w;
+      g.clearRect(0,0,w,h);
+      if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
+      g.save();g.translate(w/2,h/2);g.scale(z,z);g.translate(-w/2,-h/2);
+      for(let y=0;y<h;y+=st){
+        const hh=Math.min(st,h-y),dx=dir*A*Math.sin(2*Math.PI*(p.cnt*(y+hh/2)/h-ph));
+        g.drawImage(S.canvas,0,y,w,hh,dx,y,w,hh);
+      }
+      g.restore();
+    };
   }
 
+  const WP=[['amt','Kekuatan',0,100,60],['cnt','Jumlah gelombang',1,8,1],['spd','Kecepatan',10,100,50],['dec','Peredam (mereda sepanjang clip, 0 = terus bergelombang)',0,100,70]];
   const LIST=[
     {id:'glitch',name:'Glitch RGB',desc:'Layar pecah dan warnanya terpisah',
       params:[['amt','Kekuatan',0,100,60],['spd','Kecepatan',10,100,50]],apply:glitch},
     {id:'shake',name:'Getar',desc:'Layar bergetar dan sedikit ter-zoom',
       params:[['amt','Kekuatan',0,100,50],['spd','Kecepatan',10,100,50]],apply:shake},
-    {id:'wave',name:'Gelombang',desc:'Gambar meliuk seperti riak air',
-      params:[['amt','Kekuatan',0,100,60],['cnt','Jumlah gelombang',1,8,1],['spd','Kecepatan',10,100,50],['dec','Peredam (0 = terus bergelombang)',0,100,70]],apply:wave}
+    {id:'wave',name:'Gelombang',desc:'Gambar meliuk ke samping, merambat turun',len:1.2,params:WP,apply:waveFx(1)},
+    {id:'wave2',name:'Gelombang Balik',desc:'Gambar meliuk ke samping, merambat naik',len:1.2,params:WP,apply:waveFx(-1)}
   ];
   const DEF={};LIST.forEach(e=>DEF[e.id]=e);
   const label=fx=>(DEF[fx&&fx.type]||{name:'Efek'}).name;
@@ -113,20 +119,20 @@ APK.fxclip=(function(){
     for(const q of d.params){const v=fx.p&&fx.p[q[0]];o[q[0]]=clamp(v!=null&&isFinite(+v)?+v:q[4],q[2],q[3])}
     return o;
   }
-  /* detik sejak clip efek pemilik fx ini mulai (fx dicari lewat referensi objek; di luar project, misalnya kartu pratinjau, dipakai waktu apa adanya) */
+  /* waktu sejak clip efek pemilik fx ini mulai, dan lama clipnya (fx dicari lewat referensi objek; di luar project, misalnya kartu pratinjau, dipakai waktu apa adanya) */
   function relOf(fx,tm){
     const p=P();
-    if(p)for(const tr of p.tracks)for(const c of tr.clips)if(c.fx===fx)return Math.max(0,tm-c.start);
-    return tm;
+    if(p)for(const tr of p.tracks)for(const c of tr.clips)if(c.fx===fx)return{rel:Math.max(0,tm-c.start),dur:c.dur};
+    return{rel:tm,dur:0};
   }
-  /* terapkan efek fx ke SELURUH isi kanvas g (tm = waktu timeline dalam detik, opaque = latar kanvas tidak transparan, rel = detik sejak efek mulai, opsional) */
-  function run(g,fx,tm,opaque,rel){
+  /* terapkan efek fx ke SELURUH isi kanvas g (tm = waktu timeline dalam detik, opaque = latar kanvas tidak transparan, rel dan dur = detik sejak efek mulai dan lama efek, opsional) */
+  function run(g,fx,tm,opaque,rel,dur){
     const d=fx&&DEF[fx.type];if(!d)return;
     const cv=g.canvas;if(!cv.width||!cv.height)return;
-    const r=rel==null?relOf(fx,tm):rel;
+    const o=rel==null?relOf(fx,tm):{rel,dur:dur||0};
     g.save();g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';
     if('filter' in g)g.filter='none';
-    try{d.apply(g,cv.width,cv.height,params(fx),tm,!!opaque,r)}catch(_){}
+    try{d.apply(g,cv.width,cv.height,params(fx),tm,!!opaque,o.rel,o.dur)}catch(_){}
     g.restore();
   }
 
@@ -170,14 +176,14 @@ APK.fxclip=(function(){
   function add(type){
     const p=P(),d=DEF[type];if(!p||!d)return null;
     APK.history.record();
-    const t=APK.preview.time;
+    const t=APK.preview.time,dur=d.len||DUR;
     let tr=p.tracks[0];
-    const ok=x=>!!x&&x.kind==='video'&&!x.locked&&!x.clips.some(c=>t<c.start+c.dur-1e-6&&t+DUR>c.start+1e-6);
+    const ok=x=>!!x&&x.kind==='video'&&!x.locked&&!x.clips.some(c=>t<c.start+c.dur-1e-6&&t+dur>c.start+1e-6);
     if(!ok(tr)){
       tr={id:uid('t_'),kind:'video',name:'Video '+(p.tracks.filter(x=>x.kind==='video').length+1),muted:false,clips:[]};
       p.tracks.unshift(tr);
     }
-    const c={id:uid('c_'),mediaId:null,start:t,in:0,dur:DUR,props:{x:0,y:0,scale:1,opacity:1,rotation:0,volume:1},fx:{type}};
+    const c={id:uid('c_'),mediaId:null,start:t,in:0,dur,props:{x:0,y:0,scale:1,opacity:1,rotation:0,volume:1},fx:{type}};
     tr.clips.push(c);
     APK.timeline.select(c.id);APK.timeline.commit();
     return c;

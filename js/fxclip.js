@@ -1,11 +1,12 @@
 /* Efek clip (ala CapCut): efek berdiri sendiri sebagai clip di timeline, terpisah dari media, jadi bisa digeser, dipotong,
    diperpanjang, dan diduplikat tanpa menyentuh media.
-   Data clip: clip.fx = { type:'glitch'|'shake', p:{amt,spd} (hanya nilai yang diubah), targets?:[id clip] }
+   Data clip: clip.fx = { type:'glitch'|'shake'|'wave', p:{...} (hanya nilai yang diubah), targets?:[id clip] }
      tanpa targets : efek berlaku untuk SEMUA layer di bawah clip efek (track yang urutannya lebih belakang), selama durasi clip efek
      dengan targets: efek hanya berlaku untuk clip yang dipilih (video, gambar, teks, bentuk), selama durasi clip efek
    Preview menggambar efek lewat run(), targets(), layerBegin(), layerEnd(), jadi ikut ter-export.
    Panel Properti clip efek dibuat oleh panel() dan dipasang properties.js; add() dipanggil daftar efek (js/fxlib.js).
-   Menambah efek baru: tambahkan satu objek di LIST (id, name, desc, def, apply). apply(g, w, h, p, tm, opaque) mengubah isi kanvas g langsung. */
+   Menambah efek baru: tambahkan satu objek di LIST: id, name, desc, params (daftar [kunci, label, min, max, bawaan]) dan apply.
+   apply(g, w, h, p, tm, opaque, rel) mengubah isi kanvas g langsung. tm = waktu timeline, rel = detik sejak clip efek mulai. */
 window.APK=window.APK||{};
 APK.fxclip=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
@@ -14,8 +15,6 @@ APK.fxclip=(function(){
   const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   const clone=o=>JSON.parse(JSON.stringify(o));
   const DUR=3;   /* lama clip efek baru (detik) */
-  /* parameter yang sama untuk semua efek: kunci, label, min, max (nilai bawaan ada di tiap efek) */
-  const PARAMS=[['amt','Kekuatan',0,100],['spd','Kecepatan',10,100]];
 
   /* ===== kanvas bantu untuk efek (dipakai bergantian, tidak pernah bersarang) ===== */
   const aux={};
@@ -77,24 +76,57 @@ APK.fxclip=(function(){
     put(pos(u),0.65);
   }
 
+  /* ===== efek 3: Gelombang =====
+     Tiap strip horizontal tipis digeser ke kiri/kanan mengikuti gelombang sinus yang merambat turun, sehingga gambar meliuk seperti riak.
+     Nilai bawaan diukur dari video referensi (detik 3,5-5): simpangan puncak sekitar 4-7% lebar layar, sekitar 1 gelombang per tinggi layar,
+     merambat turun sekitar 1,3 putaran per detik, dan mereda dalam sekitar 0,8 detik sejak efek mulai (rel).
+     Peredam 0 = gelombang terus berjalan tanpa mereda. Di-zoom tipis seperti Getar supaya tepi tidak bolong. */
+  function wave(g,w,h,p,tm,opaque,rel){
+    const env=p.dec>0?Math.exp(-rel*p.dec/100*6):1;
+    const A=p.amt/100*0.08*w*env;
+    if(A<0.3)return;
+    const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
+    const ph=rel*1.3*(p.spd/50),st=Math.max(1,Math.round(h/320)),z=1+2*A/w;
+    g.clearRect(0,0,w,h);
+    if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
+    g.save();g.translate(w/2,h/2);g.scale(z,z);g.translate(-w/2,-h/2);
+    for(let y=0;y<h;y+=st){
+      const hh=Math.min(st,h-y),dx=A*Math.sin(2*Math.PI*(p.cnt*(y+hh/2)/h-ph));
+      g.drawImage(S.canvas,0,y,w,hh,dx,y,w,hh);
+    }
+    g.restore();
+  }
+
   const LIST=[
-    {id:'glitch',name:'Glitch RGB',desc:'Layar pecah dan warnanya terpisah',def:{amt:60,spd:50},apply:glitch},
-    {id:'shake',name:'Getar',desc:'Layar bergetar dan sedikit ter-zoom',def:{amt:50,spd:50},apply:shake}
+    {id:'glitch',name:'Glitch RGB',desc:'Layar pecah dan warnanya terpisah',
+      params:[['amt','Kekuatan',0,100,60],['spd','Kecepatan',10,100,50]],apply:glitch},
+    {id:'shake',name:'Getar',desc:'Layar bergetar dan sedikit ter-zoom',
+      params:[['amt','Kekuatan',0,100,50],['spd','Kecepatan',10,100,50]],apply:shake},
+    {id:'wave',name:'Gelombang',desc:'Gambar meliuk seperti riak air',
+      params:[['amt','Kekuatan',0,100,60],['cnt','Jumlah gelombang',1,8,1],['spd','Kecepatan',10,100,50],['dec','Peredam (0 = terus bergelombang)',0,100,70]],apply:wave}
   ];
   const DEF={};LIST.forEach(e=>DEF[e.id]=e);
   const label=fx=>(DEF[fx&&fx.type]||{name:'Efek'}).name;
   function params(fx){
     const d=DEF[fx&&fx.type],o={};
-    for(const q of PARAMS){const v=fx&&fx.p&&fx.p[q[0]];o[q[0]]=clamp(v!=null&&isFinite(+v)?+v:(d?d.def[q[0]]:50),q[2],q[3])}
+    if(!d)return o;
+    for(const q of d.params){const v=fx.p&&fx.p[q[0]];o[q[0]]=clamp(v!=null&&isFinite(+v)?+v:q[4],q[2],q[3])}
     return o;
   }
-  /* terapkan efek fx ke SELURUH isi kanvas g (tm = waktu timeline dalam detik, opaque = latar kanvas tidak transparan) */
-  function run(g,fx,tm,opaque){
+  /* detik sejak clip efek pemilik fx ini mulai (fx dicari lewat referensi objek; di luar project, misalnya kartu pratinjau, dipakai waktu apa adanya) */
+  function relOf(fx,tm){
+    const p=P();
+    if(p)for(const tr of p.tracks)for(const c of tr.clips)if(c.fx===fx)return Math.max(0,tm-c.start);
+    return tm;
+  }
+  /* terapkan efek fx ke SELURUH isi kanvas g (tm = waktu timeline dalam detik, opaque = latar kanvas tidak transparan, rel = detik sejak efek mulai, opsional) */
+  function run(g,fx,tm,opaque,rel){
     const d=fx&&DEF[fx.type];if(!d)return;
     const cv=g.canvas;if(!cv.width||!cv.height)return;
+    const r=rel==null?relOf(fx,tm):rel;
     g.save();g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';
     if('filter' in g)g.filter='none';
-    try{d.apply(g,cv.width,cv.height,params(fx),tm,!!opaque)}catch(_){}
+    try{d.apply(g,cv.width,cv.height,params(fx),tm,!!opaque,r)}catch(_){}
     g.restore();
   }
 
@@ -184,18 +216,23 @@ APK.fxclip=(function(){
         return `<label class="fx-tg${inr?'':' off'}"><input type="checkbox" data-fxt="${esc(x.id)}"${locked?' disabled':''}><span><b>${esc(clipName(x,z.m))}</b><small>${esc(z.tr.name)} · ${mmss(x.start)} sampai ${mmss(x.start+x.dur)}${inr?'':' · di luar waktu efek'}</small></span></label>`;
       }).join('')+'</div>';
   }
+  /* baris slider + angka untuk parameter efek (berbeda tiap jenis efek, jadi dibuat ulang saat jenis efek diganti) */
+  function rowsHtml(type,locked){
+    const d=DEF[type],dis=locked?' disabled':'';
+    return (d?d.params:[]).map(q=>`<div class="pr-f"><div class="pr-lab"><span>${esc(q[1])}</span></div><div class="pr-row"><input type="range" data-fxp="${q[0]}" min="${q[2]}" max="${q[3]}" step="1"${dis}><input type="number" data-fxp="${q[0]}" min="${q[2]}" max="${q[3]}" step="1"${dis}></div></div>`).join('');
+  }
 
   /* ===== panel Properti untuk clip efek ===== */
   function panel(s,locked){
     const fx=s.c.fx,dis=locked?' disabled':'';
     const opts=LIST.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
-    const rows=PARAMS.map(q=>`<div class="pr-f"><div class="pr-lab"><span>${q[1]}</span></div><div class="pr-row"><input type="range" data-fxp="${q[0]}" min="${q[2]}" max="${q[3]}" step="1"${dis}><input type="number" data-fxp="${q[0]}" min="${q[2]}" max="${q[3]}" step="1"${dis}></div></div>`).join('');
     return `<h3>Properti</h3><div class="pr-name">✦ ${esc(label(fx))}</div>${locked?'<p class="lock-note">Layer ini terkunci. Klik ikon gembok di timeline untuk membuka kunci.</p>':''}
       <label>Waktu mulai (detik)<input type="number" data-t="start" min="0" step="0.01"${dis}></label>
       <label>Durasi (detik)<input type="number" data-t="dur" min="0.1" step="0.01"${dis}></label>
       <label>Waktu selesai (detik)<input type="number" data-end readonly></label>
       <h3 class="kf-title">Efek</h3>
-      <label>Jenis efek<select data-fxp="type"${dis}>${opts}</select></label>${rows}
+      <label>Jenis efek<select data-fxp="type"${dis}>${opts}</select></label>
+      <div id="fx-params" data-type=""></div>
       <h3 class="kf-title">Berlaku untuk</h3>
       <div class="tx-row"><label><input type="radio" name="fxm" data-fxm="all"${dis}>Semua layer di bawah</label><label><input type="radio" name="fxm" data-fxm="pick"${dis}>Pilih clip tertentu</label></div>
       <div id="fx-targets" class="fx-targets" hidden></div>
@@ -205,7 +242,10 @@ APK.fxclip=(function(){
   function fill(el,c){
     const fx=c.fx;if(!fx)return;
     const d=el.dataset;
-    if(d.fxp!=null)el.value=d.fxp==='type'?fx.type:params(fx)[d.fxp];
+    if(d.fxp!=null){
+      if(d.fxp==='type')el.value=fx.type;
+      else{const v=params(fx)[d.fxp];if(v!=null)el.value=v}
+    }
     else if(d.fxm!=null)el.checked=(d.fxm==='pick')===Array.isArray(fx.targets);
     else if(d.fxt!=null)el.checked=Array.isArray(fx.targets)&&fx.targets.includes(d.fxt);
   }
@@ -214,12 +254,17 @@ APK.fxclip=(function(){
   const sel=()=>{const s=T.selectedClip();return s&&s.c.fx&&!s.tr.locked?s:null};
   let editing=false;
 
-  /* daftar target dan judul dibuat ulang tiap refresh (isi timeline bisa berubah kapan saja) */
+  /* parameter, daftar target, dan judul dibuat ulang tiap refresh (jenis efek dan isi timeline bisa berubah kapan saja) */
   function syncPanel(){
     const s=T.selectedClip(),box=$('fx-targets');
     if(!s||!s.c.fx||!box)return;
     const fx=s.c.fx,nm=pn.querySelector('.pr-name');
     if(nm){const t='✦ '+label(fx);if(nm.textContent!==t)nm.textContent=t}
+    const pb=$('fx-params');
+    if(pb){
+      if(pb.dataset.type!==fx.type){pb.innerHTML=rowsHtml(fx.type,!!s.tr.locked);pb.dataset.type=fx.type}
+      pb.querySelectorAll('[data-fxp]').forEach(el=>{if(document.activeElement!==el)fill(el,s.c)});
+    }
     const pick=Array.isArray(fx.targets);
     box.hidden=!pick;
     if(!pick){box.dataset.sig='';box.innerHTML='';return}
@@ -245,7 +290,8 @@ APK.fxclip=(function(){
   /* slider dan angka parameter */
   pn.addEventListener('input',e=>{
     const el=e.target,d=el.dataset;if(d.fxp==null||el.tagName==='SELECT')return;
-    const q=PARAMS.find(x=>x[0]===d.fxp),s=sel();if(!q||!s)return;
+    const s=sel();if(!s)return;
+    const def=DEF[s.c.fx.type],q=def&&def.params.find(x=>x[0]===d.fxp);if(!q)return;
     const v=parseFloat(el.value);if(!isFinite(v))return;
     if(!editing){APK.history.record();editing=true}
     s.c.fx.p=Object.assign({},s.c.fx.p,{[d.fxp]:clamp(v,q[2],q[3])});
@@ -294,5 +340,5 @@ APK.fxclip=(function(){
   function unshare(){for(const id of T.selectedIds()){const c=find(id);if(c&&c.fx)c.fx=clone(c.fx)}}
   for(const n of ['duplicate','split']){const o=T[n];T[n]=function(){o.apply(this,arguments);unshare()}}
 
-  return{LIST,DEF,PARAMS,label,params,run,targets,layerBegin,layerEnd,add,panel,owns,fill};
+  return{LIST,DEF,label,params,run,targets,layerBegin,layerEnd,add,panel,owns,fill};
 })();

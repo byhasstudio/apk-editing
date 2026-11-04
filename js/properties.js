@@ -1,5 +1,5 @@
 /* Panel properti clip: keyframe animasi + grafik kurva bezier, kecepatan, putar mundur, blend, flip, teks, bentuk,
-   gradien dan bayangan, chroma key, mask, dan fade audio */
+   gradien dan bayangan, chroma key, mask, dan fade audio. Clip efek (js/fxclip.js) memakai panelnya sendiri. */
 window.APK=window.APK||{};
 APK.properties=(function(){
   const $=id=>document.getElementById(id),panel=$('panel-props'),dock=$('curve-dock');
@@ -18,7 +18,7 @@ APK.properties=(function(){
   let shown=null,editing=false,spanRef=0,gd=null;
   const rnd=v=>Math.round(v*100)/100;
   const rel=s=>Math.min(Math.max(APK.preview.time-s.c.start,0),s.c.dur);
-  const typeOf=s=>s.c.text?'text':s.c.shape?'shape':(s.tr&&s.tr.kind==='audio'?'audio':(s.m?s.m.type:'video'));
+  const typeOf=s=>s.c.fx?'fx':s.c.text?'text':s.c.shape?'shape':(s.tr&&s.tr.kind==='audio'?'audio':(s.m?s.m.type:'video'));
   const keyOf=s=>s.c.id+(s.tr&&s.tr.locked?':L':'');
   const shapeOpts=()=>APK.shapes.TYPES.map(t=>`<option value="${t[0]}">${t[1]}</option>`).join('');
   /* bagian gradien + bayangan, dipakai untuk teks (g=tx) dan bentuk (g=sh) */
@@ -34,6 +34,7 @@ APK.properties=(function(){
 
   function build(s){
     const type=typeOf(s),K=APK.kf,T=APK.text,locked=!!(s.tr&&s.tr.locked);
+    if(type==='fx'&&APK.fxclip){panel.innerHTML=APK.fxclip.panel(s,locked);return}
     const rows=F.filter(f=>f[5].includes(type)).map(f=>`<div class="pr-f"><div class="pr-lab"><span>${f[1]}</span><span class="kf-ctl"><button type="button" data-kfgo="-1" data-kp="${f[0]}" title="Loncat ke keyframe sebelumnya">◀</button><button type="button" class="kf-d" data-kf="${f[0]}" title="Tambah / hapus keyframe di posisi playhead">◇</button><button type="button" data-kfgo="1" data-kp="${f[0]}" title="Loncat ke keyframe berikutnya">▶</button></span></div><div class="pr-row"><input type="range" data-p="${f[0]}" min="${f[2]}" max="${f[3]}" step="1"><input type="number" data-p="${f[0]}" min="${f[2]}" max="${f[3]}" step="1"></div></div>`).join('');
     const speed=type==='video'||type==='audio'?`<label title="100% = normal, 200% = 2x lebih cepat">Kecepatan (%)<input type="number" data-sp="1" min="10" max="800" step="5"></label>`:'';
     const rev=type==='video'?`<div class="tx-row"><label><input type="checkbox" data-cp="reverse">Putar mundur (audio dibisukan)</label></div>`:'';
@@ -122,6 +123,7 @@ APK.properties=(function(){
       if(!force&&document.activeElement===el)return;
       const d=el.dataset;
       if(d.an){el.value=rnd((c.anchor&&+c.anchor[d.an])||0);return}
+      if(APK.fxclip&&APK.fxclip.owns(el)){APK.fxclip.fill(el,c);return}
       if(APK.effects&&APK.effects.owns(el)){APK.effects.fill(el,c);return}
       if(d.p){const f=F.find(f=>f[0]===d.p);el.value=rnd(pr[f[0]]*f[4])}
       else if(d.t)el.value=rnd(d.t==='start'?c.start:c.dur);
@@ -167,7 +169,7 @@ APK.properties=(function(){
     fill(s,false);
   }
   function addAll(){
-    const s=APK.timeline.selectedClip();if(!s||s.tr.locked)return;
+    const s=APK.timeline.selectedClip();if(!s||s.tr.locked||s.c.fx)return;
     const K=APK.kf,r=rel(s),list=typeOf(s)==='audio'?['volume']:K.VISUAL;
     APK.history.record();
     list.forEach(p=>K.setKey(s.c,p,r,K.value(s.c,p,r)));
@@ -182,6 +184,7 @@ APK.properties=(function(){
   panel.addEventListener('input',e=>{
     const el=e.target,s=APK.timeline.selectedClip(),d=el.dataset;if(!s||s.tr.locked)return;
     if(APK.effects&&APK.effects.owns(el))return;   /* dikelola modul efek */
+    if(APK.fxclip&&APK.fxclip.owns(el))return;     /* dikelola modul clip efek */
     if(d.an){
       const v=parseFloat(el.value);if(!isFinite(v))return;
       if(!editing){APK.history.record();editing=true}

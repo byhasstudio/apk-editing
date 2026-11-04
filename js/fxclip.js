@@ -77,12 +77,14 @@ APK.fxclip=(function(){
   }
 
   /* ===== efek 3 dan 4: Gelombang dan Gelombang Balik =====
-     Tiap strip horizontal tipis digeser ke kiri/kanan mengikuti gelombang sinus, sehingga gambar meliuk seperti riak (tetap ke samping).
-     Gelombang: merambat TURUN. Gelombang Balik: merambat NAIK dan simpangannya berlawanan arah (dir = -1).
-     Nilai bawaan diukur dari video referensi (detik 3,5-5): simpangan puncak sekitar 4-7% lebar layar, sekitar 1 gelombang per tinggi layar,
+     Gambar dipotong jadi strip tipis, tiap strip digeser mengikuti gelombang sinus sehingga gambar meliuk seperti riak.
+     ARAH simpangan diatur "Arah gelombang" (derajat): 0 = ke samping (strip horizontal digeser kiri kanan), 60 = miring naik ke kanan,
+     90 = naik turun (strip vertikal digeser atas bawah). Nilai negatif = miringnya dibalik (naik ke kiri).
+     Gelombang: merambat searah putaran fase positif. Gelombang Balik: merambat dan menyimpang berlawanan arah (dir = -1).
+     Nilai bawaan dasar diukur dari video referensi (detik 3,5-5): simpangan puncak sekitar 4-7% lebar layar, sekitar 1 gelombang per tinggi layar,
      dan merambat sekitar 1,3 putaran per detik.
      Pola kekuatan sepanjang clip (supaya tidak kaget): DIAM sebentar di awal, lalu NAIK PELAN sampai puncak, lalu MEREDA sampai akhir clip.
-     "Awal pelan" mengatur panjang bagian diam dan naik (0 = langsung kuat di awal clip, seperti versi lama; 100 = diam 15% dan naik 45% dari panjang clip).
+     "Awal pelan" mengatur panjang bagian diam dan naik (0 = langsung kuat di awal clip; 100 = diam 15% dan naik 45% dari panjang clip).
      "Peredam" mengatur seberapa kuat gelombang mereda setelah puncak sampai akhir clip (0 = tetap kuat sampai akhir).
      Semuanya mengikuti PANJANG CLIP, jadi clip yang diperpanjang = gelombang lebih lama.
      TIDAK ada zoom in/out: tepi yang kosong akibat strip bergeser ditutup dengan sambungan dari sisi seberang (membungkus, seperti Glitch). */
@@ -98,25 +100,46 @@ APK.fxclip=(function(){
       const A=p.amt/100*0.08*w*env;
       if(A<0.3)return;
       const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
-      const ph=dir*rel*1.3*(p.spd/50),st=Math.max(1,Math.round(h/320));
+      const ph=dir*rel*1.3*(p.spd/50),deg=p.ang||0;
       g.clearRect(0,0,w,h);
       if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
-      for(let y=0;y<h;y+=st){
-        const hh=Math.min(st,h-y),dx=dir*A*Math.sin(2*Math.PI*(p.cnt*(y+hh/2)/h-ph));
-        g.drawImage(S.canvas,0,y,w,hh,dx,y,w,hh);
-        g.drawImage(S.canvas,0,y,w,hh,dx>0?dx-w:dx+w,y,w,hh);   /* menutup tepi yang kosong dengan sisi seberang */
+      if(deg===0){
+        /* ke samping: strip horizontal digeser kiri kanan */
+        const st=Math.max(1,Math.round(h/320));
+        for(let y=0;y<h;y+=st){
+          const hh=Math.min(st,h-y),dx=dir*A*Math.sin(2*Math.PI*(p.cnt*(y+hh/2)/h-ph));
+          g.drawImage(S.canvas,0,y,w,hh,dx,y,w,hh);
+          g.drawImage(S.canvas,0,y,w,hh,dx>0?dx-w:dx+w,y,w,hh);   /* menutup tepi yang kosong dengan sisi seberang */
+        }
+        return;
+      }
+      /* miring atau naik turun: bidang diputar sebesar sudut, strip digeser sepanjang arah simpangan (u), fase berubah sepanjang arah tegak lurusnya (v) */
+      const th=deg*Math.PI/180,sn=Math.sin(th),cs=Math.cos(th);
+      const ux=cs,uy=-sn;                                           /* arah simpangan di kanvas: naik ke kanan untuk sudut positif */
+      const Ev=w*Math.abs(sn)+h*Math.abs(cs),E=w*Math.abs(cs)+h*Math.abs(sn),R=Math.hypot(w,h);
+      const st=Math.max(3,Math.round(Ev/180));
+      for(let v=-Ev/2;v<Ev/2;v+=st){
+        const fr=(v+st/2+Ev/2)/Ev,dx=dir*A*Math.sin(2*Math.PI*(p.cnt*fr-ph));
+        g.save();
+        g.translate(w/2,h/2);g.rotate(-th);
+        g.beginPath();g.rect(-R,v,2*R,st+1);g.clip();                /* +1 supaya antar strip saling menimpa, tidak ada garis tipis */
+        g.setTransform(1,0,0,1,0,0);
+        g.drawImage(S.canvas,dx*ux,dx*uy);
+        const wr=dx>0?dx-E:dx+E;
+        g.drawImage(S.canvas,wr*ux,wr*uy);                           /* menutup bagian kosong dengan sisi seberang */
+        g.restore();
       }
     };
   }
 
-  const WP=[['amt','Kekuatan',0,100,60],['cnt','Jumlah gelombang',1,8,1],['spd','Kecepatan',10,100,50],['atk','Awal pelan (0 = langsung kuat, makin besar makin lama diam dan naik pelan)',0,100,60],['dec','Peredam (mereda sampai akhir clip, 0 = tetap kuat)',0,100,70]];
+  const WP=[['amt','Kekuatan',0,100,60],['cnt','Jumlah gelombang',1,8,1],['spd','Kecepatan',10,100,50],['ang','Arah gelombang (0 = ke samping, 60 = miring naik, 90 = naik turun, minus = dibalik)',-90,90,60],['atk','Awal pelan (0 = langsung kuat, makin besar makin lama diam dan naik pelan)',0,100,60],['dec','Peredam (mereda sampai akhir clip, 0 = tetap kuat)',0,100,70]];
   const LIST=[
     {id:'glitch',name:'Glitch RGB',desc:'Layar pecah dan warnanya terpisah',
       params:[['amt','Kekuatan',0,100,60],['spd','Kecepatan',10,100,50]],apply:glitch},
     {id:'shake',name:'Getar',desc:'Layar bergetar dan sedikit ter-zoom',
       params:[['amt','Kekuatan',0,100,50],['spd','Kecepatan',10,100,50]],apply:shake},
-    {id:'wave',name:'Gelombang',desc:'Gambar meliuk ke samping, merambat turun',len:1.2,params:WP,apply:waveFx(1)},
-    {id:'wave2',name:'Gelombang Balik',desc:'Gambar meliuk ke samping, merambat naik',len:1.2,params:WP,apply:waveFx(-1)}
+    {id:'wave',name:'Gelombang',desc:'Gambar meliuk miring ke atas, arah bisa diatur',len:1.2,params:WP,apply:waveFx(1)},
+    {id:'wave2',name:'Gelombang Balik',desc:'Gambar meliuk berlawanan arah, arah bisa diatur',len:1.2,params:WP,apply:waveFx(-1)}
   ];
   const DEF={};LIST.forEach(e=>DEF[e.id]=e);
   const label=fx=>(DEF[fx&&fx.type]||{name:'Efek'}).name;

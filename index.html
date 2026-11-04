@@ -16,11 +16,12 @@
 <link rel="stylesheet" href="css/studio.css?v=15">
 <link rel="stylesheet" href="css/vector.css?v=15">
 <link rel="stylesheet" href="css/autokey.css?v=18">
+<link rel="stylesheet" href="css/smartfx.css?v=20">
 </head>
 <body>
 <section id="home" class="view">
   <header class="home-head">
-    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO · v19 regang, animasi, filter, transisi</small></div></div>
+    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO · v20 regang, animasi, filter, transisi, efek pintar</small></div></div>
     <div class="actions"><button class="btn" id="btn-open">Buka Project</button><button class="btn primary" id="btn-new">Project Baru</button></div>
   </header>
   <main class="home-main"><h2>Project terakhir</h2><div id="project-list" class="project-grid"></div></main>
@@ -63,6 +64,7 @@
     <button class="btn" id="tl-sticker" title="Tambah stiker emoji di playhead">☺ Stiker</button>
     <button class="btn" id="tl-group" title="Tambah layer grup kosong untuk dijadikan induk beberapa clip">▣ Grup</button>
     <button class="btn" id="tl-auto" title="Mode kurva otomatis: tekan Mulai, hitung mundur 3 detik, lalu timeline berjalan sendiri dan setiap geser, zoom, atau putar objek langsung direkam jadi keyframe">⏺ Kurva otomatis</button>
+    <button class="btn" id="tl-smart" title="Efek pintar: analisis kecerahan, gerakan, dan beat audio clip, lalu sarankan efek (Cerah otomatis dan Zoom beat)">✨ Efek pintar</button>
     <button class="btn adv" id="tl-ext" title="Pisahkan audio dari clip video terpilih">Pisah audio</button>
     <select id="tl-addtrack" class="adv" title="Tambah track baru"><option value="">+ Track</option><option value="video">Video</option><option value="audio">Audio</option><option value="image">Gambar</option></select><span class="sp"></span>
     <button class="btn on adv" id="tl-snap" title="Snap: clip menempel ke tepi clip lain dan playhead">Snap</button><button class="btn" id="tl-zout" aria-label="Zoom out" title="Perkecil timeline">−</button><button class="btn" id="tl-zin" aria-label="Zoom in" title="Perbesar timeline">+</button></div>
@@ -84,6 +86,11 @@
   <div id="stk-grid" class="stk-grid"></div>
   <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Tutup</button></div>
 </form></dialog>
+<dialog id="dlg-smart">
+  <h3>✨ Efek pintar</h3>
+  <div id="sf-body"></div>
+  <div class="dlg-actions" id="sf-actions"></div>
+</dialog>
 <dialog id="dlg-export"><form method="dialog" id="form-export">
   <h3>Export video</h3>
   <div id="ex-settings">
@@ -127,5 +134,6 @@
 <script src="js/vector.js?v=19"></script>
 <script src="js/presets.js?v=17"></script>
 <script src="js/autokey.js?v=19"></script>
+<script src="js/smartfx.js?v=20"></script>
 </body>
 </html>

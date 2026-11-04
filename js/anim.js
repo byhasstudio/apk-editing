@@ -41,7 +41,8 @@ APK.anim=(function(){
     stretchY:{l:'Memendek ke tengah',f:b=>({sy:[[0,b.sy,'in'],[1,0]],opacity:fadeOut(b)})},
     skew:{l:'Miring lalu hilang',f:(b,W)=>({skx:[[0,b.skx,'in'],[1,45]],x:[[0,b.x,'in'],[1,b.x+W*0.25]],opacity:fadeOut(b)})}
   };
-  /* loop: pola satu siklus, fase 0..1, selalu mulai dan berakhir di posisi diam. per = pengali panjang siklus */
+  /* loop: pola satu siklus, fase 0..1, selalu mulai dan berakhir di posisi diam. per = pengali panjang siklus.
+     env:false = tanpa selubung (dipakai putaran 360 derajat yang memang harus berputar penuh). */
   const wave=(v0,a,ease)=>[[0,v0,ease||'inout'],[.25,v0-a,ease||'inout'],[.75,v0+a,ease||'inout'],[1,v0]];
   const LOOP={
     pulse:{l:'Denyut (membesar mengecil)',f:b=>({scale:[[0,b.scale,'inout'],[.5,b.scale*1.15,'inout'],[1,b.scale]]})},
@@ -52,8 +53,13 @@ APK.anim=(function(){
     blink:{l:'Berkedip',f:b=>({opacity:[[0,b.opacity,'inout'],[.5,b.opacity*0.25,'inout'],[1,b.opacity]]})},
     shake:{l:'Getar (cepat)',per:0.15,f:b=>({x:wave(b.x,8,'linear')})},
     wobble:{l:'Miring goyang',f:b=>({skx:wave(b.skx,10)})},
-    spin360:{l:'Berputar terus',f:b=>({rotation:[[0,b.rotation,'linear'],[1,b.rotation+360]]})}
+    spin360:{l:'Berputar terus',env:false,f:b=>({rotation:[[0,b.rotation,'linear'],[1,b.rotation+360]]})}
   };
+  /* Selubung gelombang (pola: diam > bergelombang > akhir). u = posisi di jendela loop (0..1), hasil 0..1 = seberapa besar gelombang.
+     0-20% diam, 20-45% naik pelan, 45-75% penuh, 75-95% mereda pelan, 95-100% diam lagi. */
+  const smooth=x=>x*x*(3-2*x);
+  const envAt=u=>u<.2?0:u<.45?smooth((u-.2)/.25):u<.75?1:u<.95?smooth(1-(u-.75)/.2):0;
+  const MINCYC=4; /* minimal siklus supaya gelombang tetap terlihat di clip yang pendek */
   const KINDS={in:IN,out:OUT,loop:LOOP};
   const LABEL={in:'Animasi masuk',out:'Animasi keluar',loop:'Animasi berulang (loop)'};
 
@@ -130,8 +136,13 @@ APK.anim=(function(){
       cut(c,q,t0,t1,kind!=='loop');
       const list=spec[q];
       if(kind==='loop'){
-        const per=Math.max(0.1,c.anim.loopP*(def.per||1)),n=Math.max(1,Math.min(100,Math.round((t1-t0)/per))),step=(t1-t0)/n,keys=[];
-        for(let i=0;i<n;i++)for(let j=0;j<list.length-(i<n-1?1:0);j++)keys.push([t0+(i+list[j][0])*step,list[j][1],list[j][2]]);
+        const useEnv=def.env!==false,per=Math.max(0.1,c.anim.loopP*(def.per||1)),n=Math.max(useEnv?MINCYC:1,Math.min(100,Math.round((t1-t0)/per))),step=(t1-t0)/n,keys=[],rest=list[0][1];
+        for(let i=0;i<n;i++)for(let j=0;j<list.length-(i<n-1?1:0);j++){
+          const t=t0+(i+list[j][0])*step;let v=list[j][1];
+          /* selubung: simpangan dari posisi diam dikalikan 0..1 sesuai posisi di jendela loop */
+          if(useEnv)v=rest+(v-rest)*envAt((t-t0)/(t1-t0));
+          keys.push([t,v,list[j][2]]);
+        }
         put(c,q,keys);
       }else put(c,q,list.map(k=>[t0+k[0]*(t1-t0),k[1],k[2]]));
     }

@@ -1,0 +1,34 @@
+/* Efek clip (js/fxclip.js) dan daftar efek di bilah kanan (js/fxlib.js) */
+.clip.fx{background:#0c8599}
+
+/* bilah kanan: daftar efek menggantikan panel Properti selama terbuka */
+#panel-efek{display:none}
+@media(min-width:901px){
+  #editor[data-right=efek] #panel-props{display:none}
+  #editor[data-right=efek] #panel-efek{display:block}
+}
+@media(max-width:900px){
+  #panel-efek{flex:0 0 44vh}
+  #editor[data-tab=efek] #panel-efek{display:block}
+  #editor[data-tab=efek] .timeline{display:none}
+  .fx-card canvas{aspect-ratio:16/9}
+}
+#panel-efek .kf-hint{margin:0 0 4px}
+.fx-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.fx-card{position:relative;display:flex;flex-direction:column;gap:2px;text-align:left;padding:0 0 8px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);color:var(--text);font:inherit;cursor:pointer;overflow:hidden}
+.fx-card:hover,.fx-card:focus-visible{border-color:var(--accent)}
+.fx-card canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;background:#000}
+.fx-card b{font-size:12px;font-weight:600;padding:5px 8px 0}
+.fx-card small{font-size:11px;padding:0 8px;line-height:1.35}
+.fx-tag{position:absolute;left:6px;top:6px;font-size:10px;line-height:1.5;background:rgba(0,0,0,.6);color:#fff;border-radius:4px;padding:0 6px}
+.fx-add{position:absolute;right:6px;top:6px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;line-height:1}
+
+/* daftar "Berlaku untuk" di panel Properti clip efek */
+.fx-targets{margin-top:8px}
+.fx-tlist{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:240px;overflow:auto}
+#panel-props .fx-tg{display:flex;align-items:flex-start;gap:8px;margin:0;padding:6px 8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer}
+#panel-props .fx-tg input{flex:none;margin:3px 0 0}
+#panel-props .fx-tg span{display:flex;flex-direction:column;gap:2px;min-width:0}
+#panel-props .fx-tg b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#panel-props .fx-tg small{color:var(--dim);font-size:11px;line-height:1.35}
+#panel-props .fx-tg.off{opacity:.6}

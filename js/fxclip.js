@@ -1,6 +1,6 @@
 /* Efek clip (ala CapCut): efek berdiri sendiri sebagai clip di timeline, terpisah dari media, jadi bisa digeser, dipotong,
    diperpanjang, dan diduplikat tanpa menyentuh media.
-   Data clip: clip.fx = { type:'glitch'|'shake'|'wave'|'wave2', p:{...} (hanya nilai yang diubah), targets?:[id clip] }
+   Data clip: clip.fx = { type:'glitch'|'shake'|'wave'|'wave2'|'jj', p:{...} (hanya nilai yang diubah), targets?:[id clip] }
      tanpa targets : efek berlaku untuk SEMUA layer di bawah clip efek (track yang urutannya lebih belakang), selama durasi clip efek
      dengan targets: efek hanya berlaku untuk clip yang dipilih (video, gambar, teks, bentuk), selama durasi clip efek
    Preview menggambar efek lewat run(), targets(), layerBegin(), layerEnd(), jadi ikut ter-export.
@@ -132,6 +132,31 @@ APK.fxclip=(function(){
     };
   }
 
+  /* ===== efek 5: JJ Tipis (jedag-jedug tipis) =====
+     Tiap ketukan, gambar tersentak bergeser sedikit ke satu arah lalu cepat kembali (arah acak tapi tetap untuk ketukan yang sama).
+     Ketukan dihitung dari BPM, mulai dari awal clip efek, jadi taruh clip tepat di ketukan pertama lagu.
+     Ada jejak tipis di antara posisi diam dan posisi tersentak supaya terasa seperti blur gerak. TIDAK ada zoom:
+     tepi yang kosong ditutup dengan sisi seberang (membungkus, seperti Glitch dan Gelombang). */
+  function jj(g,w,h,p,tm,opaque,rel){
+    const x=Math.max(0,rel)*p.bpm/60,bi=Math.floor(x),ph=x-bi;
+    const env=Math.exp(-ph*(3+p.dec/100*9));
+    const A=p.amt/100*0.03*Math.min(w,h)*env;
+    if(A<0.2)return;
+    const ang=rng(bi*7919+31)()*Math.PI*2,dx=Math.cos(ang)*A,dy=Math.sin(ang)*A;
+    const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
+    g.clearRect(0,0,w,h);
+    if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
+    const put=(ox,oy,al)=>{
+      const wx=ox>0?-w:w,wy=oy>0?-h:h;
+      g.globalAlpha=al;
+      g.drawImage(S.canvas,ox,oy);g.drawImage(S.canvas,ox+wx,oy);
+      g.drawImage(S.canvas,ox,oy+wy);g.drawImage(S.canvas,ox+wx,oy+wy);
+    };
+    put(dx,dy,1);
+    put(dx*0.35,dy*0.35,0.4);
+    g.globalAlpha=1;
+  }
+
   const WP=[['amt','Kekuatan',0,100,60],['cnt','Jumlah gelombang',1,8,1],['spd','Kecepatan',10,100,50],['ang','Arah gelombang (0 = ke samping, 60 = miring naik, 90 = naik turun, minus = dibalik)',-90,90,60],['atk','Awal pelan (0 = langsung kuat, makin besar makin lama diam dan naik pelan)',0,100,60],['dec','Peredam (mereda sampai akhir clip, 0 = tetap kuat)',0,100,70]];
   const LIST=[
     {id:'glitch',name:'Glitch RGB',desc:'Layar pecah dan warnanya terpisah',
@@ -139,7 +164,9 @@ APK.fxclip=(function(){
     {id:'shake',name:'Getar',desc:'Layar bergetar dan sedikit ter-zoom',
       params:[['amt','Kekuatan',0,100,50],['spd','Kecepatan',10,100,50]],apply:shake},
     {id:'wave',name:'Gelombang',desc:'Gambar meliuk miring ke atas, arah bisa diatur',len:1.2,params:WP,apply:waveFx(1)},
-    {id:'wave2',name:'Gelombang Balik',desc:'Gambar meliuk berlawanan arah, arah bisa diatur',len:1.2,params:WP,apply:waveFx(-1)}
+    {id:'wave2',name:'Gelombang Balik',desc:'Gambar meliuk berlawanan arah, arah bisa diatur',len:1.2,params:WP,apply:waveFx(-1)},
+    {id:'jj',name:'JJ Tipis',desc:'Tersentak tipis di tiap ketukan, hitungan BPM',len:4,
+      params:[['amt','Kekuatan',0,100,50],['bpm','Ketukan per menit (BPM)',60,200,120],['dec','Kecepatan kembali (makin besar makin cepat)',0,100,60]],apply:jj}
   ];
   const DEF={};LIST.forEach(e=>DEF[e.id]=e);
   const label=fx=>(DEF[fx&&fx.type]||{name:'Efek'}).name;

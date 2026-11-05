@@ -1,6 +1,7 @@
 /* Daftar efek di bilah kanan (tombol "Efek" di timeline), ala CapCut.
    Tiap kartu menampilkan foto atau video contoh yang memakai efek itu dan bergerak langsung (memakai media project kalau ada, kalau tidak gambar contoh bawaan).
-   Ketuk kartu = tambahkan clip efek di posisi playhead (js/fxclip.js). Di layar kecil daftar ini jadi tab "Efek" di bawah. */
+   Ketuk kartu = tambahkan clip efek di posisi playhead (js/fxclip.js). Di layar kecil daftar ini jadi tab "Efek" di bawah.
+   Di sini juga dipasang dua tombol pintasan di bar timeline, tepat di samping kanan tombol "Pisah audio": Kuning (kurva otomatis) dan Biru (kurva hentakan JJ Tipis Pintar). */
 window.APK=window.APK||{};
 APK.fxlib=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
@@ -98,7 +99,39 @@ APK.fxlib=(function(){
     $('tl-fx').classList.remove('on');stop();
   }
 
+  /* ===== pintasan Kuning dan Biru di bar timeline, di samping kanan tombol "Pisah audio" =====
+     Kuning = kurva otomatis (merekam gerakan, ukuran, dan putaran objek), sama dengan tombol "Kurva otomatis".
+     Biru = kurva hentakan JJ Tipis Pintar: kalau clip JJ Tipis Pintar sedang dipilih, langsung buka kurvanya;
+     kalau belum, tambahkan clip JJ Tipis Pintar di playhead lalu buka kurvanya. */
+  function shortcuts(){
+    const ext=$('tl-ext'),auto=$('tl-auto');
+    if(!ext||$('tl-yel'))return;
+    const mk=(id,txt,title,col)=>{
+      const b=document.createElement('button');
+      b.type='button';b.className='btn';b.id=id;b.textContent=txt;b.title=title;
+      b.style.cssText='border-color:'+col+';color:'+col+';font-weight:700';
+      return b;
+    };
+    const yel=mk('tl-yel','〰 Kuning','Pintasan kurva kuning: kurva otomatis, merekam gerakan, ukuran, dan putaran objek','#facc15');
+    const blu=mk('tl-blu','〰 Biru','Pintasan kurva biru: tambah atau buka JJ Tipis Pintar, lalu atur hentakannya di kurva biru','#3b82f6');
+    ext.after(yel,blu);
+    yel.onclick=()=>{if(auto)auto.click()};
+    if(auto)new MutationObserver(()=>yel.classList.toggle('on',auto.classList.contains('on'))).observe(auto,{attributes:true,attributeFilter:['class']});
+    blu.onclick=()=>{
+      if(!P())return;
+      const s=APK.timeline.selectedClip(),d=s&&s.c.fx&&APK.fxclip.DEF[s.c.fx.type];
+      if(!(d&&d.curve)){
+        if(!APK.fxclip.add('jjp'))return;
+        toast('JJ Tipis Pintar ditambahkan di timeline. Atur hentakannya di kurva biru.');
+      }
+      if(isOpen())close();
+      if(small()){const tb=document.querySelector('#mtabs [data-tab="props"]');if(tb)tb.click()}
+      setTimeout(()=>{const cv=document.querySelector('#fx-params canvas[data-fxc="cv"]');if(cv&&cv.scrollIntoView)cv.scrollIntoView({block:'center',behavior:'smooth'})},200);
+    };
+  }
+
   function init(){
+    try{shortcuts()}catch(e){console.error('Pintasan kurva gagal dimuat',e)}
     $('tl-fx').onclick=()=>isOpen()?close():open();
     $('fx-close').onclick=close;
     $('fx-grid').addEventListener('click',e=>{

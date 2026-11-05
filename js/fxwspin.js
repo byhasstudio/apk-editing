@@ -1,5 +1,6 @@
 /* Efek clip tambahan: Gelombang Putar (js/fxclip.js menyediakan daftar efek, file ini menambahkan satu efek ke dalamnya).
-   Dimuat setelah js/fxclip.js dan sebelum js/fxlib.js, jadi efeknya muncul di daftar Efek dan di pilihan "Jenis efek" panel Properti. */
+   Dimuat setelah js/fxclip.js dan sebelum js/fxlib.js, jadi efeknya muncul di daftar Efek dan di pilihan "Jenis efek" panel Properti.
+   Performa (v23): saat preview diputar, jumlah strip gelombang dikurangi (lebih ringan); saat export tetap penuh. */
 window.APK=window.APK||{};
 (function(){
   if(!APK.fxclip||!APK.fxclip.LIST||!APK.fxclip.DEF)return;
@@ -15,7 +16,7 @@ window.APK=window.APK||{};
     g.clearRect(0,0,w,h);
     return g;
   }
-  /* ===== efek: Gelombang Putar =====
+  /* efek: Gelombang Putar
      Satu efek utuh yang meniru transisi di video referensi (sekitar 4,4 detik), terdiri dari lima tahap berurutan sepanjang clip efek:
        1. GELOMBANG (0 sampai 33%): gambar meliuk miring, simpangan membesar pelan (mulai terlihat sekitar 20%) sampai kuat, gambar ikut membesar supaya tepi tidak bolong.
        2. KILAT PUTAR (33 sampai 40%): layar memutih, gambar kabur dan berputar 90 derajat berlawanan arah jarum jam.
@@ -34,16 +35,17 @@ window.APK=window.APK||{};
   /* gelombang miring (sama dengan efek Gelombang): src digeser per strip mengikuti sinus, hasil digambar ke g */
   function wsWave(g,src,w,h,A,cnt,ph,deg){
     const th=deg*Math.PI/180,sn=Math.sin(th),cs=Math.cos(th),ux=cs,uy=-sn;
+    const fast=!!(APK.preview&&APK.preview.playing&&!APK.preview.exporting);   /* preview diputar: strip lebih sedikit */
     const z=1+2*A*Math.max(Math.abs(ux)/w,Math.abs(uy)/h);
     const Z=ac('z',w,h);
     Z.translate(w/2,h/2);Z.scale(z,z);Z.translate(-w/2,-h/2);Z.drawImage(src,0,0);
     g.clearRect(0,0,w,h);
     if(deg===0){
-      const st=Math.max(1,Math.round(h/320));
+      const st=Math.max(1,Math.round(h/(fast?180:320)));
       for(let y=0;y<h;y+=st){const hh=Math.min(st,h-y),dx=A*Math.sin(2*Math.PI*(cnt*(y+hh/2)/h-ph));g.drawImage(Z.canvas,0,y,w,hh,dx,y,w,hh)}
       return;
     }
-    const Ev=w*Math.abs(sn)+h*Math.abs(cs),R=Math.hypot(w,h),st=Math.max(3,Math.round(Ev/180));
+    const Ev=w*Math.abs(sn)+h*Math.abs(cs),R=Math.hypot(w,h),st=Math.max(3,Math.round(Ev/(fast?120:180)));
     for(let v=-Ev/2;v<Ev/2;v+=st){
       const fr=(v+st/2+Ev/2)/Ev,dx=A*Math.sin(2*Math.PI*(cnt*fr-ph));
       g.save();

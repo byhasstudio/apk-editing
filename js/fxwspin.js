@@ -1,6 +1,7 @@
 /* Efek clip tambahan: Gelombang Putar (js/fxclip.js menyediakan daftar efek, file ini menambahkan satu efek ke dalamnya).
    Dimuat setelah js/fxclip.js dan sebelum js/fxlib.js, jadi efeknya muncul di daftar Efek dan di pilihan "Jenis efek" panel Properti.
-   Performa (v23): saat preview diputar, jumlah strip gelombang dikurangi (lebih ringan); saat export tetap penuh. */
+   Performa (v23): saat preview diputar, jumlah strip gelombang dikurangi (lebih ringan); saat export tetap penuh.
+   Perbaikan frame hitam (v24): pembesaran gambar dan geseran strip gelombang digabung dalam satu gambar langsung dari gambar asli, jadi tepi tidak lagi terbuka dan terisi hitam. */
 window.APK=window.APK||{};
 (function(){
   if(!APK.fxclip||!APK.fxclip.LIST||!APK.fxclip.DEF)return;
@@ -36,13 +37,12 @@ window.APK=window.APK||{};
   function wsWave(g,src,w,h,A,cnt,ph,deg){
     const th=deg*Math.PI/180,sn=Math.sin(th),cs=Math.cos(th),ux=cs,uy=-sn;
     const fast=!!(APK.preview&&APK.preview.playing&&!APK.preview.exporting);   /* preview diputar: strip lebih sedikit */
+    /* pembesaran dari tengah dilakukan saat menggambar tiap strip (bukan di kanvas bantu), supaya bagian yang keluar layar tidak hilang dan tepi tidak jadi kosong */
     const z=1+2*A*Math.max(Math.abs(ux)/w,Math.abs(uy)/h);
-    const Z=ac('z',w,h);
-    Z.translate(w/2,h/2);Z.scale(z,z);Z.translate(-w/2,-h/2);Z.drawImage(src,0,0);
     g.clearRect(0,0,w,h);
     if(deg===0){
       const st=Math.max(1,Math.round(h/(fast?180:320)));
-      for(let y=0;y<h;y+=st){const hh=Math.min(st,h-y),dx=A*Math.sin(2*Math.PI*(cnt*(y+hh/2)/h-ph));g.drawImage(Z.canvas,0,y,w,hh,dx,y,w,hh)}
+      for(let y=0;y<h;y+=st){const hh=Math.min(st,h-y),dx=A*Math.sin(2*Math.PI*(cnt*(y+hh/2)/h-ph));g.drawImage(src,0,h/2+(y-h/2)/z,w,hh/z,dx+w/2-z*w/2,y,z*w,hh)}
       return;
     }
     const Ev=w*Math.abs(sn)+h*Math.abs(cs),R=Math.hypot(w,h),st=Math.max(3,Math.round(Ev/(fast?120:180)));
@@ -52,7 +52,8 @@ window.APK=window.APK||{};
       g.translate(w/2,h/2);g.rotate(-th);
       g.beginPath();g.rect(-R,v,2*R,st+1);g.clip();
       g.setTransform(1,0,0,1,0,0);
-      g.drawImage(Z.canvas,dx*ux,dx*uy);
+      g.translate(w/2+dx*ux,h/2+dx*uy);g.scale(z,z);g.translate(-w/2,-h/2);
+      g.drawImage(src,0,0);
       g.restore();
     }
   }

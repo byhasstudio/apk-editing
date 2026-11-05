@@ -1,8 +1,10 @@
 /* Efek clip (ala CapCut): efek berdiri sendiri sebagai clip di timeline, terpisah dari media, jadi bisa digeser, dipotong,
    diperpanjang, dan diduplikat tanpa menyentuh media.
-   Data clip: clip.fx = { type:'glitch'|'shake'|'wave'|'wave2'|'jj', p:{...} (hanya nilai yang diubah), targets?:[id clip] }
+   Data clip: clip.fx = { type:'glitch'|'shake'|'wave'|'wave2'|'jj'|'mirror', p:{...} (hanya nilai yang diubah), targets?:[id clip] }
      tanpa targets : efek berlaku untuk SEMUA layer di bawah clip efek (track yang urutannya lebih belakang), selama durasi clip efek
      dengan targets: efek hanya berlaku untuk clip yang dipilih (video, gambar, teks, bentuk), selama durasi clip efek
+   Efek dengan perLayer:true (Isi Cermin) tanpa targets tidak mengolah kanvas utama, tapi tiap clip media (video/gambar) yang sedang tampil di track bawahnya
+   diolah sendiri-sendiri di lapisan transparan (lihat targets() dan layerEnd()), karena efek itu perlu tahu mana bagian yang kosong (transparan) dan kotak medianya.
    Preview menggambar efek lewat run(), targets(), layerBegin(), layerEnd(), jadi ikut ter-export.
    Panel Properti clip efek dibuat oleh panel() dan dipasang properties.js; add() dipanggil daftar efek (js/fxlib.js).
    Menambah efek baru: tambahkan satu objek di LIST: id, name, desc, params (daftar [kunci, label, min, max, bawaan]), apply, dan len (opsional, lama clip baru).
@@ -15,6 +17,7 @@ APK.fxclip=(function(){
   const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   const clone=o=>JSON.parse(JSON.stringify(o));
   const DUR=3;   /* lama clip efek baru (detik), kecuali efek punya len sendiri */
+  let curClip=null;   /* clip media yang sedang diolah layerEnd(): efek per-layer memakainya untuk tahu kotak medianya (APK.preview.bounds) */
 
   /* ===== kanvas bantu untuk efek (dipakai bergantian, tidak pernah bersarang) ===== */
   const aux={};
@@ -189,6 +192,71 @@ APK.fxclip=(function(){
     g.globalCompositeOperation='source-over';
   }
 
+  /* ===== efek 6: Isi Cermin =====
+     Mengusir frame yang kosong: area di sekitar media yang tidak tertutup (sisa letterbox karena rasio beda, media yang dikecilkan, atau media yang digeser)
+     diisi dengan CERMIN media itu sendiri. Media dipantulkan bolak-balik melewati tiap tepinya (seperti ubin cermin), jadi sambungan di tepi selalu mulus.
+     Efek ini bekerja PER CLIP MEDIA (perLayer): tiap video/gambar di bawah clip efek diolah di lapisannya sendiri, memakai kotak medianya dari preview
+     (APK.preview.bounds, sudah termasuk posisi, skala, dan rotasi), lalu hasilnya yang menutup layer di bawahnya. Teks dan bentuk tidak diisi (hanya kalau dipilih
+     lewat "Pilih clip tertentu"). Kalau media sudah menutupi seluruh frame, tidak ada yang dikerjakan.
+     "Blur isian" melembutkan bagian cermin saja (media aslinya tetap tajam), "Gelapkan isian" menggelapkannya supaya fokus ke media.
+     Di kartu pratinjau (tanpa clip sungguhan) dipakai kotak 62% di tengah gambar contoh supaya efeknya kelihatan. */
+  function mirrorFill(g,w,h,p){
+    const pj=P();let b=null,demo=false;
+    if(curClip){
+      const q=pj&&pj.width&&APK.preview&&APK.preview.bounds?APK.preview.bounds(curClip.id):null;
+      if(!q)return;
+      const K=w/pj.width;
+      b={cx:q.cx*K,cy:q.cy*K,w:q.w*K,h:q.h*K,rot:+q.rot||0};
+    }else{demo=true;b={cx:w/2,cy:h/2,w:w*0.62,h:h*0.62,rot:0}}
+    const tw=Math.round(b.w),th=Math.round(b.h);
+    if(!(tw>=4&&th>=4))return;
+    const rad=b.rot*Math.PI/180,cs=Math.cos(rad),sn=Math.sin(rad);
+    let Rmax=0,cover=true;
+    for(const q of [[0,0],[w,0],[w,h],[0,h]]){
+      const dx=q[0]-b.cx,dy=q[1]-b.cy,lx=dx*cs+dy*sn,ly=-dx*sn+dy*cs;   /* sudut kanvas di ruang media (diputar balik) */
+      Rmax=Math.max(Rmax,Math.hypot(dx,dy));
+      if(Math.abs(lx)>b.w/2+0.5||Math.abs(ly)>b.h/2+0.5)cover=false;
+    }
+    if(cover&&!demo)return;   /* media sudah menutupi seluruh frame */
+    const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
+    /* satu ubin = kotak media yang diluruskan (rotasi dibalik) */
+    const T=ac('t',tw,th);
+    T.translate(tw/2,th/2);T.rotate(-rad);T.translate(-b.cx,-b.cy);T.drawImage(S.canvas,0,0);
+    const bl=p.blur/100*0.05*Math.min(w,h),F=ac('f',w,h);
+    const blur=bl>=0.5&&'filter' in F;
+    /* ubin dicermin bergantian (ubin ganjil dibalik), disusun di ruang media: pusat, sumbu, dan putar mengikuti media */
+    F.translate(b.cx,b.cy);F.rotate(rad);
+    const lim=Rmax+Math.hypot(tw,th)/2,nx=Math.min(6,Math.ceil(Rmax/tw)),ny=Math.min(6,Math.ceil(Rmax/th));
+    for(let j=-ny;j<=ny;j++)for(let i=-nx;i<=nx;i++){
+      if(Math.hypot(i*tw,j*th)>lim)continue;
+      if(!i&&!j&&!blur)continue;   /* ubin tengah = media asli, nanti digambar tajam di atasnya (kecuali blur: perlu agar tepi blur tidak memudar) */
+      F.save();
+      F.translate(i*tw,j*th);F.scale(i&1?-1:1,j&1?-1:1);
+      F.drawImage(T.canvas,-tw/2-0.5,-th/2-0.5,tw+1,th+1);   /* +1 supaya antar ubin saling menimpa, tidak ada garis tipis */
+      F.restore();
+    }
+    F.setTransform(1,0,0,1,0,0);
+    let FL=F;
+    if(blur){
+      /* blur sekali untuk seluruh isian (bukan per ubin, supaya tidak ada sambungan); diperbesar sedikit supaya tepi kanvas tidak memudar */
+      const U=ac('u',w,h),m=Math.ceil(bl*2);
+      U.filter='blur('+bl.toFixed(1)+'px)';
+      U.drawImage(F.canvas,-m,-m,w+2*m,h+2*m);
+      U.filter='none';
+      FL=U;
+    }
+    if(p.dim>0){FL.globalCompositeOperation='source-atop';FL.fillStyle='rgba(0,0,0,'+(p.dim/100)+')';FL.fillRect(0,0,w,h);FL.globalCompositeOperation='source-over'}
+    g.clearRect(0,0,w,h);
+    g.drawImage(FL.canvas,0,0);
+    if(demo){
+      /* kartu pratinjau: hanya kotak tengah yang dianggap media, sisanya diganti cermin */
+      g.save();
+      g.translate(b.cx,b.cy);g.rotate(rad);g.beginPath();g.rect(-b.w/2,-b.h/2,b.w,b.h);g.clip();
+      g.setTransform(1,0,0,1,0,0);g.drawImage(S.canvas,0,0);
+      g.restore();
+    }else g.drawImage(S.canvas,0,0);
+  }
+
   const WP=[['amt','Kekuatan',0,100,60],['cnt','Jumlah gelombang',1,8,1],['spd','Kecepatan',10,100,50],['ang','Arah gelombang (0 = ke samping, 60 = miring naik, 90 = naik turun, minus = dibalik)',-90,90,60],['atk','Awal pelan (0 = langsung kuat, makin besar makin lama diam dan naik pelan)',0,100,60],['dec','Peredam (mereda sampai akhir clip, 0 = tetap kuat)',0,100,70]];
   const LIST=[
     {id:'glitch',name:'Glitch RGB',desc:'Layar pecah dan warnanya terpisah',
@@ -198,7 +266,9 @@ APK.fxclip=(function(){
     {id:'wave',name:'Gelombang',desc:'Gambar meliuk miring ke atas, arah bisa diatur',len:1.2,params:WP,apply:waveFx(1)},
     {id:'wave2',name:'Gelombang Balik',desc:'Gambar meliuk berlawanan arah, arah bisa diatur',len:1.2,params:WP,apply:waveFx(-1)},
     {id:'jj',name:'JJ Tipis',desc:'Sentak zoom, geser, putar tipis, jejak gerak, dan pecah warna satu kali di awal clip',len:0.6,
-      params:[['amt','Kekuatan geser',0,100,50],['zm','Zoom sentak (%)',0,30,6],['rot','Putaran tipis (derajat, 0 = tanpa putar)',0,10,2],['rgb','Pecah warna RGB (0 = mati)',0,100,30],['dec','Kecepatan kembali (makin besar makin cepat)',0,100,60]],apply:jj}
+      params:[['amt','Kekuatan geser',0,100,50],['zm','Zoom sentak (%)',0,30,6],['rot','Putaran tipis (derajat, 0 = tanpa putar)',0,10,2],['rgb','Pecah warna RGB (0 = mati)',0,100,30],['dec','Kecepatan kembali (makin besar makin cepat)',0,100,60]],apply:jj},
+    {id:'mirror',name:'Isi Cermin',desc:'Menutup frame kosong di sekitar media dengan cermin tepinya',len:5,perLayer:true,
+      params:[['blur','Blur isian (0 = cermin tajam)',0,100,0],['dim','Gelapkan isian',0,80,0]],apply:mirrorFill}
   ];
   const DEF={};LIST.forEach(e=>DEF[e.id]=e);
   const label=fx=>(DEF[fx&&fx.type]||{name:'Efek'}).name;
@@ -218,6 +288,8 @@ APK.fxclip=(function(){
   function run(g,fx,tm,opaque,rel,dur){
     const d=fx&&DEF[fx.type];if(!d)return;
     const cv=g.canvas;if(!cv.width||!cv.height)return;
+    /* efek per-layer hanya jalan lewat layerEnd() (curClip terisi) atau kartu pratinjau (memberi rel); dipanggil preview untuk kanvas utama = dilewati */
+    if(d.perLayer&&rel==null&&!curClip)return;
     const o=rel==null?relOf(fx,tm):{rel,dur:dur||0};
     g.save();g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';
     if('filter' in g)g.filter='none';
@@ -226,18 +298,30 @@ APK.fxclip=(function(){
   }
 
   /* ===== dipakai preview.js ===== */
-  /* clip efek bertarget yang aktif di waktu t: Map id clip target -> daftar fx (null kalau tidak ada). Track tersembunyi dilewati. */
+  /* clip efek bertarget yang aktif di waktu t: Map id clip target -> daftar fx (null kalau tidak ada). Track tersembunyi dilewati.
+     Efek perLayer tanpa target: targetnya semua clip media (video/gambar) yang sedang tampil di track di bawah clip efek. */
   function targets(p,t){
     let map=null;
-    for(const tr of p.tracks){
-      if(tr.hidden)continue;
+    const add=(id,f)=>{map=map||new Map();const a=map.get(id);if(a)a.push(f);else map.set(id,[f])};
+    p.tracks.forEach((tr,ti)=>{
+      if(tr.hidden)return;
       for(const c of tr.clips){
         const f=c.fx;
-        if(!f||!Array.isArray(f.targets)||!f.targets.length||t<c.start||t>=c.start+c.dur-1e-6)continue;
-        map=map||new Map();
-        for(const id of f.targets){const a=map.get(id);if(a)a.push(f);else map.set(id,[f])}
+        if(!f||t<c.start||t>=c.start+c.dur-1e-6)continue;
+        if(Array.isArray(f.targets)){for(const id of f.targets)add(id,f);continue}
+        const d=DEF[f.type];
+        if(!d||!d.perLayer)continue;
+        for(let k=ti+1;k<p.tracks.length;k++){
+          const lt=p.tracks[k];
+          if(lt.hidden||lt.kind==='audio')continue;
+          for(const x of lt.clips){
+            if(x.fx||!x.mediaId||t<x.start||t>=x.start+x.dur-1e-6)continue;
+            const m=p.media.find(q=>q.id===x.mediaId);
+            if(m&&(m.type==='image'||m.type==='video'))add(x.id,f);
+          }
+        }
       }
-    }
+    });
     return map;
   }
   /* satu clip digambar dulu ke lapisan terpisah (transparan), lalu efek diterapkan ke lapisan itu saja, baru ditempel ke kanvas utama */
@@ -254,7 +338,8 @@ APK.fxclip=(function(){
     return layer;
   }
   function layerEnd(main,c,list,t){
-    for(const fx of list)run(layer,fx,t,false);
+    curClip=c;
+    try{for(const fx of list)run(layer,fx,t,false)}finally{curClip=null}
     main.save();main.setTransform(1,0,0,1,0,0);main.globalAlpha=1;main.globalCompositeOperation=c.blend||'source-over';
     if('filter' in main)main.filter='none';
     main.drawImage(layer.canvas,0,0);

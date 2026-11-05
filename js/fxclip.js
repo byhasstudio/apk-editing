@@ -136,37 +136,57 @@ APK.fxclip=(function(){
     };
   }
 
-  /* ===== efek 5: JJ Tipis (jedag-jedug tipis) =====
-     Kedut SATU KALI saja di awal clip efek, tidak berulang: gambar tersentak bergeser sedikit ke satu arah sambil berputar tipis, lalu cepat kembali diam.
-     Setelah itu clip efek tidak mengubah gambar lagi, jadi clip yang diperpanjang tidak membuat kedutnya berulang. Mau kedut lagi: duplikat clip efeknya
-     dan taruh tepat di titik yang mau dikedutkan.
-     Ada jejak tipis di antara posisi diam dan posisi tersentak supaya terasa seperti blur gerak. Gambar utama DAN jejaknya sama-sama ikut berputar tipis
-     (arah putar tetap, mengikuti arah sentakan). TIDAK ada zoom: tepi yang kosong akibat geser dan putar ditutup dengan salinan dari sisi seberang
-     (membungkus, seperti Glitch dan Gelombang). */
+  /* ===== efek 5: JJ Tipis (jedag-jedug tipis, gaya yang lagi viral) =====
+     Kedut SATU KALI saja di awal clip efek, tidak berulang. Taruh clip tepat di ketukan yang mau dikedutkan; mau kedut lagi: duplikat clip efeknya.
+     Satu sentakan terdiri dari beberapa gerak yang jalan bersamaan dari satu pola waktu:
+       - ZOOM SENTAK: gambar langsung membesar sedikit di ketukan, lalu cepat mengecil kembali
+       - GESER ke satu arah (arah tetap) dan PUTAR tipis, ikut mereda bersama zoom
+       - PANTUL: pola waktunya peluruh bergetar (cosinus yang meredam), jadi setelah kembali ke posisi diam gambar memantul tipis sekali ke arah sebaliknya, baru diam
+       - JEJAK GERAK: dua bayangan dari beberapa milidetik sebelumnya ditumpuk transparan, jadi terasa seperti blur gerak
+       - PECAH WARNA (RGB): kanal merah dan biru terpisah tipis ke kiri kanan selama sentakan, hilang saat gambar diam
+     Tepi yang kosong (kalau geser dan putar lebih besar dari zoom, atau saat memantul mengecil) ditutup dengan salinan dari sisi seberang (membungkus).
+     Setelah sentakan selesai, clip efek tidak mengubah gambar lagi, jadi clip yang diperpanjang tidak membuat kedutnya berulang. */
   function jj(g,w,h,p,tm,opaque,rel){
-    const t=Math.max(0,rel);
-    const env=Math.exp(-t*(6+p.dec*0.18));   /* turun cepat dari 1 ke 0, satu kali (tanpa hitungan ketukan) */
-    const A=p.amt/100*0.03*Math.min(w,h)*env;
-    const R=p.rot*Math.PI/180*env;
-    if(A<0.2&&Math.abs(R)<0.0005)return;
+    const t=Math.max(0,rel),k=5+p.dec*0.1,om=2*Math.PI*2.5;
+    const st=u=>u<0?0:Math.exp(-u*k)*Math.cos(u*om);   /* 1 tepat di ketukan, mereda cepat, memantul tipis, lalu diam */
+    const D1=0.025,D2=0.05,e0=st(t);
+    if(Math.max(Math.abs(e0),Math.abs(st(t-D1)),Math.abs(st(t-D2)))<0.004)return;
     const rd=rng(31),ang=rd()*Math.PI*2,sg=rd()<0.5?-1:1;
-    const dx=Math.cos(ang)*A,dy=Math.sin(ang)*A,r=sg*R;
+    const A0=p.amt/100*0.03*Math.min(w,h),R0=p.rot*Math.PI/180,Z0=p.zm/100;
+    const ux=Math.cos(ang),uy=Math.sin(ang);
+    const pose=u=>{const e=st(u);return{dx:ux*A0*e,dy:uy*A0*e,r:sg*R0*e,z:1+Z0*e}};
     const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
-    g.clearRect(0,0,w,h);
-    if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
-    /* k = seberapa jauh dari posisi diam (1 = posisi tersentak penuh); geser dan putar dikali k, lalu gambar diulang 3x3 supaya sudut yang kosong tertutup */
-    const put=(k,al)=>{
-      g.globalAlpha=al;
-      for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
-        g.save();
-        g.translate(w/2+dx*k,h/2+dy*k);g.rotate(r*k);g.translate(-w/2,-h/2);
-        g.drawImage(S.canvas,i*w,j*h);
-        g.restore();
+    const M=ac('m',w,h);
+    if(opaque){M.fillStyle='#000';M.fillRect(0,0,w,h)}
+    /* tepi cukup tertutup oleh zoom kalau pembesarannya melebihi geser dan sudut putar di tiap sisi; kalau tidak, gambar diulang 3x3 */
+    const put=(q,al)=>{
+      M.globalAlpha=al;
+      const fit=(q.z-1)*w/2>=Math.abs(q.dx)+Math.abs(q.r)*h/2+1&&(q.z-1)*h/2>=Math.abs(q.dy)+Math.abs(q.r)*w/2+1,n=fit?0:1;
+      for(let j=-n;j<=n;j++)for(let i=-n;i<=n;i++){
+        M.save();
+        M.translate(w/2+q.dx,h/2+q.dy);M.rotate(q.r);M.scale(q.z,q.z);M.translate(-w/2,-h/2);
+        M.drawImage(S.canvas,i*w,j*h);
+        M.restore();
       }
     };
-    put(1,1);
-    put(0.35,0.4);
-    g.globalAlpha=1;
+    put(pose(t),1);                                  /* gambar utama */
+    if(t-D1>=0||t>0)put(pose(t-D1),0.45);            /* jejak gerak: posisi beberapa milidetik sebelumnya (sebelum ketukan = posisi diam) */
+    put(pose(t-D2),0.3);
+    M.globalAlpha=1;
+    /* pecah warna: tiga kanal digeser horizontal berlawanan arah, besarnya mengikuti kuat sentakan */
+    const sh=Math.round(p.rgb/100*0.012*w*Math.abs(e0));
+    g.clearRect(0,0,w,h);
+    if(sh<1){g.drawImage(M.canvas,0,0);return}
+    const C=ac('c',w,h);
+    g.globalCompositeOperation='lighter';
+    for(const ch of [['#f00',-sh],['#0f0',0],['#00f',sh]]){
+      C.globalCompositeOperation='source-over';C.clearRect(0,0,w,h);
+      C.drawImage(M.canvas,0,0);
+      C.globalCompositeOperation='multiply';C.fillStyle=ch[0];C.fillRect(0,0,w,h);          /* sisakan satu kanal warna */
+      C.globalCompositeOperation='destination-in';C.drawImage(M.canvas,0,0);                /* kembalikan transparansi asli */
+      g.drawImage(C.canvas,ch[1],0);
+    }
+    g.globalCompositeOperation='source-over';
   }
 
   const WP=[['amt','Kekuatan',0,100,60],['cnt','Jumlah gelombang',1,8,1],['spd','Kecepatan',10,100,50],['ang','Arah gelombang (0 = ke samping, 60 = miring naik, 90 = naik turun, minus = dibalik)',-90,90,60],['atk','Awal pelan (0 = langsung kuat, makin besar makin lama diam dan naik pelan)',0,100,60],['dec','Peredam (mereda sampai akhir clip, 0 = tetap kuat)',0,100,70]];
@@ -177,8 +197,8 @@ APK.fxclip=(function(){
       params:[['amt','Kekuatan',0,100,50],['spd','Kecepatan',10,100,50]],apply:shake},
     {id:'wave',name:'Gelombang',desc:'Gambar meliuk miring ke atas, arah bisa diatur',len:1.2,params:WP,apply:waveFx(1)},
     {id:'wave2',name:'Gelombang Balik',desc:'Gambar meliuk berlawanan arah, arah bisa diatur',len:1.2,params:WP,apply:waveFx(-1)},
-    {id:'jj',name:'JJ Tipis',desc:'Tersentak dan berputar tipis satu kali di awal clip',len:0.6,
-      params:[['amt','Kekuatan',0,100,50],['rot','Putaran tipis (derajat, 0 = tanpa putar)',0,10,2],['dec','Kecepatan kembali (makin besar makin cepat)',0,100,60]],apply:jj}
+    {id:'jj',name:'JJ Tipis',desc:'Sentak zoom, geser, putar tipis, jejak gerak, dan pecah warna satu kali di awal clip',len:0.6,
+      params:[['amt','Kekuatan geser',0,100,50],['zm','Zoom sentak (%)',0,30,6],['rot','Putaran tipis (derajat, 0 = tanpa putar)',0,10,2],['rgb','Pecah warna RGB (0 = mati)',0,100,30],['dec','Kecepatan kembali (makin besar makin cepat)',0,100,60]],apply:jj}
   ];
   const DEF={};LIST.forEach(e=>DEF[e.id]=e);
   const label=fx=>(DEF[fx&&fx.type]||{name:'Efek'}).name;

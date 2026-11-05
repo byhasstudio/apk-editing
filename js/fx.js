@@ -1,5 +1,7 @@
 /* Efek klip: chroma key (hapus warna latar), mask bentuk, serta bantuan gradien dan bayangan.
-   Data per clip: clip.chroma = {on,color,sim,smooth} ; clip.mask = {on,type,x,y,w,h,feather,invert} (satuan persen) */
+   Data per clip: clip.chroma = {on,color,sim,smooth} ; clip.mask = {on,type,x,y,w,h,feather,invert} (satuan persen)
+   Performa (v20): resolusi olahan mengikuti ukuran kanvas yang sebenarnya (parameter lim), dan kanvas yang membaca piksel (CPU)
+   dipisah dari kanvas yang hanya menggambar (GPU), jadi mask dan vignette saja tidak lagi memaksa jalur lambat. */
 window.APK=window.APK||{};
 APK.fx=(function(){
   const MAXD=1280;
@@ -7,12 +9,17 @@ APK.fx=(function(){
     chroma:{on:false,color:'#00b140',sim:35,smooth:15},
     mask:{on:false,type:'ellipse',x:0,y:0,w:80,h:80,feather:0,invert:false}
   };
-  let cv=null,g=null;
+  const cvs={},gs={};
   const rgb=h=>{const n=parseInt(String(h).slice(1),16);return isFinite(n)?[n>>16&255,n>>8&255,n&255]:[0,177,64]};
-  function layer(w,h){
-    if(!cv){cv=document.createElement('canvas');g=cv.getContext('2d',{willReadFrequently:true})}
+  /* cpu = true: kanvas yang sering dibaca pikselnya (getImageData); false: kanvas biasa yang dipercepat GPU */
+  function layer(w,h,cpu){
+    const k=cpu?'c':'g';
+    if(!cvs[k]){cvs[k]=document.createElement('canvas');gs[k]=cvs[k].getContext('2d',cpu?{willReadFrequently:true}:{})}
+    const cv=cvs[k],g=gs[k];
     if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h}
-    g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';g.clearRect(0,0,w,h);
+    g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';
+    if('filter' in g)g.filter='none';
+    g.clearRect(0,0,w,h);
     return g;
   }
   /* jarak warna di bidang Cb/Cr supaya tidak terpengaruh terang gelapnya latar */
@@ -72,19 +79,20 @@ APK.fx=(function(){
       ctx.save();ctx.globalCompositeOperation='source-atop';ctx.fillStyle=gr;ctx.fillRect(0,0,w,h);ctx.restore();
     }
   }
-  /* kembalikan canvas hasil olahan (chroma + mask + efek piksel) atau null bila clip tidak memakai efek */
-  function process(el,w,h,c){
+  /* kembalikan canvas hasil olahan (chroma + mask + efek piksel) atau null bila clip tidak memakai efek.
+     lim (opsional) = sisi terpanjang yang dibutuhkan (px kanvas); olahan tidak dibuat lebih besar dari itu */
+  function process(el,w,h,c,lim){
     const ck=c.chroma&&c.chroma.on,mk=c.mask&&c.mask.on,f=c.flt,px=!!f&&(f.vig>0||f.rgb>0||f.glitch>0);
     if(!ck&&!mk&&!px)return null;
-    const sc=Math.min(1,MAXD/Math.max(w,h)),cw=Math.max(1,Math.round(w*sc)),ch=Math.max(1,Math.round(h*sc));
-    const ctx=layer(cw,ch);
+    const cap=Math.max(320,Math.min(MAXD,lim>0?lim:MAXD)),sc=Math.min(1,cap/Math.max(w,h)),cw=Math.max(1,Math.round(w*sc)),ch=Math.max(1,Math.round(h*sc));
+    const cpu=!!ck||(!!f&&(f.rgb>0||f.glitch>0)),ctx=layer(cw,ch,cpu);
     try{
       ctx.drawImage(el,0,0,cw,ch);
       if(ck)key(ctx,cw,ch,Object.assign({},DEF.chroma,c.chroma));
       if(mk)mask(ctx,cw,ch,Object.assign({},DEF.mask,c.mask));
       if(px)pixelFx(ctx,cw,ch,f,APK.preview?APK.preview.time:0);
     }catch(_){return null}
-    return cv;
+    return cpu?cvs.c:cvs.g;
   }
   /* gradien linear dua warna untuk kotak berukuran 2*hw x 2*hh yang berpusat di (0,0); deg 0 = kiri ke kanan, 90 = atas ke bawah */
   function grad(ctx,c1,c2,deg,hw,hh){

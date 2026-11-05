@@ -1,6 +1,6 @@
 /* Efek clip (ala CapCut): efek berdiri sendiri sebagai clip di timeline, terpisah dari media, jadi bisa digeser, dipotong,
    diperpanjang, dan diduplikat tanpa menyentuh media.
-   Data clip: clip.fx = { type:'glitch'|'shake'|'wave'|'wave2'|'jj'|'mirror', p:{...} (hanya nilai yang diubah), targets?:[id clip] }
+   Data clip: clip.fx = { type:'glitch'|'shake'|'wave'|'wave2'|'jj'|'jjp'|'mirror', p:{...} (hanya nilai yang diubah), targets?:[id clip], curve?:[[u,v],...] (khusus jjp) }
      tanpa targets : efek berlaku untuk SEMUA layer di bawah clip efek (track yang urutannya lebih belakang), selama durasi clip efek
      dengan targets: efek hanya berlaku untuk clip yang dipilih (video, gambar, teks, bentuk), selama durasi clip efek
    Efek dengan perLayer:true (Isi Cermin) tanpa targets tidak mengolah kanvas utama, tapi tiap clip media (video/gambar) yang sedang tampil di track bawahnya
@@ -8,6 +8,7 @@
    Preview menggambar efek lewat run(), targets(), layerBegin(), layerEnd(), jadi ikut ter-export.
    Panel Properti clip efek dibuat oleh panel() dan dipasang properties.js; add() dipanggil daftar efek (js/fxlib.js).
    Menambah efek baru: tambahkan satu objek di LIST: id, name, desc, params (daftar [kunci, label, min, max, bawaan]), apply, dan len (opsional, lama clip baru).
+   Efek yang punya kurva (curve:true) mendapat editor kurva biru di panelnya dan menerima p.curve di apply().
    apply(g, w, h, p, tm, opaque, rel, dur) mengubah isi kanvas g langsung. tm = waktu timeline, rel = detik sejak clip efek mulai, dur = lama clip efek. */
 window.APK=window.APK||{};
 APK.fxclip=(function(){
@@ -168,7 +169,71 @@ APK.fxclip=(function(){
     g.restore();
   }
 
-  /* ===== efek 6: Isi Cermin =====
+  /* ===== efek 6: JJ Tipis Pintar =====
+     Sama seperti JJ Tipis (zoom sentak, geser, putar tipis, tanpa glitch), tapi kekuatannya tidak berhenti sesudah satu sentakan: ia MENGIKUTI KURVA BIRU yang
+     digambar di panel Properti. Sumbu mendatar kurva = waktu sepanjang clip efek (kiri = awal clip, kanan = akhir clip), tinggi kurva = kekuatan sentakan
+     (0 = gambar diam, 1 = sentakan penuh). Jadi tiap PUNCAK kurva = satu hentakan; bagian kurva yang rata di bawah = gambar diam. Clip efek diperpanjang = kurva ikut melebar.
+     Data kurva ada di clip.fx.curve = [[u,v],...] (u dan v 0..1, urut menurut u, titik pertama u=0 dan titik terakhir u=1). Antar titik dihaluskan (monotonik,
+     tidak pernah melampaui titik di sebelahnya, jadi tidak ada pantulan liar). Arah geser dan arah putar tetap seperti JJ Tipis.
+     Tepi kosong ditutup dengan zoom tambahan secukupnya, sama seperti JJ Tipis. */
+  const KW=600,KH=340,KP=24;   /* ukuran kanvas editor kurva (piksel dalam) dan jarak tepinya */
+  const CURVE_DEF=[[0,0],[0.05,1],[0.3,0],[0.5,0],[0.55,0.8],[0.8,0],[1,0]];   /* contoh bawaan: dua hentakan */
+  function curvePts(fx){
+    const o=[],a=fx&&Array.isArray(fx.curve)?fx.curve:null;
+    if(a)for(const q of a){if(Array.isArray(q)&&isFinite(+q[0])&&isFinite(+q[1]))o.push([clamp(+q[0],0,1),clamp(+q[1],0,1)])}
+    if(o.length<2)return CURVE_DEF.map(q=>q.slice());
+    o.sort((x,y)=>x[0]-y[0]);
+    return o;
+  }
+  /* nilai kurva di u (0..1): interpolasi kubik monotonik (Fritsch-Butland), puncak dan lembah mulus, tanpa overshoot */
+  function curveAt(pts,u){
+    const n=pts.length;
+    if(!n)return 0;
+    if(u<=pts[0][0])return pts[0][1];
+    if(u>=pts[n-1][0])return pts[n-1][1];
+    let i=0;while(i<n-2&&u>pts[i+1][0])i++;
+    const sl=k=>(pts[k+1][1]-pts[k][1])/Math.max(1e-9,pts[k+1][0]-pts[k][0]);
+    const tg=k=>{
+      if(k===0)return sl(0);
+      if(k===n-1)return sl(n-2);
+      const a=sl(k-1),b=sl(k);
+      return a*b<=0?0:2*a*b/(a+b);
+    };
+    const x0=pts[i][0],x1=pts[i+1][0],y0=pts[i][1],y1=pts[i+1][1],hh=x1-x0;
+    if(hh<=1e-9)return y1;
+    const t=(u-x0)/hh,t2=t*t,t3=t2*t;
+    const y=(2*t3-3*t2+1)*y0+(t3-2*t2+t)*hh*tg(i)+(-2*t3+3*t2)*y1+(t3-t2)*hh*tg(i+1);
+    return clamp(y,0,1);
+  }
+  function jjp(g,w,h,p,tm,opaque,rel,dur){
+    const u=dur>0?clamp(rel/dur,0,1):0,e=curveAt(p.curve||CURVE_DEF,u);
+    if(e<0.003)return;   /* kurva di dasar = gambar diam */
+    const rd=rng(31),ang=rd()*Math.PI*2,sg=rd()<0.5?-1:1;   /* arah tetap, sama dengan JJ Tipis */
+    const A=p.amt/100*0.03*Math.min(w,h)*e,r=sg*p.rot*Math.PI/180*e;
+    const dx=Math.cos(ang)*A,dy=Math.sin(ang)*A;
+    const cover=1+2*Math.max((Math.abs(dx)+Math.abs(r)*h/2+1)/w,(Math.abs(dy)+Math.abs(r)*w/2+1)/h);
+    const z=Math.max(1+p.zm/100*e,cover);
+    const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
+    g.clearRect(0,0,w,h);
+    if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
+    g.save();
+    g.translate(w/2+dx,h/2+dy);g.rotate(r);g.scale(z,z);g.translate(-w/2,-h/2);
+    g.drawImage(S.canvas,0,0);
+    g.restore();
+  }
+  /* kurva berisi n hentakan sama rata sepanjang clip (naik cepat sekitar 0,04 detik, lalu turun) */
+  function hitsCurve(n,dur){
+    const s=1/n,rise=Math.min(0.3*s,0.04/Math.max(0.2,dur)),pts=[[0,0]];
+    for(let k=0;k<n;k++){
+      const a=k*s,b=a+rise,c=a+0.6*s;
+      if(a>1e-6)pts.push([a,0]);
+      pts.push([b,1],[c,0]);
+    }
+    pts.push([1,0]);
+    return pts;
+  }
+
+  /* ===== efek 7: Isi Cermin =====
      Mengusir frame yang kosong: area di sekitar media yang tidak tertutup (sisa letterbox karena rasio beda, media yang dikecilkan, atau media yang digeser)
      diisi dengan CERMIN media itu sendiri. Media dipantulkan bolak-balik melewati tiap tepinya (seperti ubin cermin), jadi sambungan di tepi selalu mulus.
      Efek ini bekerja PER CLIP MEDIA (perLayer): tiap video/gambar di bawah clip efek diolah di lapisannya sendiri, memakai kotak medianya dari preview
@@ -243,6 +308,8 @@ APK.fxclip=(function(){
     {id:'wave2',name:'Gelombang Balik',desc:'Gambar meliuk berlawanan arah, arah bisa diatur',len:1.2,params:WP,apply:waveFx(-1)},
     {id:'jj',name:'JJ Tipis',desc:'Sentak zoom, geser, dan putar tipis satu kali di awal clip, mulus tanpa glitch',len:0.6,
       params:[['amt','Kekuatan geser',0,100,50],['zm','Zoom sentak (%)',0,30,6],['rot','Putaran tipis (derajat, 0 = tanpa putar)',0,10,2],['dec','Kecepatan kembali (makin besar makin cepat)',0,100,60]],apply:jj},
+    {id:'jjp',name:'JJ Tipis Pintar',desc:'JJ Tipis yang mengikuti kurva biru: tiap puncak kurva = satu hentakan',len:2,curve:true,
+      params:[['amt','Kekuatan geser',0,100,50],['zm','Zoom sentak (%)',0,30,6],['rot','Putaran tipis (derajat, 0 = tanpa putar)',0,10,2]],apply:jjp},
     {id:'mirror',name:'Isi Cermin',desc:'Menutup frame kosong di sekitar media dengan cermin tepinya',len:5,perLayer:true,
       params:[['blur','Blur isian (0 = cermin tajam)',0,100,0],['dim','Gelapkan isian',0,80,0]],apply:mirrorFill}
   ];
@@ -252,6 +319,7 @@ APK.fxclip=(function(){
     const d=DEF[fx&&fx.type],o={};
     if(!d)return o;
     for(const q of d.params){const v=fx.p&&fx.p[q[0]];o[q[0]]=clamp(v!=null&&isFinite(+v)?+v:q[4],q[2],q[3])}
+    if(d.curve)o.curve=curvePts(fx);
     return o;
   }
   /* waktu sejak clip efek pemilik fx ini mulai, dan lama clipnya (fx dicari lewat referensi objek; di luar project, misalnya kartu pratinjau, dipakai waktu apa adanya) */
@@ -372,10 +440,17 @@ APK.fxclip=(function(){
         return `<label class="fx-tg${inr?'':' off'}"><input type="checkbox" data-fxt="${esc(x.id)}"${locked?' disabled':''}><span><b>${esc(clipName(x,z.m))}</b><small>${esc(z.tr.name)} · ${mmss(x.start)} sampai ${mmss(x.start+x.dur)}${inr?'':' · di luar waktu efek'}</small></span></label>`;
       }).join('')+'</div>';
   }
-  /* baris slider + angka untuk parameter efek (berbeda tiap jenis efek, jadi dibuat ulang saat jenis efek diganti) */
+  /* baris slider + angka untuk parameter efek (berbeda tiap jenis efek, jadi dibuat ulang saat jenis efek diganti); efek berkurva mendapat editor kurva biru di bawahnya */
   function rowsHtml(type,locked){
     const d=DEF[type],dis=locked?' disabled':'';
-    return (d?d.params:[]).map(q=>`<div class="pr-f"><div class="pr-lab"><span>${esc(q[1])}</span></div><div class="pr-row"><input type="range" data-fxp="${q[0]}" min="${q[2]}" max="${q[3]}" step="1"${dis}><input type="number" data-fxp="${q[0]}" min="${q[2]}" max="${q[3]}" step="1"${dis}></div></div>`).join('');
+    let h=(d?d.params:[]).map(q=>`<div class="pr-f"><div class="pr-lab"><span>${esc(q[1])}</span></div><div class="pr-row"><input type="range" data-fxp="${q[0]}" min="${q[2]}" max="${q[3]}" step="1"${dis}><input type="number" data-fxp="${q[0]}" min="${q[2]}" max="${q[3]}" step="1"${dis}></div></div>`).join('');
+    if(d&&d.curve){
+      h+=`<h3 class="kf-title">Kurva biru (penentu hentakan)</h3>
+        <canvas data-fxc="cv" width="${KW}" height="${KH}" style="display:block;width:100%;height:auto;aspect-ratio:${KW}/${KH};background:#0b1020;border:1px solid #2c313c;border-radius:8px;touch-action:none"></canvas>
+        <div class="kf-bar"><button type="button" class="btn" data-fxc="n1"${dis}>1 hentak</button><button type="button" class="btn" data-fxc="n2"${dis}>2 hentak</button><button type="button" class="btn" data-fxc="n3"${dis}>3 hentak</button><button type="button" class="btn" data-fxc="n4"${dis}>4 hentak</button><button type="button" class="btn" data-fxc="del"${dis}>Hapus titik</button><button type="button" class="btn" data-fxc="reset"${dis}>Reset kurva</button></div>
+        <p class="kf-hint">Kiri = awal clip efek, kanan = akhir clip efek. Makin tinggi kurva, makin kuat hentakannya; kurva rata di bawah = gambar diam. Tiap puncak = satu hentakan. Ketuk area kosong untuk menambah titik, seret titik untuk mengubah, ketuk titik lalu tekan Hapus titik untuk menghapusnya (titik paling kiri dan kanan tidak bisa dihapus). Garis merah = posisi playhead. Memperpanjang clip efek ikut melebarkan kurva.</p>`;
+    }
+    return h;
   }
 
   /* ===== panel Properti untuk clip efek ===== */
@@ -394,7 +469,7 @@ APK.fxclip=(function(){
       <div id="fx-targets" class="fx-targets" hidden></div>
       <p class="kf-hint">Efek ini clip sendiri, terpisah dari media: geser, tarik tepinya, belah, atau duplikat di timeline. Efek hanya tampil selama durasi clip efek. "Semua layer di bawah" mengikuti urutan layer, jadi hanya track yang berada di bawah track clip efek yang terkena.</p>`;
   }
-  const owns=el=>!!el&&!!el.dataset&&(el.dataset.fxp!=null||el.dataset.fxm!=null||el.dataset.fxt!=null);
+  const owns=el=>!!el&&!!el.dataset&&(el.dataset.fxp!=null||el.dataset.fxm!=null||el.dataset.fxt!=null||el.dataset.fxc!=null);
   function fill(el,c){
     const fx=c.fx;if(!fx)return;
     const d=el.dataset;
@@ -418,8 +493,9 @@ APK.fxclip=(function(){
     if(nm){const t='✦ '+label(fx);if(nm.textContent!==t)nm.textContent=t}
     const pb=$('fx-params');
     if(pb){
-      if(pb.dataset.type!==fx.type){pb.innerHTML=rowsHtml(fx.type,!!s.tr.locked);pb.dataset.type=fx.type}
+      if(pb.dataset.type!==fx.type){pb.innerHTML=rowsHtml(fx.type,!!s.tr.locked);pb.dataset.type=fx.type;cSel=-1}
       pb.querySelectorAll('[data-fxp]').forEach(el=>{if(document.activeElement!==el)fill(el,s.c)});
+      drawCurve();
     }
     const pick=Array.isArray(fx.targets);
     box.hidden=!pick;
@@ -442,6 +518,107 @@ APK.fxclip=(function(){
       const sp=el.querySelector('span');if(sp)sp.textContent=n;
     });
   }
+
+  /* ===== editor kurva biru (efek JJ Tipis Pintar) ===== */
+  let cSel=-1,cDrag=null;   /* cSel = indeks titik terpilih, cDrag = seretan yang sedang berjalan */
+  const cvEl=()=>{const b=$('fx-params');return b?b.querySelector('canvas[data-fxc="cv"]'):null};
+  const cx=u=>KP+u*(KW-2*KP),cy=v=>KP+(1-v)*(KH-2*KP);
+  const rd3=q=>[Math.round(q[0]*1000)/1000,Math.round(q[1]*1000)/1000];
+  const hasCurve=s=>!!s&&!!s.c.fx&&!!DEF[s.c.fx.type]&&!!DEF[s.c.fx.type].curve;
+  function drawCurve(){
+    const cv=cvEl(),s=T.selectedClip();
+    if(!cv||!hasCurve(s))return;
+    const c=s.c,pts=curvePts(c.fx),g=cv.getContext('2d');
+    g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;
+    g.clearRect(0,0,KW,KH);
+    g.fillStyle='#0b1020';g.fillRect(0,0,KW,KH);
+    /* kisi */
+    g.strokeStyle='#1f2a44';g.lineWidth=1;g.beginPath();
+    for(const v of [0,0.5,1]){g.moveTo(cx(0),cy(v));g.lineTo(cx(1),cy(v))}
+    for(const u of [0,0.25,0.5,0.75,1]){g.moveTo(cx(u),cy(0));g.lineTo(cx(u),cy(1))}
+    g.stroke();
+    /* kurva biru: isi lembut di bawahnya, lalu garisnya */
+    g.beginPath();
+    for(let i=0;i<=160;i++){const u=i/160,x=cx(u),y=cy(curveAt(pts,u));i?g.lineTo(x,y):g.moveTo(x,y)}
+    g.lineTo(cx(1),cy(0));g.lineTo(cx(0),cy(0));g.closePath();
+    g.fillStyle='rgba(59,130,246,0.2)';g.fill();
+    g.beginPath();
+    for(let i=0;i<=160;i++){const u=i/160,x=cx(u),y=cy(curveAt(pts,u));i?g.lineTo(x,y):g.moveTo(x,y)}
+    g.strokeStyle='#3b82f6';g.lineWidth=4;g.lineJoin='round';g.stroke();
+    /* garis playhead */
+    if(c.dur>0&&APK.preview){
+      const u=(APK.preview.time-c.start)/c.dur;
+      if(u>=0&&u<=1){g.strokeStyle='#ff5d5d';g.lineWidth=2;g.beginPath();g.moveTo(cx(u),cy(1)-8);g.lineTo(cx(u),cy(0)+8);g.stroke()}
+    }
+    /* titik */
+    pts.forEach((q,i)=>{
+      g.beginPath();g.arc(cx(q[0]),cy(q[1]),i===cSel?12:9,0,Math.PI*2);
+      g.fillStyle=i===cSel?'#3b82f6':'#fff';g.fill();
+      g.strokeStyle='#3b82f6';g.lineWidth=3;g.stroke();
+    });
+  }
+  const cpos=(cv,e)=>{const r=cv.getBoundingClientRect(),k=cv.width/(r.width||1);return[(e.clientX-r.left)*k,(e.clientY-r.top)*k]};
+  const cval=(px,py)=>[clamp((px-KP)/(KW-2*KP),0,1),clamp(1-(py-KP)/(KH-2*KP),0,1)];
+  pn.addEventListener('pointerdown',e=>{
+    const cv=e.target;
+    if(!cv||!cv.dataset||cv.dataset.fxc!=='cv')return;
+    const s=sel();if(!hasCurve(s))return;
+    const fx=s.c.fx,pts=curvePts(fx),pp=cpos(cv,e);
+    let bi=-1,bd=40;
+    pts.forEach((q,i)=>{const d=Math.hypot(cx(q[0])-pp[0],cy(q[1])-pp[1]);if(d<bd){bd=d;bi=i}});
+    cDrag={i:bi,moved:false,x0:pp[0],y0:pp[1]};
+    if(bi<0){
+      /* ketukan di area kosong = titik baru di situ (selalu di antara dua titik, tidak pernah di ujung kiri atau kanan) */
+      const v=cval(pp[0],pp[1]),u=clamp(v[0],0.005,0.995);
+      APK.history.record();cDrag.moved=true;
+      let k=pts.findIndex(q=>q[0]>u);if(k<1)k=pts.length-1;
+      pts.splice(k,0,[u,v[1]]);
+      bi=k;cDrag.i=k;
+      fx.curve=pts.map(rd3);
+      T.touch();
+    }
+    cSel=bi;
+    try{cv.setPointerCapture(e.pointerId)}catch(_){}
+    e.preventDefault();drawCurve();
+  });
+  pn.addEventListener('pointermove',e=>{
+    if(!cDrag)return;
+    const cv=cvEl(),s=sel();
+    if(!cv||!hasCurve(s)){cDrag=null;return}
+    const fx=s.c.fx,pts=curvePts(fx),i=cDrag.i,pp=cpos(cv,e);
+    if(i<0||i>=pts.length)return;
+    if(!cDrag.moved){
+      if(Math.hypot(pp[0]-cDrag.x0,pp[1]-cDrag.y0)<10)return;   /* ketukan biasa tidak menggeser titik */
+      APK.history.record();cDrag.moved=true;
+    }
+    const v=cval(pp[0],pp[1]);
+    pts[i][1]=v[1];
+    if(i>0&&i<pts.length-1)pts[i][0]=clamp(v[0],pts[i-1][0]+0.004,pts[i+1][0]-0.004);
+    fx.curve=pts.map(rd3);
+    T.touch();drawCurve();
+  });
+  const cEnd=()=>{
+    if(!cDrag)return;
+    const m=cDrag.moved;cDrag=null;
+    if(m)T.commit();
+    drawCurve();
+  };
+  pn.addEventListener('pointerup',cEnd);
+  pn.addEventListener('pointercancel',cEnd);
+  /* tombol di bawah kurva: 1 sampai 4 hentakan sama rata, hapus titik terpilih, kembalikan ke kurva bawaan */
+  pn.addEventListener('click',e=>{
+    const b=e.target.closest('button[data-fxc]');if(!b)return;
+    const s=sel();if(!hasCurve(s))return;
+    const a=b.dataset.fxc,fx=s.c.fx;
+    if(/^n[1-6]$/.test(a)){APK.history.record();fx.curve=hitsCurve(+a.slice(1),s.c.dur).map(rd3);cSel=-1}
+    else if(a==='reset'){APK.history.record();delete fx.curve;cSel=-1}
+    else if(a==='del'){
+      const pts=curvePts(fx);
+      if(cSel<=0||cSel>=pts.length-1)return;
+      APK.history.record();pts.splice(cSel,1);fx.curve=pts.map(rd3);cSel=-1;
+    }else return;
+    T.commit();
+  });
 
   /* slider dan angka parameter */
   pn.addEventListener('input',e=>{
@@ -491,6 +668,9 @@ APK.fxclip=(function(){
   /* ===== pembungkus (pola yang sama dengan layers-ui.js, jadi timeline.js dan properties.js hanya perlu sedikit perubahan) ===== */
   const oldRefresh=APK.properties.refresh;
   APK.properties.refresh=function(f){oldRefresh(f);decorate();syncPanel()};
+  /* garis playhead di kurva ikut bergerak saat preview diputar (properties.tick dipanggil tiap frame preview) */
+  const oldTick=APK.properties.tick;
+  APK.properties.tick=function(){if(oldTick)oldTick.apply(this,arguments);if(cvEl())drawCurve()};
   /* duplikat dan split membuat salinan clip: data efek salinan harus terpisah dari aslinya */
   function find(id){for(const tr of P().tracks){const c=tr.clips.find(x=>x.id===id);if(c)return c}return null}
   function unshare(){for(const id of T.selectedIds()){const c=find(id);if(c&&c.fx)c.fx=clone(c.fx)}}

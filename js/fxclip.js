@@ -87,7 +87,9 @@ APK.fxclip=(function(){
      "Awal pelan" mengatur panjang bagian diam dan naik (0 = langsung kuat di awal clip; 100 = diam 15% dan naik 45% dari panjang clip).
      "Peredam" mengatur seberapa kuat gelombang mereda setelah puncak sampai akhir clip (0 = tetap kuat sampai akhir).
      Semuanya mengikuti PANJANG CLIP, jadi clip yang diperpanjang = gelombang lebih lama.
-     TIDAK ada zoom in/out: tepi yang kosong akibat strip bergeser ditutup dengan sambungan dari sisi seberang (membungkus, seperti Glitch). */
+     Efek diterapkan APA ADANYA pada gambar yang sedang tampil: tepi yang kosong akibat strip bergeser ditutup dengan PEMBESARAN (gambar diperbesar dari tengah
+     secukupnya, sebesar simpangan gelombang saat itu, jadi membesar pelan waktu gelombang menguat dan kembali waktu mereda). Tidak lagi disambung dari sisi seberang,
+     jadi media yang sudah diperbesar tetap tampil besar dan tidak ada potongan yang "dikembalikan ke ukuran semula". */
   function waveFx(dir){
     return function(g,w,h,p,tm,opaque,rel,dur){
       let env=1;
@@ -101,6 +103,13 @@ APK.fxclip=(function(){
       if(A<0.3)return;
       const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
       const ph=dir*rel*1.3*(p.spd/50),deg=p.ang||0;
+      const th=deg*Math.PI/180,sn=Math.sin(th),cs=Math.cos(th);
+      const ux=cs,uy=-sn;                                           /* arah simpangan di kanvas: naik ke kanan untuk sudut positif */
+      /* gambar diperbesar dari tengah sebesar yang dibutuhkan supaya geseran terjauh (A searah ux, uy) tidak membuka tepi kosong */
+      const z=1+2*A*Math.max(Math.abs(ux)/w,Math.abs(uy)/h);
+      const Z=ac('z',w,h);
+      Z.translate(w/2,h/2);Z.scale(z,z);Z.translate(-w/2,-h/2);Z.drawImage(S.canvas,0,0);
+      const src=Z.canvas;
       g.clearRect(0,0,w,h);
       if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
       if(deg===0){
@@ -108,15 +117,12 @@ APK.fxclip=(function(){
         const st=Math.max(1,Math.round(h/320));
         for(let y=0;y<h;y+=st){
           const hh=Math.min(st,h-y),dx=dir*A*Math.sin(2*Math.PI*(p.cnt*(y+hh/2)/h-ph));
-          g.drawImage(S.canvas,0,y,w,hh,dx,y,w,hh);
-          g.drawImage(S.canvas,0,y,w,hh,dx>0?dx-w:dx+w,y,w,hh);   /* menutup tepi yang kosong dengan sisi seberang */
+          g.drawImage(src,0,y,w,hh,dx,y,w,hh);
         }
         return;
       }
       /* miring atau naik turun: bidang diputar sebesar sudut, strip digeser sepanjang arah simpangan (u), fase berubah sepanjang arah tegak lurusnya (v) */
-      const th=deg*Math.PI/180,sn=Math.sin(th),cs=Math.cos(th);
-      const ux=cs,uy=-sn;                                           /* arah simpangan di kanvas: naik ke kanan untuk sudut positif */
-      const Ev=w*Math.abs(sn)+h*Math.abs(cs),E=w*Math.abs(cs)+h*Math.abs(sn),R=Math.hypot(w,h);
+      const Ev=w*Math.abs(sn)+h*Math.abs(cs),R=Math.hypot(w,h);
       const st=Math.max(3,Math.round(Ev/180));
       for(let v=-Ev/2;v<Ev/2;v+=st){
         const fr=(v+st/2+Ev/2)/Ev,dx=dir*A*Math.sin(2*Math.PI*(p.cnt*fr-ph));
@@ -124,9 +130,7 @@ APK.fxclip=(function(){
         g.translate(w/2,h/2);g.rotate(-th);
         g.beginPath();g.rect(-R,v,2*R,st+1);g.clip();                /* +1 supaya antar strip saling menimpa, tidak ada garis tipis */
         g.setTransform(1,0,0,1,0,0);
-        g.drawImage(S.canvas,dx*ux,dx*uy);
-        const wr=dx>0?dx-E:dx+E;
-        g.drawImage(S.canvas,wr*ux,wr*uy);                           /* menutup bagian kosong dengan sisi seberang */
+        g.drawImage(src,dx*ux,dx*uy);
         g.restore();
       }
     };

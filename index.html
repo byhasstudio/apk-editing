@@ -21,7 +21,7 @@
 <body>
 <section id="home" class="view">
   <header class="home-head">
-    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO · v21 regang, animasi, filter, transisi, efek</small></div></div>
+    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO · v22 regang, animasi, filter, transisi, efek, performa</small></div></div>
     <div class="actions"><button class="btn" id="btn-open">Buka Project</button><button class="btn primary" id="btn-new">Project Baru</button></div>
   </header>
   <main class="home-main"><h2>Project terakhir</h2><div id="project-list" class="project-grid"></div></main>
@@ -90,11 +90,12 @@
 <dialog id="dlg-export"><form method="dialog" id="form-export">
   <h3>Export video</h3>
   <div id="ex-settings">
+    <label>Mode<select id="ex-mode"></select></label>
     <label>Format<select id="ex-format"></select></label>
     <label>Resolusi<select id="ex-res"></select></label>
     <label>Frame rate<select id="ex-fps"></select></label>
     <label>Kualitas<select id="ex-q"><option value="0.05">Rendah</option><option value="0.1" selected>Sedang</option><option value="0.18">Tinggi</option></select></label>
-    <p class="meta">Export berjalan real-time seperti memutar video, jadi lamanya sama dengan durasi timeline. Biarkan tab tetap terbuka dan terlihat.</p>
+    <p class="meta" id="ex-note">Biarkan tab tetap terbuka dan terlihat selama export.</p>
     <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Batal</button><button class="btn primary" id="ex-start" type="button">Mulai Export</button></div>
   </div>
   <div id="ex-progress" hidden>
@@ -110,20 +111,20 @@
 <script src="js/keyframes.js?v=19"></script>
 <script src="js/text.js?v=19"></script>
 <script src="js/shapes.js?v=19"></script>
-<script src="js/fx.js?v=19"></script>
+<script src="js/fx.js?v=20"></script>
 <script src="js/motion.js?v=15"></script>
 <script src="js/layers.js?v=19"></script>
 <script src="js/anim.js?v=19"></script>
 <script src="js/effects.js?v=19"></script>
 <script src="js/project.js?v=15"></script>
 <script src="js/media.js?v=15"></script>
-<script src="js/preview.js?v=21"></script>
+<script src="js/preview.js?v=22"></script>
 <script src="js/waveform.js?v=15"></script>
 <script src="js/properties.js?v=21"></script>
 <script src="js/timeline.js?v=19"></script>
 <script src="js/gizmo.js?v=19"></script>
 <script src="js/keyboard.js?v=15"></script>
-<script src="js/export.js?v=15"></script>
+<script src="js/export.js?v=16"></script>
 <script src="js/app.js?v=15"></script>
 <script src="js/ui.js?v=15"></script>
 <script src="js/layers-ui.js?v=15"></script>
@@ -131,7 +132,8 @@
 <script src="js/presets.js?v=17"></script>
 <script src="js/autokey.js?v=19"></script>
 <script src="js/fxclip.js?v=21"></script>
-<script src="js/fxwspin.js?v=22"></script>
+<script src="js/fxwspin.js?v=23"></script>
 <script src="js/fxlib.js?v=21"></script>
+<script src="js/fxperf.js?v=1"></script>
 </body>
 </html>

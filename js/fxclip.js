@@ -133,27 +133,35 @@ APK.fxclip=(function(){
   }
 
   /* ===== efek 5: JJ Tipis (jedag-jedug tipis) =====
-     Tiap ketukan, gambar tersentak bergeser sedikit ke satu arah lalu cepat kembali (arah acak tapi tetap untuk ketukan yang sama).
-     Ketukan dihitung dari BPM, mulai dari awal clip efek, jadi taruh clip tepat di ketukan pertama lagu.
-     Ada jejak tipis di antara posisi diam dan posisi tersentak supaya terasa seperti blur gerak. TIDAK ada zoom:
-     tepi yang kosong ditutup dengan sisi seberang (membungkus, seperti Glitch dan Gelombang). */
+     Kedut SATU KALI saja di awal clip efek, tidak berulang: gambar tersentak bergeser sedikit ke satu arah sambil berputar tipis, lalu cepat kembali diam.
+     Setelah itu clip efek tidak mengubah gambar lagi, jadi clip yang diperpanjang tidak membuat kedutnya berulang. Mau kedut lagi: duplikat clip efeknya
+     dan taruh tepat di titik yang mau dikedutkan.
+     Ada jejak tipis di antara posisi diam dan posisi tersentak supaya terasa seperti blur gerak. Gambar utama DAN jejaknya sama-sama ikut berputar tipis
+     (arah putar tetap, mengikuti arah sentakan). TIDAK ada zoom: tepi yang kosong akibat geser dan putar ditutup dengan salinan dari sisi seberang
+     (membungkus, seperti Glitch dan Gelombang). */
   function jj(g,w,h,p,tm,opaque,rel){
-    const x=Math.max(0,rel)*p.bpm/60,bi=Math.floor(x),ph=x-bi;
-    const env=Math.exp(-ph*(3+p.dec/100*9));
+    const t=Math.max(0,rel);
+    const env=Math.exp(-t*(6+p.dec*0.18));   /* turun cepat dari 1 ke 0, satu kali (tanpa hitungan ketukan) */
     const A=p.amt/100*0.03*Math.min(w,h)*env;
-    if(A<0.2)return;
-    const ang=rng(bi*7919+31)()*Math.PI*2,dx=Math.cos(ang)*A,dy=Math.sin(ang)*A;
+    const R=p.rot*Math.PI/180*env;
+    if(A<0.2&&Math.abs(R)<0.0005)return;
+    const rd=rng(31),ang=rd()*Math.PI*2,sg=rd()<0.5?-1:1;
+    const dx=Math.cos(ang)*A,dy=Math.sin(ang)*A,r=sg*R;
     const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
     g.clearRect(0,0,w,h);
     if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
-    const put=(ox,oy,al)=>{
-      const wx=ox>0?-w:w,wy=oy>0?-h:h;
+    /* k = seberapa jauh dari posisi diam (1 = posisi tersentak penuh); geser dan putar dikali k, lalu gambar diulang 3x3 supaya sudut yang kosong tertutup */
+    const put=(k,al)=>{
       g.globalAlpha=al;
-      g.drawImage(S.canvas,ox,oy);g.drawImage(S.canvas,ox+wx,oy);
-      g.drawImage(S.canvas,ox,oy+wy);g.drawImage(S.canvas,ox+wx,oy+wy);
+      for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
+        g.save();
+        g.translate(w/2+dx*k,h/2+dy*k);g.rotate(r*k);g.translate(-w/2,-h/2);
+        g.drawImage(S.canvas,i*w,j*h);
+        g.restore();
+      }
     };
-    put(dx,dy,1);
-    put(dx*0.35,dy*0.35,0.4);
+    put(1,1);
+    put(0.35,0.4);
     g.globalAlpha=1;
   }
 
@@ -165,8 +173,8 @@ APK.fxclip=(function(){
       params:[['amt','Kekuatan',0,100,50],['spd','Kecepatan',10,100,50]],apply:shake},
     {id:'wave',name:'Gelombang',desc:'Gambar meliuk miring ke atas, arah bisa diatur',len:1.2,params:WP,apply:waveFx(1)},
     {id:'wave2',name:'Gelombang Balik',desc:'Gambar meliuk berlawanan arah, arah bisa diatur',len:1.2,params:WP,apply:waveFx(-1)},
-    {id:'jj',name:'JJ Tipis',desc:'Tersentak tipis di tiap ketukan, hitungan BPM',len:4,
-      params:[['amt','Kekuatan',0,100,50],['bpm','Ketukan per menit (BPM)',60,200,120],['dec','Kecepatan kembali (makin besar makin cepat)',0,100,60]],apply:jj}
+    {id:'jj',name:'JJ Tipis',desc:'Tersentak dan berputar tipis satu kali di awal clip',len:0.6,
+      params:[['amt','Kekuatan',0,100,50],['rot','Putaran tipis (derajat, 0 = tanpa putar)',0,10,2],['dec','Kecepatan kembali (makin besar makin cepat)',0,100,60]],apply:jj}
   ];
   const DEF={};LIST.forEach(e=>DEF[e.id]=e);
   const label=fx=>(DEF[fx&&fx.type]||{name:'Efek'}).name;

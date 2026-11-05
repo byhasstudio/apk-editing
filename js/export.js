@@ -1,4 +1,6 @@
-/* Export video: render timeline real-time ke MediaRecorder (MP4 jika didukung browser, selain itu WebM) */
+/* Export video: render timeline real-time ke MediaRecorder (MP4 jika didukung browser, selain itu WebM)
+   Perbaikan: semua media dimuat dan di-seek dulu sebelum rekaman mulai (lagu tidak telat), frame rate bawaan 30 fps untuk project 60 fps
+   supaya render sanggup real-time, dan fps export dipakai sebagai batas gambar. */
 window.APK=window.APK||{};
 APK.export=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
@@ -19,8 +21,9 @@ APK.export=(function(){
     const short=Math.min(p.width,p.height);
     const rs=[...new Set([480,720,1080,2160].filter(r=>r<short).concat([short]))].sort((a,b)=>a-b);
     $('ex-res').innerHTML=rs.map(r=>{const s=APK.project.size(p.aspect,r);return `<option value="${r}"${r===short?' selected':''}>${s.width}×${s.height}</option>`}).join('');
-    const fps=[...new Set([24,30,60,p.fps])].sort((a,b)=>a-b);
-    $('ex-fps').innerHTML=fps.map(f=>`<option${f===p.fps?' selected':''}>${f}</option>`).join('');
+    /* project 60 fps: export bawaan 30 fps (real-time 60 fps di browser sering tidak terkejar, hasilnya patah-patah) */
+    const fps=[...new Set([24,30,60,p.fps])].sort((a,b)=>a-b),def=p.fps>30?30:p.fps;
+    $('ex-fps').innerHTML=fps.map(f=>`<option${f===def?' selected':''}>${f}</option>`).join('');
     $('ex-settings').hidden=false;$('ex-progress').hidden=true;
     $('dlg-export').showModal();
   }
@@ -34,17 +37,27 @@ APK.export=(function(){
     if(busy)return;
     const p=P(),fm=formats(),ext=$('ex-format').value,mime=fm[ext],q=+$('ex-q').value,fps=+$('ex-fps').value;
     const {width:w,height:h}=APK.project.size(p.aspect,+$('ex-res').value);
-    busy=true;$('ex-settings').hidden=true;$('ex-progress').hidden=false;setProg(0,'Menyiapkan...');
+    busy=true;$('ex-settings').hidden=true;$('ex-progress').hidden=false;setProg(0,'Memuat media...');
     const AC=window.AudioContext||window.webkitAudioContext,ac=new AC(),dest=ac.createMediaStreamDestination();
     const hook=el=>{try{ac.createMediaElementSource(el).connect(dest)}catch(_){}};
-    let rec,timer,cancelled=false;const chunks=[];
+    let rec=null,timer,cancelled=false;const chunks=[];
     const cleanup=()=>{clearInterval(timer);APK.preview.endExport();ac.close().catch(()=>{});busy=false;abortFn=null};
+    /* batal bisa dilakukan juga saat media masih dimuat (rekaman belum mulai) */
+    abortFn=()=>{
+      cancelled=true;APK.preview.pause();
+      if(rec&&rec.state!=='inactive')rec.stop();
+      else if(!rec){cleanup();$('dlg-export').close();toast('Export dibatalkan')}
+    };
     try{
       await ac.resume();
-      APK.preview.beginExport(w,h,hook,()=>setTimeout(()=>{if(rec&&rec.state!=='inactive')rec.stop()},400));
+      APK.preview.beginExport(w,h,hook,()=>setTimeout(()=>{if(rec&&rec.state!=='inactive')rec.stop()},400),fps);
+      /* muat dan seek semua media awal dulu, baru rekam: tidak ada bagian kosong di awal dan lagu langsung sinkron */
+      await APK.preview.warm(0,6,15000);
+      if(cancelled)return;
+      setProg(0,'Menyiapkan rekaman...');
       const stream=$('pv-canvas').captureStream(fps);
       dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
-      rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:Math.min(50e6,Math.round(w*h*fps*q))});
+      rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:Math.min(50e6,Math.round(w*h*fps*q)),audioBitsPerSecond:192000});
       rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
       rec.onerror=()=>{cancelled=true;if(rec.state!=='inactive')rec.stop();toast('Export gagal')};
       rec.onstop=()=>{
@@ -53,11 +66,11 @@ APK.export=(function(){
         download(new Blob(chunks,{type:mime.split(';')[0]}),ext);
         toast('Export selesai, file diunduh');
       };
-      abortFn=()=>{cancelled=true;APK.preview.pause();if(rec.state!=='inactive')rec.stop()};
       rec.start(1000);
-      APK.preview.seek(0);APK.preview.play();
+      APK.preview.seek(0);
       const t0=Date.now();
       timer=setInterval(()=>setProg(APK.preview.time/APK.preview.duration,`Merender ${Math.round((Date.now()-t0)/1000)} dtk · ${w}×${h} · ${fps} fps`),250);
+      await APK.preview.play();
     }catch(e){
       cleanup();$('ex-settings').hidden=false;$('ex-progress').hidden=true;
       toast('Export gagal dimulai: '+(e.message||e));

@@ -1,5 +1,7 @@
 /* Keyframe: animasi properti clip (x, y, scale, opacity, rotation, volume) dengan easing.
-   Data per clip: clip.kf = { x:[{t,v,e}], ... } ; t = detik relatif terhadap awal clip, e = nama easing atau 'bz:x1,y1,x2,y2' (kurva bezier kustom) */
+   Data per clip: clip.kf = { x:[{t,v,e}], ... } ; t = detik relatif terhadap awal clip, e = nama easing atau 'bz:x1,y1,x2,y2' (kurva bezier kustom)
+   v24: keyframe TANPA easing (e kosong, seperti pada preset hasil ekstrak) tidak lagi linear patah-patah, tapi dihaluskan dengan interpolasi kubik
+   monotonik (kecepatan nyambung antar keyframe, tanpa pantulan melewati nilai keyframe). Keyframe yang easing-nya diisi tetap persis seperti dulu. */
 window.APK=window.APK||{};
 APK.kf=(function(){
   const PROPS=['x','y','scale','opacity','rotation','volume','sx','sy','skx','sky'];
@@ -53,14 +55,28 @@ APK.kf=(function(){
   const find=(a,rel,e)=>a.findIndex(k=>Math.abs(k.t-rel)<=e);
   const clone=o=>JSON.parse(JSON.stringify(o));
 
+  /* kemiringan di keyframe k: rata-rata harmonis kemiringan dua sisi (nol kalau arahnya berbalik, jadi tidak melampaui keyframe) */
+  function slopeAt(a,k){
+    const n=a.length,sl=j=>(a[j+1].v-a[j].v)/Math.max(1e-6,a[j+1].t-a[j].t);
+    if(n<2)return 0;
+    if(k===0)return sl(0);
+    if(k===n-1)return sl(n-2);
+    const s0=sl(k-1),s1=sl(k);
+    return s0*s1<=0?0:2*s0*s1/(s0+s1);
+  }
   function value(c,p,rel){
     const a=arr(c,p);
     if(!a)return c.props&&c.props[p]!=null?c.props[p]:DEF[p];
     if(rel<=a[0].t)return a[0].v;
     const L=a[a.length-1];if(rel>=L.t)return L.v;
     let i=0;while(i<a.length-2&&rel>=a[i+1].t)i++;
-    const k0=a[i],k1=a[i+1],u=(rel-k0.t)/(k1.t-k0.t),f=easeFn(k0.e);
-    return k0.v+(k1.v-k0.v)*f(u);
+    const k0=a[i],k1=a[i+1],h=k1.t-k0.t,u=(rel-k0.t)/h;
+    if(k0.e==null){
+      /* tanpa easing: kubik Hermite monotonik */
+      const t2=u*u,t3=t2*u;
+      return (2*t3-3*t2+1)*k0.v+(t3-2*t2+u)*h*slopeAt(a,i)+(-2*t3+3*t2)*k1.v+(t3-t2)*h*slopeAt(a,i+1);
+    }
+    return k0.v+(k1.v-k0.v)*easeFn(k0.e)(u);
   }
   function props(c,rel){
     const o=Object.assign({},DEF,c.props);

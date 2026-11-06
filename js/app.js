@@ -23,6 +23,8 @@
   APK.media.init(toast);APK.timeline.init(toast);APK.preview.init();
   async function openProject(p){await P.open(p);renderEditor();show('editor')}
   async function goHome(){if(P.dirty)await P.save();P.close();show('home');renderHome()}
+  /* dipakai js/template.js (preset foto) untuk membuka project yang baru dibuat */
+  APK.app={openProject,renderHome,toast};
 
   /* tab bawah untuk layar kecil: Timeline / Media / Properti */
   $('mtabs').onclick=e=>{

@@ -1,3 +1,10 @@
 {
-  "presets": []
+  "presets": [
+    {
+      "id": "kilau-matcha",
+      "name": "Kilau Matcha 3 Foto",
+      "desc": "3 foto: fade-in, zoom-putar cermin, hentakan beat, flip, hue, fade putih",
+      "file": "kilau-matcha.apktemplate"
+    }
+  ]
 }

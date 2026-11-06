@@ -1,16 +1,18 @@
-/* Preset foto (template): hasil edit yang sudah jadi, pengguna HANYA mengganti fotonya.
+/* Preset foto (template): hasil edit yang sudah jadi, pengguna HANYA mengganti fotonya (seperti template CapCut).
    Yang tetap persis sama: video, teks, bentuk, animasi, keyframe, kurva, efek, filter, musik, urutan track, rasio, fps.
    Yang bisa diganti: foto (media bertipe gambar yang dipakai clip). Foto yang tidak diganti memakai foto bawaan preset.
 
    Alur memakai (tombol "✦ Preset" di beranda):
-   1. Buka file preset (.apktemplate) -> muncul daftar foto yang bisa diganti.
-   2. Ganti foto sesuka hati (boleh sebagian saja), isi nama project, tekan "Pakai Preset".
+   1. Dialog Preset menampilkan GALERI preset yang sudah didaftarkan (dari presets/index.json), pengguna tidak perlu file apa pun.
+   2. Ketuk satu preset -> muncul daftar foto yang bisa diganti. Ganti foto sesuka hati (boleh sebagian saja), isi nama project, tekan "Pakai Preset".
    3. Project baru dibuat dan langsung terbuka di editor. Tidak ada yang ditulis ke penyimpanan sebelum tombol Pakai ditekan.
+   (Untuk pembuat: tombol kecil "Buka dari file" di dialog yang sama bisa membuka file .apktemplate langsung, untuk mencoba preset sebelum didaftarkan.)
 
    Alur membuat (tombol "⬇ Preset Foto" di editor): menyimpan SEMUA layer project + media + pengaturan project (rasio, fps) jadi satu file .apktemplate.
    Formatnya sama dengan preset format 3 (js/presets.js: 'APKPRESET3' + header JSON + isi media) ditambah header:
      template:{v:1, project:{aspect,width,height,fps,...}, slots:[id media foto yang boleh diganti]}
-   Daftar preset bawaan BELUM ada. Nanti cukup panggil APK.template.register({id,name,desc,url}) dan daftarnya otomatis muncul di dialog.
+   Mendaftarkan preset: taruh file .apktemplate di folder presets/ lalu tambahkan satu baris di presets/index.json (lihat presets/README.md).
+   Bisa juga lewat kode: APK.template.register({id,name,desc,url,cover}).
    Dimuat setelah js/presets.js dan js/app.js (memakai APK.presets dan APK.app). */
 window.APK=window.APK||{};
 APK.template=(function(){
@@ -18,13 +20,35 @@ APK.template=(function(){
   const clone=o=>JSON.parse(JSON.stringify(o));
   const num=v=>typeof v==='number'&&isFinite(v);
   const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const RATIOS=['16:9','9:16','1:1','4:3','21:9'],IMG='.png,.jpg,.jpeg,.webp';
+  const RATIOS=['16:9','9:16','1:1','4:3','21:9'],IMG='.png,.jpg,.jpeg,.webp',DIR='presets/';
   const registry=[];
-  let cur=null,urls=[],fileIn=null,slotIn=null,pickIdx=-1;
+  let cur=null,urls=[],fileIn=null,slotIn=null,pickIdx=-1,manifestP=null,loadingUse=false;
   function toast(m){const t=$('toast');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),3200)}
 
-  /* daftar preset bawaan (kosong dulu): {id,name,desc,url} */
-  function register(t){if(t&&typeof t.name==='string'&&typeof t.url==='string'&&!registry.some(x=>x.id===t.id&&t.id))registry.push(t)}
+  /* daftar preset: {id,name,desc,url,cover} */
+  function register(t){
+    if(!t||typeof t.name!=='string'||typeof t.url!=='string')return;
+    if(t.id&&registry.some(x=>x.id===t.id))return;
+    registry.push(t);
+  }
+  /* baca presets/index.json: {"presets":[{"id","name","desc","file","cover"}]}. File dan cover hanya boleh nama file di folder presets/ */
+  const safeName=s=>typeof s==='string'&&/^[\w\-. ]+$/.test(s)&&!s.startsWith('.');
+  function loadManifest(){
+    if(manifestP)return manifestP;
+    manifestP=(async()=>{
+      try{
+        const r=await fetch(DIR+'index.json',{cache:'no-cache'});
+        if(!r.ok){manifestP=null;return}
+        const j=await r.json();
+        for(const t of (Array.isArray(j&&j.presets)?j.presets:[])){
+          if(!t||typeof t.name!=='string'||!safeName(t.file))continue;
+          register({id:String(t.id||t.file),name:t.name.slice(0,60),desc:typeof t.desc==='string'?t.desc.slice(0,120):'',
+            url:DIR+encodeURIComponent(t.file),cover:safeName(t.cover)?DIR+encodeURIComponent(t.cover):''});
+        }
+      }catch(_){manifestP=null}
+    })();
+    return manifestP;
+  }
 
   /* ===== membuat preset (di editor) ===== */
   async function save(){
@@ -47,7 +71,7 @@ APK.template=(function(){
     const a=document.createElement('a');
     a.href=URL.createObjectURL(b.blob);a.download=base+'.apktemplate';a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),b.total?120000:1500);
-    toast('Preset foto disimpan ('+imgs.length+' foto bisa diganti'+b.note+')');
+    toast('Preset foto disimpan ('+imgs.length+' foto bisa diganti'+b.note+'). Taruh di folder presets/ dan daftarkan di presets/index.json');
   }
 
   /* ===== memakai preset (di beranda) ===== */
@@ -80,25 +104,37 @@ APK.template=(function(){
     const u=URL.createObjectURL(m._blob);urls.push(u);return u;
   };
 
-  function showStart(){
+  /* galeri preset yang sudah didaftarkan (tanpa file) */
+  function renderStart(loading){
     const d=dlg();
-    const items=registry.map((t,i)=>'<div class="tp-item"><div><b>'+esc(t.name)+'</b>'+(t.desc?'<small>'+esc(t.desc)+'</small>':'')+'</div><button class="btn" type="button" data-use="'+i+'">Pakai</button></div>').join('');
+    const cards=registry.map((t,i)=>'<button class="tp-card" type="button" data-use="'+i+'" title="Pakai preset ini">'
+      +'<span class="tp-cover"><i>✦</i>'+(t.cover?'<img alt="" loading="lazy" src="'+esc(t.cover)+'" onerror="this.remove()">':'')+'</span>'
+      +'<b>'+esc(t.name)+'</b>'+(t.desc?'<small>'+esc(t.desc)+'</small>':'')+'</button>').join('');
     d.innerHTML='<h3>Preset</h3>'
-      +'<p class="tp-note">Preset adalah hasil edit yang sudah jadi. Kamu tinggal mengganti fotonya, sedangkan animasi, teks, efek, dan musiknya tetap.</p>'
-      +(registry.length?'<div class="tp-list">'+items+'</div>':'')
-      +'<div class="dlg-actions"><button class="btn" type="button" id="tp-close">Tutup</button><button class="btn primary" type="button" id="tp-file">Buka file preset</button></div>';
+      +'<p class="tp-note">Pilih preset yang sudah jadi, lalu ganti fotonya. Animasi, teks, efek, dan musiknya tetap.</p>'
+      +(registry.length?'<div class="tp-gallery" id="tp-gallery">'+cards+'</div>'
+        :'<p class="tp-empty">'+(loading?'Memuat daftar preset...':'Belum ada preset yang tersedia.')+'</p>')
+      +'<div class="dlg-actions"><button class="btn" type="button" id="tp-file" title="Untuk mencoba file .apktemplate sendiri">Buka dari file</button><button class="btn primary" type="button" id="tp-close">Tutup</button></div>';
     d.querySelector('#tp-close').onclick=()=>d.close();
     d.querySelector('#tp-file').onclick=()=>fileIn.click();
     d.querySelectorAll('[data-use]').forEach(b=>b.onclick=()=>useBuiltin(+b.dataset.use));
     if(!d.open)d.showModal();
   }
+  async function showStart(){
+    renderStart(!manifestP||registry.length===0);
+    const n=registry.length;
+    await loadManifest();
+    /* perbarui galeri hanya kalau dialog masih menampilkan galeri (bukan sedang memilih foto) */
+    if(!cur&&dlg().open&&(registry.length!==n||!n))renderStart(false);
+  }
   async function useBuiltin(i){
-    const t=registry[i];if(!t)return;
-    toast('Memuat preset...');
+    const t=registry[i];if(!t||loadingUse)return;
+    loadingUse=true;toast('Memuat preset '+t.name+'...');
     try{
-      const r=await fetch(t.url);if(!r.ok)throw new Error('HTTP '+r.status);
+      const r=await fetch(t.url);if(!r.ok)throw new Error(r.status===404?'file preset tidak ditemukan':'HTTP '+r.status);
       await openBlob(await r.blob());
     }catch(e){toast('Gagal memuat preset: '+e.message)}
+    finally{loadingUse=false}
   }
   async function openBlob(file){
     if(!APK.presets||!APK.app){toast('Sistem preset belum dimuat');return}
@@ -135,8 +171,9 @@ APK.template=(function(){
         :'Preset ini tidak punya foto yang bisa diganti. Kamu tetap bisa memakainya apa adanya.')+'</p>'
       +(cur.slots.length?'<div class="tp-slots" id="tp-slots">'+slotCards()+'</div>':'')
       +'<label>Nama project<input id="tp-name" maxlength="80" value="'+esc(cur.name)+'"></label>'
-      +'<div class="dlg-actions"><button class="btn" type="button" id="tp-cancel">Batal</button><button class="btn primary" type="button" id="tp-apply">Pakai Preset</button></div>';
-    d.querySelector('#tp-cancel').onclick=()=>d.close();
+      +'<div class="dlg-actions"><button class="btn" type="button" id="tp-cancel">Kembali</button><button class="btn primary" type="button" id="tp-apply">Pakai Preset</button></div>';
+    /* Kembali = ke galeri, tidak ada yang tersimpan */
+    d.querySelector('#tp-cancel').onclick=()=>{cleanup();renderStart(false)};
     d.querySelector('#tp-apply').onclick=apply;
     const g=d.querySelector('#tp-slots');
     if(g)g.onclick=e=>{const b=e.target.closest('[data-pick]');if(!b)return;pickIdx=+b.dataset.pick;slotIn.click()};
@@ -206,7 +243,8 @@ APK.template=(function(){
     if(nb)nb.before(mk('btn-preset-home','✦ Preset','Pakai preset: hasil edit yang sudah jadi, kamu tinggal mengganti fotonya',showStart));
     const anchor=$('btn-preset-save')||$('btn-mode');
     if(anchor)anchor.before(mk('btn-preset-foto','⬇ Preset Foto','Simpan project ini jadi preset foto (.apktemplate): seluruh layer dan media ikut tersimpan, pengguna hanya bisa mengganti fotonya',save));
+    loadManifest();   /* daftar dimuat di latar belakang supaya galeri langsung siap saat dibuka */
   }
   try{init()}catch(e){console.error('Preset foto gagal dimuat',e)}
-  return{register,save,showStart,openBlob};
+  return{register,save,showStart,openBlob,loadManifest};
 })();

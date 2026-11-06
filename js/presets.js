@@ -112,7 +112,15 @@ APK.presets=(function(){
       }
       return o;
     }
-    return JSON.parse(await file.text());
+    const o=JSON.parse(await file.text());
+    /* preset teks murni boleh membawa foto bawaan sebagai base64 (m.b64), supaya bisa disimpan sebagai file teks biasa di repo */
+    for(const m of (Array.isArray(o&&o.media)?o.media:[])){
+      if(!m||typeof m.b64!=='string')continue;
+      try{const bin=atob(m.b64),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+        m._blob=new Blob([u],{type:typeof m.mime==='string'?m.mime:''});m.size=u.length}catch(_){}
+      delete m.b64;
+    }
+    return o;
   }
   /* sambungkan media preset ke project: pakai media yang sudah ada (id sama, atau nama+jenis+ukuran sama), kalau belum ada impor dari isi preset.
      Lalu clip di preset diarahkan ke id media di project ini. Mengembalikan jumlah media yang baru diimpor. */

@@ -23,3 +23,6 @@ Preset di folder ini otomatis muncul di galeri tombol **✦ Preset** (beranda), 
 ```
 
 `file` dan `cover` hanya berupa nama file di folder ini. `cover` boleh dikosongkan.
+
+## Preset berbentuk file teks
+File `.apktemplate` juga boleh berupa JSON biasa (bukan biner). Foto bawaannya ditaruh di `media[].b64` (base64), jadi file bisa dibaca dan diubah di GitHub. Contoh: `kilau-matcha.apktemplate` (3 foto, dibuat dari analisis video referensi: fade-in, zoom-out dengan isi cermin lalu putar, hentakan zoom + flip horizontal + blur sesuai beat, siklus hue, fade putih ke hitam).

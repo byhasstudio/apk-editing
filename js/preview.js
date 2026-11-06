@@ -1,17 +1,25 @@
 /* Preview: render komposisi timeline ke canvas, playback, sinkron dengan playhead.
-   Performa (v22):
+   Performa (v23):
    - clip yang akan tampil dalam 1,5 detik disiapkan lebih dulu (dimuat dan diposisikan), jadi audio dan video tidak telat mulai
    - audio disinkronkan lembut (kecepatan putar disesuaikan sedikit) dan jeda start play() dipelajari otomatis, jadi tidak ada delay audio
    - kualitas preview menyesuaikan diri: kalau perangkat tidak kuat, fps dan resolusi preview turun sendiri (hasil export tidak terpengaruh)
    - pembaruan antarmuka (waktu, playhead, gizmo) dibatasi saat memutar
-   - export presisi: prepare() dan exportFrame() merender frame demi frame tanpa bergantung pada kecepatan perangkat */
+   - export presisi: prepare() dan exportFrame() merender frame demi frame tanpa bergantung pada kecepatan perangkat
+   Perbaikan frame hitam (v23):
+   - FOTO DIPAKAI BERSAMA: satu elemen Image per media (bukan satu per clip). Preset dengan puluhan potongan clip dari foto yang sama
+     dulu memuat ulang gambar di setiap pergantian clip, sekarang gambar sudah siap sehingga tidak ada jeda dan tidak ada frame kosong.
+   - ISI CERMIN OTOMATIS: clip media yang menjadi layer paling dasar (tidak ada layer lain di bawahnya) dan hampir selebar layar,
+     tapi pada saat itu tidak menutupi seluruh frame (diperkecil, diputar, atau digeser sampai tepinya terbuka), otomatis diisi cermin tepinya
+     (efek Isi Cermin, js/fxclip.js) sehingga sudut dan tepi tidak pernah hitam. Clip yang sengaja kecil (di bawah skala 0,5), transparan,
+     bertransisi, bermask, atau ber-chroma tidak disentuh. Clip yang sudah punya efek Isi Cermin sendiri memakai efeknya sendiri. */
 window.APK=window.APK||{};
 APK.preview=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
   let canvas,ctx,t=0,playing=false,base=0,t0=0,raf=0,vol=1,K=1,hook=null,onEnd=null,exporting=false,off=false,offFps=30;
-  const els=new Map(),bmap=new Map();
+  const els=new Map(),bmap=new Map(),imgs=new Map();
   const LOOK=1.5;                                                   /* detik: clip yang mulai dalam waktu ini disiapkan lebih awal */
   const LV=[[60,1],[30,1],[30,0.75],[24,0.6],[24,0.45]];            /* tingkat kualitas preview: [fps maksimum, skala resolusi] */
+  const AUTO=[{type:'mirror',p:{blur:14}}];                         /* efek isi cermin otomatis (blur isian tipis supaya terasa seperti latar) */
   let lat=0.1,lv=0,Q=1,ema=0,dema=0,slow=0,fast=0,nextDraw=0,lastUi=0,gcN=0,needResize=false;
   const clampN=(v,a,b)=>Math.min(b,Math.max(a,v));
   const mediaOf=id=>P().media.find(m=>m.id===id);
@@ -26,10 +34,16 @@ APK.preview=(function(){
   function getEl(clip){
     let e=els.get(clip.id);if(e)return e;
     const m=mediaOf(clip.mediaId);if(!m)return null;
+    /* foto yang sama dipakai bersama oleh semua clip-nya (dihitung referensinya, dilepas saat clip terakhir dilepas) */
+    if(m.type==='image'){
+      const sh=imgs.get(m.id);
+      if(sh&&!sh.gone){sh.refs++;els.set(clip.id,sh);return sh}
+    }
     const el=m.type==='image'?new Image():document.createElement(m.type);
-    e={el,type:m.type,ready:false,gone:false,failed:false,pre:false,playAt:0,seekAt:0,rev:false};
+    e={el,type:m.type,ready:false,gone:false,failed:false,pre:false,playAt:0,seekAt:0,rev:false,refs:1,mid:m.id};
     e.readyP=new Promise(r=>{e.res=r});
     els.set(clip.id,e);
+    if(m.type==='image')imgs.set(m.id,e);
     const done=()=>{if(e.gone)return;e.ready=true;e.res();if(!off&&!playing)draw()};
     if(m.type==='image')el.onload=done;
     else{
@@ -46,9 +60,13 @@ APK.preview=(function(){
   }
   function release(id){
     const e=els.get(id);if(!e)return;
+    els.delete(id);
+    if(e.type==='image'){
+      if(--e.refs>0)return;                       /* masih dipakai clip lain */
+      if(imgs.get(e.mid)===e)imgs.delete(e.mid);
+    }
     e.gone=true;e.res();
     if(e.type!=='image'){e.el.pause();e.el.removeAttribute('src');e.el.load()}else e.el.removeAttribute('src');
-    els.delete(id);
   }
   /* siapkan clip yang akan mulai sebentar lagi: muat media dan taruh di titik mulainya, supaya play() nanti langsung jalan */
   function pre(c,tr){
@@ -59,6 +77,22 @@ APK.preview=(function(){
       x=rev?c.in+c.dur*sp:c.in+lat*sp;
     if(Math.abs(e.el.currentTime-x)>0.04)e.el.currentTime=x;
     e.pre=true;
+  }
+  /* true kalau clip media c pada waktu tt tidak menutupi seluruh frame dan layak diisi cermin otomatis */
+  function autoFill(c,tt,W,H){
+    if((c.mask&&c.mask.on)||(c.chroma&&c.chroma.on)||(c.tin&&c.tin.type)||(c.tout&&c.tout.type))return false;
+    const m=mediaOf(c.mediaId);
+    if(!m||(m.type!=='image'&&m.type!=='video')||!(m.width>0)||!(m.height>0))return false;
+    const pr=APK.layers.props(c,tt);
+    if(pr.opacity<0.98||pr.scale<0.5||pr.skx||pr.sky)return false;   /* sengaja transparan, kecil, atau miring: biarkan */
+    const q=APK.layers.center(c,pr),s=Math.min(W/m.width,H/m.height)*Math.max(0,pr.scale),
+      hw=m.width*s*(pr.sx==null?1:pr.sx)/2,hh=m.height*s*(pr.sy==null?1:pr.sy)/2,
+      a=pr.rotation*Math.PI/180,cs=Math.cos(a),sn=Math.sin(a),cx=W/2+q.x,cy=H/2+q.y;
+    for(const k of [[0,0],[W,0],[W,H],[0,H]]){
+      const dx=k[0]-cx,dy=k[1]-cy,lx=dx*cs+dy*sn,ly=-dx*sn+dy*cs;   /* sudut frame di ruang media (diputar balik) */
+      if(Math.abs(lx)>hw+0.5||Math.abs(ly)>hh+0.5)return true;
+    }
+    return false;
   }
   function frame(){
     const p=P(),W=p.width,H=p.height,FX=APK.fxclip,ft=FX?FX.targets(p,t):null;
@@ -72,12 +106,14 @@ APK.preview=(function(){
       for(const tr of p.tracks)for(const c of tr.clips)live.add(c.id);
       for(const id of [...els.keys()])if(!live.has(id))release(id);
     }
+    let below=false;   /* sudah ada layer yang tergambar di track yang lebih bawah */
     for(let i=p.tracks.length-1;i>=0;i--){
       const tr=p.tracks[i];
       if(tr.hidden){
         for(const c of tr.clips){const e=els.get(c.id);if(e&&e.type!=='image'&&!e.el.paused)e.el.pause()}
         continue;
       }
+      let trDrew=false;
       for(const c of tr.clips){
         const active=t>=c.start&&t<c.start+c.dur-1e-6;
         if(!active){
@@ -91,8 +127,10 @@ APK.preview=(function(){
         }
         /* clip efek (js/fxclip.js): tanpa target = mengolah semua yang sudah tergambar di bawahnya; yang bertarget diterapkan per clip di bawah */
         if(c.fx){if(FX&&!Array.isArray(c.fx.targets))FX.run(ctx,c.fx,t,true);continue}
-        const E=APK.effects,fl=ft&&ft.get(c.id)||null,main=ctx;
-        let drew=false;
+        const E=APK.effects,main=ctx;
+        let fl=ft&&ft.get(c.id)||null,drew=false;
+        /* layer dasar yang tidak menutupi frame: isi otomatis dengan cermin tepinya supaya tidak ada area hitam */
+        if(!fl&&FX&&!below&&tr.kind!=='audio'&&c.mediaId&&autoFill(c,t,W,H))fl=AUTO;
         /* clip yang dituju efek digambar dulu ke lapisan terpisah, efek diterapkan ke lapisan itu, lalu ditempel ke kanvas utama */
         if(fl)ctx=FX.layerBegin(main,K);
         try{
@@ -171,8 +209,10 @@ APK.preview=(function(){
           if(E)E.end(ctx);
         }finally{
           if(fl){ctx=main;if(drew)FX.layerEnd(main,c,fl,t)}
+          if(drew)trDrew=true;
         }
       }
+      if(trDrew)below=true;
     }
   }
   /* live = dipanggil dari loop playback: antarmuka (waktu, playhead, gizmo) tidak perlu diperbarui di setiap frame */
@@ -298,7 +338,7 @@ APK.preview=(function(){
     $('pv-aspect').onchange=e=>{APK.project.setAspect(e.target.value);resize();draw()};
   }
   function load(){t=0;playing=false;Q=1;lv=0;needResize=false;$('pv-aspect').value=P().aspect;$('pv-play').textContent='▶';resize();draw()}
-  function unload(){playing=false;cancelAnimationFrame(raf);for(const id of [...els.keys()])release(id)}
+  function unload(){playing=false;cancelAnimationFrame(raf);for(const id of [...els.keys()])release(id);imgs.clear()}
   return{init,load,unload,beginExport,beginOffline,endExport,prepare,exportFrame,refresh:()=>draw(),seek,play,pause,toggle,stop,fmt,bounds:id=>bmap.get(id),
     get exporting(){return exporting},get time(){return t},get playing(){return playing},get duration(){return duration()}};
 })();

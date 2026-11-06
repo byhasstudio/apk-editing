@@ -2,6 +2,9 @@
    - PRESISI (disarankan, MP4): frame dirender satu per satu (tidak bergantung pada kecepatan perangkat), dikodekan dengan WebCodecs (H.264),
      audio dicampur terpisah dengan OfflineAudioContext dan dikodekan (AAC). Hasilnya tidak patah-patah walau efek berat, dan audio tepat waktu.
      Lamanya mengikuti beratnya project (bisa lebih lama dari durasi video). Kalau perangkat/browser tidak mendukung, otomatis pakai mode cepat.
+     v17: GERAK HALUS (motion blur): tiap frame dirata-rata dari 2 atau 4 sub-frame di sekitar waktunya (rana 180 derajat), jadi gerak cepat
+     dan hentakan antar clip terasa mulus seperti hasil kamera, tanpa mengurangi ketajaman gambar yang diam. Kualitas Maksimal dan resolusi
+     di atas resolusi project (misalnya 1080p dari project 720p) tersedia supaya hasilnya jernih.
    - CEPAT (real-time): timeline diputar dan direkam dengan MediaRecorder (MP4 jika didukung, selain itu WebM). Lamanya sama dengan durasi,
      tapi frame bisa terlewat kalau perangkat tidak kuat. */
 window.APK=window.APK||{};
@@ -23,13 +26,14 @@ APK.export=(function(){
 
   function fillFormats(){
     const mode=$('ex-mode').value,fm=formats(),keys=Object.keys(fm);
+    const mbEl=$('ex-mb');if(mbEl)mbEl.disabled=mode!=='pre';   /* gerak halus hanya untuk mode presisi */
     if(mode==='pre'){
       $('ex-format').innerHTML='<option value="mp4">MP4 (H.264 + AAC)</option>';$('ex-format').disabled=true;
-      $('ex-note').textContent='Mode presisi merender frame demi frame, jadi hasilnya tidak patah-patah walau efeknya berat dan audio tepat waktu. Lamanya bisa lebih lama dari durasi video. Biarkan tab tetap terbuka dan terlihat.';
+      $('ex-note').textContent='Mode presisi merender frame demi frame, jadi hasilnya tidak patah-patah walau efeknya berat dan audio tepat waktu. Lamanya bisa lebih lama dari durasi video (gerak halus membuatnya lebih lama lagi). Biarkan tab tetap terbuka dan terlihat.';
     }else{
       $('ex-format').disabled=false;
       $('ex-format').innerHTML=keys.map(k=>`<option value="${k}">${LABEL[k]}</option>`).join('');
-      $('ex-note').textContent='Mode cepat berjalan real-time seperti memutar video, jadi lamanya sama dengan durasi timeline. Kalau perangkat kurang kuat, frame bisa terlewat. Biarkan tab tetap terbuka dan terlihat.';
+      $('ex-note').textContent='Mode cepat berjalan real-time seperti memutar video, jadi lamanya sama dengan durasi timeline. Kalau perangkat kurang kuat, frame bisa terlewat. Untuk hasil 60 fps yang jernih dan tidak patah-patah, pakai mode presisi. Biarkan tab tetap terbuka dan terlihat.';
     }
   }
   function open(){
@@ -42,8 +46,11 @@ APK.export=(function(){
     $('ex-mode').value=pre?'pre':'rt';
     fillFormats();
     const short=Math.min(p.width,p.height);
-    const rs=[...new Set([480,720,1080,2160].filter(r=>r<short).concat([short]))].sort((a,b)=>a-b);
-    $('ex-res').innerHTML=rs.map(r=>{const s=APK.project.size(p.aspect,r);return `<option value="${r}"${r===short?' selected':''}>${s.width}×${s.height}</option>`}).join('');
+    /* resolusi boleh di atas resolusi project (dirender ulang lebih tajam); bawaan minimal 1080p supaya jernih */
+    const cand=[480,720,1080,1440].concat(short>=1080?[2160]:[]);
+    const rs=[...new Set(cand.filter(r=>r<=Math.max(short,1440)).concat([short]))].sort((a,b)=>a-b);
+    const defR=short<1080?1080:short;
+    $('ex-res').innerHTML=rs.map(r=>{const s=APK.project.size(p.aspect,r);return `<option value="${r}"${r===defR?' selected':''}>${s.width}×${s.height}</option>`}).join('');
     const fps=[...new Set([24,30,60,p.fps])].sort((a,b)=>a-b);
     $('ex-fps').innerHTML=fps.map(f=>`<option${f===p.fps?' selected':''}>${f}</option>`).join('');
     $('ex-settings').hidden=false;$('ex-progress').hidden=true;
@@ -113,11 +120,11 @@ APK.export=(function(){
   }
 
   /* ===== mode presisi ===== */
-  async function renderPrecise(p,w,h,fps,q,D,N,st){
-    const SR=48000,bitrate=Math.min(80e6,Math.max(1e6,Math.round(w*h*fps*q)));
+  async function renderPrecise(p,w,h,fps,q,D,N,st,mb){
+    const SR=48000,bitrate=Math.min(80e6,Math.max(2e6,Math.round(w*h*fps*q)));
     let vcfg=null;
     for(const codec of ['avc1.640033','avc1.64002a','avc1.640028','avc1.64001f','avc1.42001f']){
-      const c={codec,width:w,height:h,bitrate,framerate:fps,avc:{format:'avc'}};
+      const c={codec,width:w,height:h,bitrate,framerate:fps,avc:{format:'avc'},latencyMode:'quality'};
       try{const s=await VideoEncoder.isConfigSupported(c);if(s&&s.supported){vcfg=c;break}}catch(_){}
     }
     if(!vcfg)throw new Error('encoder H.264 tidak tersedia');
@@ -127,7 +134,7 @@ APK.export=(function(){
     let acfg=null,acodec='aac';
     if(mix){
       for(const [cd,mc] of [['mp4a.40.2','aac'],['opus','opus']]){
-        try{const c={codec:cd,sampleRate:SR,numberOfChannels:2,bitrate:160000},s=await AudioEncoder.isConfigSupported(c);if(s&&s.supported){acfg=c;acodec=mc;break}}catch(_){}
+        try{const c={codec:cd,sampleRate:SR,numberOfChannels:2,bitrate:192000},s=await AudioEncoder.isConfigSupported(c);if(s&&s.supported){acfg=c;acodec=mc;break}}catch(_){}
       }
       if(!acfg)throw new Error('encoder audio tidak tersedia');
     }
@@ -154,15 +161,34 @@ APK.export=(function(){
     };
     APK.preview.beginOffline(w,h,fps);
     const canvas=$('pv-canvas'),dur=Math.round(1e6/fps);
+    /* gerak halus: kanvas penampung untuk merata-ratakan sub-frame */
+    let acc=null,ag=null;
+    if(mb>1){acc=document.createElement('canvas');acc.width=w;acc.height=h;ag=acc.getContext('2d')}
     let lastProg=0;
     for(let i=0;i<N;i++){
       if(st.cancelled)return null;
       if(err)throw err;
       const tm=i/fps;
-      await APK.preview.prepare(tm);
-      if(st.cancelled)return null;
-      APK.preview.exportFrame(tm);
-      const vf=new VideoFrame(canvas,{timestamp:Math.round(i*1e6/fps),duration:dur});
+      let srcCv=canvas;
+      if(mb>1){
+        /* rana 180 derajat: sub-frame tersebar simetris di setengah lama frame di sekitar tm; rata-rata progresif (alpha 1/(k+1)) */
+        ag.setTransform(1,0,0,1,0,0);ag.globalAlpha=1;ag.globalCompositeOperation='source-over';ag.clearRect(0,0,w,h);
+        for(let k=0;k<mb;k++){
+          const ts=Math.min(Math.max(0,D-1e-3),Math.max(0,tm+((k+0.5)/mb-0.5)*0.5/fps));
+          await APK.preview.prepare(ts);
+          if(st.cancelled)return null;
+          APK.preview.exportFrame(ts);
+          ag.globalAlpha=1/(k+1);
+          ag.drawImage(canvas,0,0);
+        }
+        ag.globalAlpha=1;
+        srcCv=acc;
+      }else{
+        await APK.preview.prepare(tm);
+        if(st.cancelled)return null;
+        APK.preview.exportFrame(tm);
+      }
+      const vf=new VideoFrame(srcCv,{timestamp:Math.round(i*1e6/fps),duration:dur});
       venc.encode(vf,{keyFrame:i%(fps*2)===0});
       vf.close();
       if(aenc)feed(Math.min(total,Math.floor((tm+1)*SR)));
@@ -171,7 +197,7 @@ APK.export=(function(){
       if(now-lastProg>200){
         lastProg=now;
         const el=(now-st.t0)/1000;
-        setProg(i/N,`Merender frame ${i}/${N} · ${w}×${h} · ${fps} fps`+(i>=15?` · sisa ±${fmtT(el/i*(N-i))}`:''));
+        setProg(i/N,`Merender frame ${i}/${N} · ${w}×${h} · ${fps} fps`+(mb>1?` · gerak halus ${mb}x`:'')+(i>=15?` · sisa ±${fmtT(el/i*(N-i))}`:''));
         await sleep(0);
       }else if(i%3===0)await sleep(0);
     }
@@ -186,13 +212,14 @@ APK.export=(function(){
   async function startPrecise(){
     if(busy)return;
     const p=P(),fps=+$('ex-fps').value,q=+$('ex-q').value,D=APK.preview.duration;
+    const mb=$('ex-mb')?Math.max(1,Math.min(4,Math.round(+$('ex-mb').value)||1)):1;
     const sz=APK.project.size(p.aspect,+$('ex-res').value),w=Math.max(2,sz.width&~1),h=Math.max(2,sz.height&~1);
     const N=Math.max(1,Math.ceil(D*fps-1e-6)),st={venc:null,aenc:null,cancelled:false,t0:Date.now()};
     busy=true;$('ex-settings').hidden=true;$('ex-progress').hidden=false;setProg(0,'Menyiapkan...');
     abortFn=()=>{st.cancelled=true;$('ex-status').textContent='Membatalkan...'};
     keepAwake();
     let blob=null,failed=null;
-    try{blob=await renderPrecise(p,w,h,fps,q,D,N,st)}catch(e){failed=e}
+    try{blob=await renderPrecise(p,w,h,fps,q,D,N,st,mb)}catch(e){failed=e}
     try{if(st.venc&&st.venc.state!=='closed')st.venc.close()}catch(_){}
     try{if(st.aenc&&st.aenc.state!=='closed')st.aenc.close()}catch(_){}
     APK.preview.endExport();releaseWake();busy=false;abortFn=null;

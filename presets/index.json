@@ -5,6 +5,12 @@
       "name": "Kilau Matcha 3 Foto",
       "desc": "3 foto: fade-in, zoom-putar cermin, hentakan beat, flip, hue, fade putih",
       "file": "kilau-matcha.apktemplate"
+    },
+    {
+      "id": "lirik-merah",
+      "name": "Lirik Merah Kinetik",
+      "desc": "Teks lirik 3D: blok merah, teks melingkar, retakan abu, fade hitam",
+      "file": "lirik-merah.apktemplate"
     }
   ]
 }

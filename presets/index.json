@@ -17,6 +17,12 @@
       "name": "Dentum Flip 3 Foto",
       "desc": "3 foto: fade-in gelap, push-in, zoom-whip, miring, flip sesuai beat, geser turun, fade hitam",
       "file": "dentum-flip.apktemplate"
+    },
+    {
+      "id": "jatuh-hanyut",
+      "name": "Jatuh Hanyut 3 Foto",
+      "desc": "3 foto: shake beat, push-in diagonal, flip miring, zoom-whip, geser bawah, landing, fade hitam",
+      "file": "jatuh-hanyut.apktemplate"
     }
   ]
 }

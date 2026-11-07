@@ -1,5 +1,6 @@
 /* 3D: rotasi X dan Y dengan perspektif untuk klip teks dan bentuk (properti keyframe rx, ry dalam derajat).
-   Cara kerja: klip digambar datar ke kanvas sementara, lalu dipetakan ulang lewat jaring segitiga dengan proyeksi perspektif.
+   Cara kerja: klip digambar datar ke kanvas sementara (pada skala hingga 2x supaya tetap tajam), lalu dipetakan ulang
+   lewat jaring segitiga kecil dengan proyeksi perspektif. Hanya area klip yang diproses, supaya tetap ringan.
    Urutan transformasi: skala -> putar Y -> putar X -> rotasi (Z) -> perspektif -> geser (x, y). */
 window.APK=window.APK||{};
 APK.p3d=(function(){
@@ -12,7 +13,8 @@ APK.p3d=(function(){
   let A=null,B=null;
   function cv(c,w,h){
     if(!c)c=document.createElement('canvas');
-    if(c.width!==w||c.height!==h){c.width=w;c.height=h}else c.getContext('2d').clearRect(0,0,w,h);
+    if(c.width!==w||c.height!==h){c.width=w;c.height=h}
+    else{const g=c.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,w,h)}
     return c;
   }
   function tri(g,img,s0,s1,s2,d0,d1,d2){
@@ -38,45 +40,60 @@ APK.p3d=(function(){
   }
   function draw3d(orig,ctx,c,pr,W,H){
     const m=ctx.getTransform(),K0=Math.hypot(m.a,m.b)||1,cw=ctx.canvas.width,ch=ctx.canvas.height;
-    A=cv(A,cw,ch);B=cv(B,cw,ch);
-    const g=A.getContext('2d');g.setTransform(K0,0,0,K0,0,0);
-    const p2=Object.assign({},pr,{x:0,y:0,rotation:0,scale:1,opacity:1,rx:0,ry:0});
-    const b=orig(g,Object.assign({},c,{blend:'source-over'}),p2,W,H)||{w:300,h:200};
     const s=Math.max(0,pr.scale);
-    if(s<=0||pr.opacity<=0)return b;
+    if(s<=0||pr.opacity<=0)return{w:300,h:200};
+    A=cv(A,cw,ch);B=cv(B,cw,ch);
+    /* gambar datar pada skala sd (maks 2x) supaya tajam; sisanya (ratio) dikerjakan proyeksi */
+    const sd=Math.min(Math.max(s,0.3),2),ratio=s/sd;
+    const g=A.getContext('2d');g.setTransform(K0,0,0,K0,0,0);
+    const p2=Object.assign({},pr,{x:0,y:0,rotation:0,scale:sd,opacity:1,rx:0,ry:0});
+    const b=orig(g,Object.assign({},c,{blend:'source-over'}),p2,W,H)||{w:300,h:200};
     const sxm=Math.abs(pr.sx==null?1:pr.sx),sym=Math.abs(pr.sy==null?1:pr.sy);
-    const bw=(b.w*sxm)*1.3+80,bh=(b.h*sym)*1.4+80;
-    const u0=Math.max(-bw/2,-W/2),u1=Math.min(bw/2,W/2),v0=Math.max(-bh/2,-H/2),v1=Math.min(bh/2,H/2);
+    const hw=Math.min(W/2,(b.w*sxm*sd)*0.62+50),hh=Math.min(H/2,(b.h*sym*sd)*0.7+50);
+    const u0=-hw,u1=hw,v0=-hh,v1=hh;
     const rx=(pr.rx||0)*Math.PI/180,ry=(pr.ry||0)*Math.PI/180,rz=(pr.rotation||0)*Math.PI/180;
     const cX=Math.cos(rx),sX=Math.sin(rx),cY=Math.cos(ry),sY=Math.sin(ry),cZ=Math.cos(rz),sZ=Math.sin(rz),D=Math.max(W,H)*1.1;
     const S=(u,v)=>[(W/2+u)*K0,(H/2+v)*K0];
     const P=(u,v)=>{
-      let x=u*s,y=v*s,z=0;
+      let x=u*ratio,y=v*ratio,z=0;
       const x1=x*cY+z*sY,z1=-x*sY+z*cY;x=x1;z=z1;
       const y1=y*cX-z*sX,z2=y*sX+z*cX;y=y1;z=z2;
       const x2=x*cZ-y*sZ,y2=x*sZ+y*cZ;x=x2;y=y2;
       const f=D/Math.max(D*0.08,D-z);
       return[(W/2+pr.x+x*f)*K0+m.e,(H/2+pr.y+y*f)*K0+m.f];
     };
-    const cols=Math.max(4,Math.min(28,Math.ceil((u1-u0)/36))),rows=Math.max(4,Math.min(20,Math.ceil((v1-v0)/36)));
+    /* jaring kecil: cukup rapat untuk perspektif teks, tapi tetap ringan */
+    const cols=Math.max(6,Math.min(14,Math.ceil((u1-u0)/50))),rows=Math.max(3,Math.min(8,Math.ceil((v1-v0)/50)));
     const gb=B.getContext('2d');gb.imageSmoothingEnabled=true;gb.imageSmoothingQuality='high';
-    for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){
-      const ua=u0+(u1-u0)*i/cols,ub=u0+(u1-u0)*(i+1)/cols,va=v0+(v1-v0)*j/rows,vb=v0+(v1-v0)*(j+1)/rows;
-      const s00=S(ua,va),s10=S(ub,va),s01=S(ua,vb),s11=S(ub,vb),d00=P(ua,va),d10=P(ub,va),d01=P(ua,vb),d11=P(ub,vb);
-      tri(gb,A,s00,s10,s01,d00,d10,d01);tri(gb,A,s10,s11,s01,d10,d11,d01);
+    const D0=[],DS=[];
+    for(let j=0;j<=rows;j++)for(let i=0;i<=cols;i++){
+      const u=u0+(u1-u0)*i/cols,v=v0+(v1-v0)*j/rows;
+      D0.push(P(u,v));DS.push(S(u,v));
     }
-    ctx.save();
-    ctx.setTransform(1,0,0,1,0,0);
-    ctx.globalAlpha=Math.min(1,Math.max(0,pr.opacity));
-    ctx.globalCompositeOperation=c.blend||'source-over';
-    ctx.drawImage(B,0,0);
-    ctx.restore();
+    let bx0=Infinity,by0=Infinity,bx1=-Infinity,by1=-Infinity;
+    for(const p of D0){if(p[0]<bx0)bx0=p[0];if(p[0]>bx1)bx1=p[0];if(p[1]<by0)by0=p[1];if(p[1]>by1)by1=p[1]}
+    const id=(i,j)=>j*(cols+1)+i;
+    for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){
+      const a=id(i,j),b2=id(i+1,j),c2=id(i,j+1),d2=id(i+1,j+1);
+      tri(gb,A,DS[a],DS[b2],DS[c2],D0[a],D0[b2],D0[c2]);
+      tri(gb,A,DS[b2],DS[d2],DS[c2],D0[b2],D0[d2],D0[c2]);
+    }
+    const rx0=Math.max(0,Math.floor(bx0)-2),ry0=Math.max(0,Math.floor(by0)-2),
+          rw=Math.min(cw,Math.ceil(bx1)+2)-rx0,rh=Math.min(ch,Math.ceil(by1)+2)-ry0;
+    if(rw>0&&rh>0){
+      ctx.save();
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.globalAlpha=Math.min(1,Math.max(0,pr.opacity));
+      ctx.globalCompositeOperation=c.blend||'source-over';
+      ctx.drawImage(B,rx0,ry0,rw,rh,rx0,ry0,rw,rh);
+      ctx.restore();
+    }
     return b;
   }
   function wrap(obj){
     const o=obj.draw;
     obj.draw=function(ctx,c,pr,W,H){
-      if(pr&&(pr.rx||pr.ry))return draw3d(o,ctx,c,pr,W,H);
+      if(pr&&(Math.abs(pr.rx||0)>0.01||Math.abs(pr.ry||0)>0.01))return draw3d(o,ctx,c,pr,W,H);
       return o.apply(this,arguments);
     };
   }

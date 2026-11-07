@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache">
+<title>Editor 3D · APK EDITING</title>
+<link rel="stylesheet" href="css/style.css?v=15">
+<link rel="stylesheet" href="css/components.css?v=15">
+<link rel="stylesheet" href="css/editor3d.css?v=1">
+</head>
+<body>
+<div id="app3">
+  <header class="t3-top">
+    <button class="btn" onclick="location.href='index.html'" title="Kembali ke editor video (project 3D tersimpan otomatis)">← Beranda</button>
+    <b>Editor 3D</b><small class="meta">by BYHASSSTUDIO</small><span class="sp"></span>
+    <button class="btn" id="b-open" title="Buka project 3D dari file">Buka</button>
+    <button class="btn" id="b-save" title="Simpan project 3D ke file">Simpan</button>
+    <button class="btn" id="b-png" title="Simpan tampilan saat ini sebagai gambar PNG">PNG</button>
+    <button class="btn primary" id="b-vid" title="Rekam animasi jadi video (bisa di-import ke editor video)">Rekam Video</button>
+  </header>
+  <aside class="t3-left">
+    <h3>Tambah objek</h3><div id="shapes"></div>
+    <h3>Objek</h3><div id="list"></div>
+    <label class="row">Warna latar <input type="color" id="bg" value="#121419"></label>
+  </aside>
+  <main class="t3-view">
+    <canvas id="gl"></canvas>
+    <div id="err" class="t3-err" hidden>WebGL2 tidak didukung di browser ini.</div>
+    <p class="hint">Seret: putar · Shift / klik kanan + seret: geser · Roda / cubit: zoom · Ketuk objek: pilih</p>
+  </main>
+  <aside class="t3-right"><h3>Properti</h3><div id="props"></div></aside>
+  <footer class="t3-bot">
+    <button class="btn" id="b-play" title="Play / Pause (Space)">▶</button>
+    <div class="tl"><input type="range" id="tm" min="0" max="5" step="0.01" value="0" aria-label="Waktu animasi"><div id="ticks"></div></div>
+    <span id="tt" class="meta">0.00 / 5.00 s</span>
+    <label class="meta">Durasi <input type="number" id="dur" min="0.5" max="120" step="0.5" value="5"></label>
+    <button class="btn" id="b-kf" title="Rekam posisi, rotasi, dan skala objek terpilih di waktu ini">◆ Keyframe</button>
+    <button class="btn" id="b-kd" title="Hapus keyframe objek terpilih di waktu ini">Hapus keyframe</button>
+  </footer>
+</div>
+<input type="file" id="f-open" accept=".json,.apk3d" hidden>
+<div id="t3" class="t3-toast" role="status"></div>
+<script src="js/editor3d.js?v=1"></script>
+</body>
+</html>

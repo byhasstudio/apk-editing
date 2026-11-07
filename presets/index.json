@@ -11,6 +11,12 @@
       "name": "Lirik Merah Kinetik",
       "desc": "Teks lirik 3D: blok merah, teks melingkar, retakan abu, fade hitam",
       "file": "lirik-merah.apktemplate"
+    },
+    {
+      "id": "dentum-flip",
+      "name": "Dentum Flip 3 Foto",
+      "desc": "3 foto: fade-in gelap, push-in, zoom-whip, miring, flip sesuai beat, geser turun, fade hitam",
+      "file": "dentum-flip.apktemplate"
     }
   ]
 }

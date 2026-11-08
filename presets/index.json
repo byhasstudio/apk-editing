@@ -23,6 +23,12 @@
       "name": "Jatuh Hanyut 3 Foto",
       "desc": "3 foto + lirik: fade-in, geser hanyut + goyang, mengecil lalu putar 360, zoom-in turun, pulse beat, pusaran blur putih, fade hitam",
       "file": "jatuh-hanyut.apktemplate"
+    },
+    {
+      "id": "kamu-kasi-3-foto",
+      "name": "kamu yang kasi tinggal 3 foto",
+      "desc": "3 foto: kartu membulat di atas latar redup, getar halus, kartu pop miring, zoom-whip, flip sesuai beat, kartu menyusut, fade gelap",
+      "file": "kamu-kasi-3-foto.apktemplate"
     }
   ]
 }

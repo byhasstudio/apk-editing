@@ -11,7 +11,9 @@
    - ISI CERMIN OTOMATIS: clip media yang menjadi layer paling dasar (tidak ada layer lain di bawahnya) dan hampir selebar layar,
      tapi pada saat itu tidak menutupi seluruh frame (diperkecil, diputar, atau digeser sampai tepinya terbuka), otomatis diisi cermin tepinya
      (efek Isi Cermin, js/fxclip.js) sehingga sudut dan tepi tidak pernah hitam. Clip yang sengaja kecil (di bawah skala 0,5), transparan,
-     bertransisi, bermask, atau ber-chroma tidak disentuh. Clip yang sudah punya efek Isi Cermin sendiri memakai efeknya sendiri. */
+     bertransisi, bermask, atau ber-chroma tidak disentuh. Clip yang sudah punya efek Isi Cermin sendiri memakai efeknya sendiri.
+   v25: clip yang miring (skew) ikut dicek dengan perhitungan yang tepat (bukan dilewati), dan flip/regang negatif tidak lagi merusak pengecekan,
+     jadi sudut hitam saat foto diputar, digeser, di-whip, atau dimiringkan juga terisi. */
 window.APK=window.APK||{};
 APK.preview=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
@@ -78,19 +80,24 @@ APK.preview=(function(){
     if(Math.abs(e.el.currentTime-x)>0.04)e.el.currentTime=x;
     e.pre=true;
   }
-  /* true kalau clip media c pada waktu tt tidak menutupi seluruh frame dan layak diisi cermin otomatis */
+  /* true kalau clip media c pada waktu tt tidak menutupi seluruh frame dan layak diisi cermin otomatis.
+     Urutan transformasi sama seperti APK.layers.xf: skala/regang -> miring -> putar -> geser. Jadi sudut frame dikembalikan ke ruang media
+     dengan urutan terbalik (putar balik, lalu batalkan miring) lalu dibandingkan dengan setengah ukuran media yang sudah diskala. */
   function autoFill(c,tt,W,H){
     if((c.mask&&c.mask.on)||(c.chroma&&c.chroma.on)||(c.tin&&c.tin.type)||(c.tout&&c.tout.type))return false;
     const m=mediaOf(c.mediaId);
     if(!m||(m.type!=='image'&&m.type!=='video')||!(m.width>0)||!(m.height>0))return false;
     const pr=APK.layers.props(c,tt);
-    if(pr.opacity<0.98||pr.scale<0.5||pr.skx||pr.sky)return false;   /* sengaja transparan, kecil, atau miring: biarkan */
+    if(pr.opacity<0.98||pr.scale<0.5)return false;   /* sengaja transparan atau kecil: biarkan */
     const q=APK.layers.center(c,pr),s=Math.min(W/m.width,H/m.height)*Math.max(0,pr.scale),
-      hw=m.width*s*(pr.sx==null?1:pr.sx)/2,hh=m.height*s*(pr.sy==null?1:pr.sy)/2,
-      a=pr.rotation*Math.PI/180,cs=Math.cos(a),sn=Math.sin(a),cx=W/2+q.x,cy=H/2+q.y;
+      hw=m.width*s*Math.abs(pr.sx==null?1:pr.sx)/2,hh=m.height*s*Math.abs(pr.sy==null?1:pr.sy)/2,
+      a=pr.rotation*Math.PI/180,cs=Math.cos(a),sn=Math.sin(a),cx=W/2+q.x,cy=H/2+q.y,
+      tn=d=>Math.tan(clampN(d||0,-80,80)*Math.PI/180),tx=tn(pr.skx),ty=tn(pr.sky),det=1-tx*ty;
+    if(Math.abs(det)<0.05)return true;
     for(const k of [[0,0],[W,0],[W,H],[0,H]]){
-      const dx=k[0]-cx,dy=k[1]-cy,lx=dx*cs+dy*sn,ly=-dx*sn+dy*cs;   /* sudut frame di ruang media (diputar balik) */
-      if(Math.abs(lx)>hw+0.5||Math.abs(ly)>hh+0.5)return true;
+      const dx=k[0]-cx,dy=k[1]-cy,lx=dx*cs+dy*sn,ly=-dx*sn+dy*cs,   /* sudut frame setelah diputar balik */
+        ux=(lx-tx*ly)/det,uy=(ly-ty*lx)/det;                         /* lalu miringnya dibatalkan */
+      if(Math.abs(ux)>hw+0.5||Math.abs(uy)>hh+0.5)return true;
     }
     return false;
   }

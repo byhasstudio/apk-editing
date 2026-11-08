@@ -1,7 +1,9 @@
 /* Keyframe: animasi properti clip (x, y, scale, opacity, rotation, volume) dengan easing.
    Data per clip: clip.kf = { x:[{t,v,e}], ... } ; t = detik relatif terhadap awal clip, e = nama easing atau 'bz:x1,y1,x2,y2' (kurva bezier kustom)
    v24: keyframe TANPA easing (e kosong, seperti pada preset hasil ekstrak) tidak lagi linear patah-patah, tapi dihaluskan dengan interpolasi kubik
-   monotonik (kecepatan nyambung antar keyframe, tanpa pantulan melewati nilai keyframe). Keyframe yang easing-nya diisi tetap persis seperti dulu. */
+   monotonik (kecepatan nyambung antar keyframe, tanpa pantulan melewati nilai keyframe). Keyframe yang easing-nya diisi tetap persis seperti dulu.
+   v25: clip.smooth=true (dipasang otomatis saat preset "kamu yang kasi tinggal 3 foto" dibuka) memakai kemiringan rata-rata dua sisi
+   (bukan rata-rata harmonis), dibatasi supaya tidak melewati keyframe, jadi gerak lebih mengalir dan tidak melambat di tiap titik. */
 window.APK=window.APK||{};
 APK.kf=(function(){
   const PROPS=['x','y','scale','opacity','rotation','volume','sx','sy','skx','sky'];
@@ -55,14 +57,21 @@ APK.kf=(function(){
   const find=(a,rel,e)=>a.findIndex(k=>Math.abs(k.t-rel)<=e);
   const clone=o=>JSON.parse(JSON.stringify(o));
 
-  /* kemiringan di keyframe k: rata-rata harmonis kemiringan dua sisi (nol kalau arahnya berbalik, jadi tidak melampaui keyframe) */
-  function slopeAt(a,k){
+  /* kemiringan di keyframe k: rata-rata harmonis kemiringan dua sisi (nol kalau arahnya berbalik, jadi tidak melampaui keyframe).
+     sm=true (mode smooth): rata-rata berbobot jarak waktu, dibatasi 3x kemiringan terkecil (batas Fritsch-Carlson) supaya tetap tidak melampaui keyframe */
+  function slopeAt(a,k,sm){
     const n=a.length,sl=j=>(a[j+1].v-a[j].v)/Math.max(1e-6,a[j+1].t-a[j].t);
     if(n<2)return 0;
     if(k===0)return sl(0);
     if(k===n-1)return sl(n-2);
     const s0=sl(k-1),s1=sl(k);
-    return s0*s1<=0?0:2*s0*s1/(s0+s1);
+    if(s0*s1<=0)return 0;
+    if(sm){
+      const h0=Math.max(1e-6,a[k].t-a[k-1].t),h1=Math.max(1e-6,a[k+1].t-a[k].t),
+        m=(s0*h1+s1*h0)/(h0+h1),lim=3*Math.min(Math.abs(s0),Math.abs(s1));
+      return Math.sign(m)*Math.min(Math.abs(m),lim);
+    }
+    return 2*s0*s1/(s0+s1);
   }
   function value(c,p,rel){
     const a=arr(c,p);
@@ -73,8 +82,8 @@ APK.kf=(function(){
     const k0=a[i],k1=a[i+1],h=k1.t-k0.t,u=(rel-k0.t)/h;
     if(k0.e==null){
       /* tanpa easing: kubik Hermite monotonik */
-      const t2=u*u,t3=t2*u;
-      return (2*t3-3*t2+1)*k0.v+(t3-2*t2+u)*h*slopeAt(a,i)+(-2*t3+3*t2)*k1.v+(t3-t2)*h*slopeAt(a,i+1);
+      const t2=u*u,t3=t2*u,sm=!!c.smooth;
+      return (2*t3-3*t2+1)*k0.v+(t3-2*t2+u)*h*slopeAt(a,i,sm)+(-2*t3+3*t2)*k1.v+(t3-t2)*h*slopeAt(a,i+1,sm);
     }
     return k0.v+(k1.v-k0.v)*easeFn(k0.e)(u);
   }
@@ -155,5 +164,21 @@ APK.kf=(function(){
     }
     return{left:L,right:R};
   }
+
+  /* Preset "kamu yang kasi tinggal 3 foto": saat file presetnya dibaca, semua clip diberi smooth=true.
+     Dipasang setelah halaman selesai dimuat, karena js/presets.js dimuat sesudah file ini. */
+  window.addEventListener('load',()=>{
+    const P=APK.presets;if(!P||typeof P.readFile!=='function'||P._smoothWrap)return;
+    const orig=P.readFile;
+    P.readFile=async function(){
+      const o=await orig.apply(this,arguments);
+      try{
+        if(o&&Array.isArray(o.items)&&/kamu.*kasi/i.test(String(o.name||'')))
+          for(const i of o.items)if(i&&i.c&&typeof i.c==='object')i.c.smooth=true;
+      }catch(_){}
+      return o;
+    };
+    P._smoothWrap=true;
+  });
   return{PROPS,VISUAL,DEF,EASE,easeFn,bezOf,fmtBz,value,props,animated,hasKey,setKey,delKey,delAt,clear,times,step,easeAt,setEase,move,shift,split,clone};
 })();

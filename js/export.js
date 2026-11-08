@@ -51,7 +51,7 @@ APK.export=(function(){
     const rs=[...new Set(cand.filter(r=>r<=Math.max(short,1440)).concat([short]))].sort((a,b)=>a-b);
     const defR=short<1080?1080:short;
     $('ex-res').innerHTML=rs.map(r=>{const s=APK.project.size(p.aspect,r);return `<option value="${r}"${r===defR?' selected':''}>${s.width}×${s.height}</option>`}).join('');
-    const fps=[...new Set([24,30,60,90,120,p.fps])].sort((a,b)=>a-b);
+    const fps=[...new Set([24,30,60,90,120,144,240,p.fps])].sort((a,b)=>a-b);
     $('ex-fps').innerHTML=fps.map(f=>`<option${f===p.fps?' selected':''}>${f}</option>`).join('');
     $('ex-settings').hidden=false;$('ex-progress').hidden=true;
     $('dlg-export').showModal();
@@ -123,7 +123,7 @@ APK.export=(function(){
   async function renderPrecise(p,w,h,fps,q,D,N,st,mb){
     const SR=48000,bitrate=Math.min(80e6,Math.max(2e6,Math.round(w*h*fps*q)));
     let vcfg=null;
-    for(const codec of ['avc1.640033','avc1.64002a','avc1.640028','avc1.64001f','avc1.42001f']){
+    for(const codec of ['avc1.640034','avc1.640033','avc1.64002a','avc1.640028','avc1.64001f','avc1.42001f']){
       const c={codec,width:w,height:h,bitrate,framerate:fps,avc:{format:'avc'},latencyMode:'quality'};
       try{const s=await VideoEncoder.isConfigSupported(c);if(s&&s.supported){vcfg=c;break}}catch(_){}
     }

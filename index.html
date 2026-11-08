@@ -94,7 +94,7 @@
     <label>Mode<select id="ex-mode"></select></label>
     <label>Format<select id="ex-format"></select></label>
     <label>Resolusi<select id="ex-res"></select></label>
-    <label>Frame rate<select id="ex-fps"></select></label>
+    <label class="fps-slide">Frame rate: <b id="ex-fps-val">60</b> fps<input type="range" id="ex-fps" min="24" max="480" step="1" value="60" style="width:100%"><span class="meta" style="display:flex;justify-content:space-between"><span>24 (kecil)</span><span>480 (maks)</span></span></label>
     <label>Gerak halus (motion blur)<select id="ex-mb"><option value="1">Mati (tercepat)</option><option value="2" selected>Halus (2x, disarankan)</option><option value="4">Sangat halus (4x, lebih lama)</option></select></label>
     <label>Kualitas<select id="ex-q"><option value="0.05">Rendah</option><option value="0.1">Sedang</option><option value="0.18" selected>Tinggi</option><option value="0.3">Maksimal (file besar)</option></select></label>
     <p class="meta" id="ex-note">Biarkan tab tetap terbuka dan terlihat selama export.</p>

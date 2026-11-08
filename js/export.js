@@ -51,8 +51,9 @@ APK.export=(function(){
     const rs=[...new Set(cand.filter(r=>r<=Math.max(short,1440)).concat([short]))].sort((a,b)=>a-b);
     const defR=short<1080?1080:short;
     $('ex-res').innerHTML=rs.map(r=>{const s=APK.project.size(p.aspect,r);return `<option value="${r}"${r===defR?' selected':''}>${s.width}×${s.height}</option>`}).join('');
-    const fps=[...new Set([24,30,60,90,120,144,240,360,480,p.fps])].sort((a,b)=>a-b);
-    $('ex-fps').innerHTML=fps.map(f=>`<option${f===p.fps?' selected':''}>${f}</option>`).join('');
+    const sl=$('ex-fps'),sv=$('ex-fps-val');
+    sl.value=Math.min(480,Math.max(24,p.fps||60));sv.textContent=sl.value;
+    sl.oninput=()=>{sv.textContent=sl.value};
     $('ex-settings').hidden=false;$('ex-progress').hidden=true;
     $('dlg-export').showModal();
   }

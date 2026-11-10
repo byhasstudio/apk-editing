@@ -29,6 +29,12 @@
       "name": "kamu yang kasi tinggal 3 foto",
       "desc": "3 foto: kartu membulat di atas latar redup, getar halus, kartu pop miring, zoom-whip, flip sesuai beat, kartu menyusut, fade gelap",
       "file": "kamu-kasi-3-foto.apktemplate"
+    },
+    {
+      "id": "stone-paradox",
+      "name": "Stone Paradox 1 Foto",
+      "desc": "1 foto orang + kartu kutipan bergetar halus, zoom-keluar ke judul, teks kinetik (kiri-ke-kanan, tilt, zoom), kedip putih, wash merah, fade hitam",
+      "file": "stone-paradox.apktemplate"
     }
   ]
 }

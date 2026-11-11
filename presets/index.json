@@ -35,12 +35,6 @@
       "name": "Stone Paradox 1 Foto",
       "desc": "1 foto orang + kartu kutipan bergetar halus, zoom-keluar ke judul, teks kinetik (kiri-ke-kanan, tilt, zoom), kedip putih, wash merah, fade hitam",
       "file": "stone-paradox.apktemplate"
-    },
-    {
-      "id": "senja-kilat",
-      "name": "Senja Kilat 3 Foto",
-      "desc": "3 foto: fade-in gelap, push-in goyang, kilat strobe foto 2, zoom-whip, flip sesuai beat, pulse zoom, fade hitam",
-      "file": "senja-kilat.apktemplate"
     }
   ]
 }

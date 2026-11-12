@@ -41,6 +41,12 @@
       "name": "warp in plastic hardtekk",
       "desc": "3 foto: fade-in gelap, getar vertikal, strobo antar foto, zoom-pulse beat, flip cepat, zoom-whip, fade gelap (gerakan diukur per frame, tanpa efek)",
       "file": "warp-plastic-hardtekk.apktemplate"
+    },
+    {
+      "id": "montagem-buda-3-foto",
+      "name": "montagem buda 3 foto",
+      "desc": "3 foto di kartu 9:16 yang diam di kiri: foto di dalamnya zoom, putar, dan hentak sesuai beat, 3 adegan, latar blur, fade-in dan fade-out (gerakan diukur per frame, tanpa efek)",
+      "file": "montagem-buda-3-foto.apktemplate"
     }
   ]
 }

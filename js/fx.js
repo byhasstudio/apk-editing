@@ -1,5 +1,7 @@
 /* Efek klip: chroma key (hapus warna latar), mask bentuk, serta bantuan gradien dan bayangan.
-   Data per clip: clip.chroma = {on,color,sim,smooth} ; clip.mask = {on,type,x,y,w,h,feather,invert} (satuan persen)
+   Data per clip: clip.chroma = {on,color,sim,smooth} ; clip.mask = {on,type,x,y,w,h,feather,invert,fix?} (satuan persen)
+   mask.fix (opsional) = {x,y,w,h,r} dalam px project: area mask DIKUNCI di layar. Foto boleh bergerak, zoom, dan berputar sesuai keyframe,
+   tapi jendela kartunya tetap diam di tempat (x,y = geser dari tengah kanvas, w,h = ukuran, r = radius sudut). Dipakai preset "montagem buda 3 foto".
    Performa (v20): resolusi olahan mengikuti ukuran kanvas yang sebenarnya (parameter lim), dan kanvas yang membaca piksel (CPU)
    dipisah dari kanvas yang hanya menggambar (GPU), jadi mask dan vignette saja tidak lagi memaksa jalur lambat. */
 window.APK=window.APK||{};
@@ -48,6 +50,26 @@ APK.fx=(function(){
     ctx.fill();
     ctx.restore();
   }
+  /* mask terkunci di layar (mask.fix): bentuk digambar di ruang gambar dengan transformasi kebalikan dari posisi, skala, dan putaran clip saat ini,
+     jadi di layar bentuknya selalu di tempat yang sama dan ukuran yang sama walau fotonya bergerak. w,h = ukuran kanvas olahan, nw,nh = ukuran asli media */
+  function maskFix(ctx,w,h,m,c,nw,nh){
+    const p=APK.project&&APK.project.current;
+    if(!p||!APK.layers||!(nw>0)||!(nh>0)){mask(ctx,w,h,m);return}
+    const f=m.fix,pr=APK.layers.props(c,APK.preview?APK.preview.time:0);
+    const k=Math.max(1e-3,Math.min(p.width/nw,p.height/nh)*Math.max(0,pr.scale)),sc=w/nw;   /* k = px layar per px media */
+    const th=(pr.rotation||0)*Math.PI/180,cs=Math.cos(th),sn=Math.sin(th);
+    const vx=(+f.x||0)-pr.x,vy=(+f.y||0)-pr.y;                       /* pusat jendela relatif pusat clip, di layar */
+    const ux=(vx*cs+vy*sn)/k,uy=(-vx*sn+vy*cs)/k;                     /* putar balik dan bagi skala = posisi di ruang media */
+    ctx.save();
+    ctx.globalCompositeOperation=m.invert?'destination-out':'destination-in';
+    ctx.translate((nw/2+ux)*sc,(nh/2+uy)*sc);
+    ctx.rotate(-th);
+    ctx.scale(sc/k,sc/k);
+    ctx.fillStyle='#000';
+    APK.shapes.path(ctx,m.type,Math.max(0,+f.w||0),Math.max(0,+f.h||0),Math.max(0,+f.r||0));
+    ctx.fill();
+    ctx.restore();
+  }
   /* efek piksel: glitch (potongan horizontal bergeser, acak stabil per 1/12 detik), pemisah RGB, dan vignette. f = clip.flt, tm = waktu (detik) */
   function pixelFx(ctx,w,h,f,tm){
     const gl=+f.glitch||0,rg=(+f.rgb||0)+gl*0.12,vg=+f.vig||0;
@@ -89,7 +111,10 @@ APK.fx=(function(){
     try{
       ctx.drawImage(el,0,0,cw,ch);
       if(ck)key(ctx,cw,ch,Object.assign({},DEF.chroma,c.chroma));
-      if(mk)mask(ctx,cw,ch,Object.assign({},DEF.mask,c.mask));
+      if(mk){
+        const mm=Object.assign({},DEF.mask,c.mask);
+        if(mm.fix&&typeof mm.fix==='object')maskFix(ctx,cw,ch,mm,c,w,h);else mask(ctx,cw,ch,mm);
+      }
       if(px)pixelFx(ctx,cw,ch,f,APK.preview?APK.preview.time:0);
     }catch(_){return null}
     return cpu?cvs.c:cvs.g;

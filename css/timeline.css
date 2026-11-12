@@ -21,7 +21,7 @@
 .clip span{position:relative;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;pointer-events:none}
 .clip.video{background:#3b5bdb}.clip.audio{background:#2b8a6e}.clip.image{background:#b5651d}
 .clip.sel{outline:2px solid #fff;z-index:2}
-.h{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;background:rgba(255,255,255,.25)}
+.h{position:absolute;top:0;bottom:0;width:min(8px,30%);cursor:ew-resize;background:rgba(255,255,255,.25)}
 .h.l{left:0}.h.r{right:0}
 .playhead{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--danger);z-index:6;pointer-events:none}
 .playhead::after{content:'';position:absolute;top:0;left:50%;width:12px;height:12px;margin-left:-6px;background:var(--danger);border-radius:3px 3px 7px 7px}

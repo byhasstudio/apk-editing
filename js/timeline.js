@@ -200,7 +200,7 @@ APK.timeline=(function(){
         if(cand&&!cand.locked&&accepts(cand,ty))tr=cand;
       }
       /* pintar: kalau menabrak clip lain, menempel ke tepi terdekat (jika cukup dekat) */
-      if(!free(tr,ns,c.dur,c.id)){
+      if(!c.fx&&!free(tr,ns,c.dur,c.id)){
         let best=null;
         for(const x of tr.clips){
           if(x.id===c.id)continue;
@@ -209,13 +209,13 @@ APK.timeline=(function(){
         }
         if(best!=null&&Math.abs(best-ns)<=40/pps)ns=best;
       }
-      if(free(tr,ns,c.dur,c.id)){
+      if(c.fx||free(tr,ns,c.dur,c.id)){
         if(tr!==f.tr){f.tr.clips=f.tr.clips.filter(x=>x!==c);tr.clips.push(c)}
         c.start=ns;drag.changed=true;render();
       }
     }else if(drag.mode==='trimL'){
       let ns=o.start+dx;const b=snapEdge(ns,pts);if(b)ns=b.p;
-      let prevEnd=0;for(const x of f.tr.clips)if(x.id!==c.id&&x.start<o.start+1e-6)prevEnd=Math.max(prevEnd,x.start+x.dur);
+      let prevEnd=0;for(const x of f.tr.clips)if(!c.fx&&x.id!==c.id&&x.start<o.start+1e-6)prevEnd=Math.max(prevEnd,x.start+x.dur);
       const lo=Math.max(prevEnd,m&&m.type!=='image'?o.start-o.in/spd(o):0);
       ns=Math.min(Math.max(ns,lo),o.start+o.dur-MIN);
       c.start=ns;c.in=o.in+(ns-o.start)*spd(o);c.dur=o.dur-(ns-o.start);
@@ -223,7 +223,7 @@ APK.timeline=(function(){
       drag.changed=true;render();
     }else{
       let ne=o.start+o.dur+dx;const b=snapEdge(ne,pts);if(b)ne=b.p;
-      let hi=Infinity;for(const x of f.tr.clips)if(x.id!==c.id&&x.start>=o.start+o.dur-1e-6)hi=Math.min(hi,x.start);
+      let hi=Infinity;for(const x of f.tr.clips)if(!c.fx&&x.id!==c.id&&x.start>=o.start+o.dur-1e-6)hi=Math.min(hi,x.start);
       if(m&&m.type!=='image'&&m.duration>0)hi=Math.min(hi,o.start+(m.duration-o.in)/spd(o));
       ne=Math.min(Math.max(ne,o.start+MIN),hi);
       c.dur=ne-o.start;drag.changed=true;render();

@@ -23,7 +23,7 @@
   .tl-bar select,.pv-controls select{padding:7px 6px}
   .pv-controls{flex-wrap:wrap;gap:6px}
   .pv-controls input[type=range]{width:64px}
-  .clip .h{width:14px}
+  .clip .h{width:min(14px,30%)}
   #tl-ruler{touch-action:none}
   #panel-props input,#panel-props select,#panel-props textarea,#panel-media input{font-size:16px}
   .toast{bottom:80px}

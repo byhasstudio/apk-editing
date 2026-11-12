@@ -35,6 +35,12 @@
       "name": "Stone Paradox 1 Foto",
       "desc": "1 foto orang + kartu kutipan bergetar halus, zoom-keluar ke judul, teks kinetik (kiri-ke-kanan, tilt, zoom), kedip putih, wash merah, fade hitam",
       "file": "stone-paradox.apktemplate"
+    },
+    {
+      "id": "warp-plastic-hardtekk",
+      "name": "warp in plastic hardtekk",
+      "desc": "3 foto: fade-in gelap, getar vertikal, strobo antar foto, zoom-pulse beat, flip cepat, zoom-whip, fade gelap (gerakan diukur per frame, tanpa efek)",
+      "file": "warp-plastic-hardtekk.apktemplate"
     }
   ]
 }

@@ -1,0 +1,7 @@
+/* Edit 3D: tombol Undo/Redo dan dialog Kirim ke editor video */
+.s3-top{flex-wrap:wrap}
+#s3-undo,#s3-redo{min-width:38px;padding:6px 10px;font-size:16px;line-height:1}
+#s3-undo:disabled,#s3-redo:disabled{opacity:.4;cursor:default}
+#s3-send{white-space:nowrap}
+#s3-dlg-send{width:min(460px,94vw);max-height:90vh}
+@media (max-width:520px){.s3-top .name-input{order:10;flex:1 0 100%}}

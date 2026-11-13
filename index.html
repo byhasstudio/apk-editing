@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="css/fxclip.css?v=21">
 <link rel="stylesheet" href="css/template.css?v=2">
 <link rel="stylesheet" href="css/scene3d.css?v=2">
+<link rel="stylesheet" href="css/s3tools.css?v=1">
 </head>
 <body>
 <section id="home" class="view">
@@ -110,9 +111,11 @@
 <section id="s3d" class="view" hidden>
   <header class="s3-top">
     <button class="btn" id="s3-back" title="Kembali ke beranda (otomatis tersimpan)">Beranda</button>
+    <button class="btn" id="s3-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>↶</button><button class="btn" id="s3-redo" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>↷</button>
     <input id="s3-name" class="name-input" aria-label="Nama project 3D" maxlength="60">
     <span id="s3-save" class="save-state"></span>
     <button class="btn" id="s3-export">Export</button>
+    <button class="btn" id="s3-send" title="Render hasil Edit 3D lalu pakai sebagai klip di editor video utama">→ Editor</button>
     <button class="btn primary" id="s3-savebtn">Simpan</button>
   </header>
   <div class="s3-body">
@@ -173,6 +176,15 @@
   </div>
   <div id="s3-ex-prog" hidden><div class="ex-bar"><i id="s3-ex-fill"></i></div><p class="meta" id="s3-ex-status"></p><div class="dlg-actions"><button class="btn" type="button" id="s3-ex-cancel">Batalkan</button></div></div>
 </form></dialog>
+<dialog id="s3-dlg-send"><form method="dialog" onsubmit="return false">
+  <h3>Kirim ke editor video</h3>
+  <p class="meta" style="margin:0 0 12px">Hasil Edit 3D dirender jadi video, lalu dipakai sebagai klip di editor APK EDITING yang biasa. Kamera, efek, hasil tracking, dan musik (♪) sudah menyatu di videonya.</p>
+  <label>Kirim ke<select id="s3-sd-target"></select></label>
+  <label>Ukuran sisi pendek<select id="s3-sd-res"><option value="540">540p</option><option value="720" selected>720p</option><option value="1080">1080p (berat)</option></select></label>
+  <label>Frame rate<select id="s3-sd-fps"><option>24</option><option selected>30</option><option>60</option></select></label>
+  <p class="meta" id="s3-sd-note"></p>
+  <div class="dlg-actions"><button class="btn" type="button" id="s3-sd-cancel">Batal</button><button class="btn primary" type="button" id="s3-sd-go">Render &amp; Kirim</button></div>
+</form></dialog>
 <input type="file" id="file-open" accept=".json,.apkedit" hidden>
 <div id="toast" class="toast" role="status"></div>
 
@@ -213,5 +225,6 @@
 <script src="js/template.js?v=2"></script>
 <script src="js/p3d.js?v=1"></script>
 <script src="js/scene3d.js?v=3"></script>
+<script src="js/s3tools.js?v=1"></script>
 </body>
 </html>

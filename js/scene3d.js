@@ -345,7 +345,7 @@ function post(out,fx,tt,W,H,k){
   if(fl>0.01){g.fillStyle=`rgba(255,255,255,${clamp(fl,0,1)})`;g.fillRect(0,0,W,H)}
 }
 let rr=0;
-function reqRender(){if(rr||playing)return;rr=requestAnimationFrame(()=>{rr=0;render()})}
+function reqRender(){if(rr||playing||exPrecise||trackBusy)return;rr=requestAnimationFrame(()=>{rr=0;render()})}
 function render(){
   if(!S)return;
   const cv=$('s3-cv'),W=cv.width,H=cv.height,k=H/REFH;
@@ -370,7 +370,7 @@ function render(){
 function syncMedia(){
   S.items.forEach(it=>{
     if(it.kind!=='video')return;const m=getMedia(it.mediaId);if(!m||m.kind!=='video')return;const el=m.el;
-    if(trackBusy)return;
+    if(trackBusy||exPrecise)return;
     if(!visible(it,t)){if(!el.paused)el.pause();return}
     const rel=Math.max(0,t-it.start+(it.trim||0)),r=Math.min(rel,(el.duration||1e9)-.05);
     if(playing){if(el.paused){el.currentTime=r;el.play().catch(()=>{})}else if(Math.abs(el.currentTime-r)>.35)el.currentTime=r}
@@ -603,13 +603,15 @@ function bindUI(){
   const end=()=>{drag=null};cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
   /* tracker, export */
   $('s3-track').onclick=openTracker;
-  $('s3-export').onclick=()=>{pause();$('s3-ex-set').hidden=false;$('s3-ex-prog').hidden=true;$('s3-dlg-ex').showModal()};
+  $('s3-export').onclick=openExport;
   $('s3-ex-start').onclick=doExport;
   $('s3-ex-cancel').onclick=()=>{exportCancel=true};
   $('s3-tk-canvas').addEventListener('pointerdown',tkPick);
   $('s3-tk-start').onclick=runTrack;
   $('s3-tk-apply').onclick=applyTrack;
   $('s3-tk-close').onclick=()=>{tkAbort=true;$('s3-dlg-tk').close()};
+  if($('s3-tk-mode'))$('s3-tk-mode').onchange=tkReset;
+  if($('s3-ex-mode'))$('s3-ex-mode').onchange=exNote;
   addEventListener('resize',()=>{if(S&&!exporting)reqRender()});
   addEventListener('keydown',e=>{
     if($('s3d').hidden||/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;
@@ -633,8 +635,15 @@ function fieldSet(it,f,el){
 }
 function previewShort(){return matchMedia('(max-width:700px)').matches?480:600}
 
-/* ===== TRACKER TITIK ===== */
-let tkPt=null,tkPath=null,tkAbort=false,trackBusy=false;
+/* ===== TRACKER v2: 1 atau 2 titik. 2 titik = posisi + ukuran + putaran. Kalau objek tertutup, pelacak mencari lagi
+   (memakai tampilan awal objek dan tampilan terakhir sebelum hilang) dan menempel lagi begitu objek muncul. Di mode 2 titik,
+   hasil pencarian ulang hanya diterima kalau jarak dan sudut antar titik masuk akal. Celah diisi gerak halus. ===== */
+let tkPts=[],tkRes=null,tkMeta=null,tkAbort=false,trackBusy=false;
+const TK={H:8,SR:18,WSR:72,THR:38,RTHR:27,TW:240,STEP:.05};
+const opt=(id,d)=>{const e=$(id);return e?e.value:d};
+const chk=(id,d)=>{const e=$(id);return e?e.checked:d};
+const tkMode=()=>opt('s3-tk-mode','2')==='1'?1:2;
+const tkHelp=()=>tkMode()===2?'Ketuk 2 titik pada objek yang sama, sejauh mungkin (misal dua sudut) supaya ukuran dan putaran ikut terlacak. Pilih bagian yang kontras.':'Ketuk titik/objek di video yang mau diikuti (pilih bagian yang kontras: sudut, tanda, wajah).';
 function seek(el,tt){
   return new Promise(r=>{
     if(Math.abs(el.currentTime-tt)<.001){r();return}
@@ -646,83 +655,346 @@ async function openTracker(){
   const it=sel();
   if(it.kind!=='video'){toast('Pilih layer VIDEO dulu (ketuk chip video), lalu Lacak titik.');return}
   const m=getMedia(it.mediaId);if(!m||m.kind!=='video'){toast('Video belum termuat');return}
-  pause();tkPt=null;tkPath=null;tkAbort=false;
+  pause();tkPts=[];tkRes=null;tkMeta=null;tkAbort=false;
   const tg=S.items.slice(2).filter(o=>IS3D(o.kind)&&o!==it&&o.kind!=='group');
   $('s3-tk-target').innerHTML=tg.length?tg.map(o=>`<option value="${o.id}">${esc(label(o))}</option>`).join(''):'<option value="">(tambah teks / foto dulu)</option>';
-  $('s3-tk-msg').textContent='Ketuk titik/objek di video yang mau diikuti (pilih bagian yang kontras: sudut, tanda, wajah).';
+  $('s3-tk-msg').textContent=tkHelp();
   $('s3-tk-apply').disabled=true;$('s3-tk-start').disabled=true;$('s3-tk-bar').style.width='0';
   $('s3-dlg-tk').showModal();
   await seek(m.el,Math.max(0,t-it.start+(it.trim||0)));tkFrame(m);
 }
+function tkReset(){
+  tkPts=[];tkRes=null;tkMeta=null;
+  const it=sel(),m=it.kind==='video'?getMedia(it.mediaId):null;if(m&&m.kind==='video')tkFrame(m);
+  $('s3-tk-start').disabled=true;$('s3-tk-apply').disabled=true;$('s3-tk-bar').style.width='0';$('s3-tk-msg').textContent=tkHelp();
+}
 function tkFrame(m){
   const c=$('s3-tk-canvas'),w=Math.min(420,m.w),h=Math.round(w*m.h/m.w);c.width=w;c.height=h;
   const g=c.getContext('2d');try{g.drawImage(m.el,0,0,w,h)}catch(_){}
-  if(tkPath){g.strokeStyle='#7fff9a';g.lineWidth=2;g.beginPath();tkPath.forEach((p,i)=>{const x=p.u*w,y=p.v*h;i?g.lineTo(x,y):g.moveTo(x,y)});g.stroke()}
-  if(tkPt){const x=tkPt.u*w,y=tkPt.v*h;g.strokeStyle='#ff4d6d';g.lineWidth=2;g.strokeRect(x-9,y-9,18,18);g.beginPath();g.moveTo(x-16,y);g.lineTo(x+16,y);g.moveTo(x,y-16);g.lineTo(x,y+16);g.stroke()}
+  if(tkRes){   /* jalur: hijau = terlacak, oranye putus-putus = tertutup (diisi gerak halus) */
+    g.lineWidth=2;
+    for(let i=1;i<tkRes.length;i++){const a=tkRes[i-1],b=tkRes[i],okk=a.ok&&b.ok;g.strokeStyle=okk?'#7fff9a':'#ff9a4d';g.setLineDash(okk?[]:[4,4]);g.beginPath();g.moveTo(a.u*w,a.v*h);g.lineTo(b.u*w,b.v*h);g.stroke()}
+    g.setLineDash([]);
+  }
+  g.strokeStyle='#ff4d6d';g.fillStyle='#ff4d6d';g.lineWidth=2;g.font='bold 14px Arial,sans-serif';
+  if(tkPts.length===2){g.beginPath();g.moveTo(tkPts[0].u*w,tkPts[0].v*h);g.lineTo(tkPts[1].u*w,tkPts[1].v*h);g.stroke()}
+  tkPts.forEach((p,i)=>{const x=p.u*w,y=p.v*h;g.strokeRect(x-9,y-9,18,18);g.beginPath();g.moveTo(x-16,y);g.lineTo(x+16,y);g.moveTo(x,y-16);g.lineTo(x,y+16);g.stroke();if(tkMode()===2)g.fillText(i?'B':'A',x+12,y-12)});
 }
 function tkPick(e){
-  const c=$('s3-tk-canvas'),r=c.getBoundingClientRect();
-  tkPt={u:clamp((e.clientX-r.left)/r.width,.02,.98),v:clamp((e.clientY-r.top)/r.height,.02,.98)};tkPath=null;
-  tkFrame(getMedia(sel().mediaId));$('s3-tk-start').disabled=false;$('s3-tk-apply').disabled=true;$('s3-tk-msg').textContent='Titik dipilih. Tekan Mulai lacak.';
+  const it=sel(),m=it.kind==='video'?getMedia(it.mediaId):null;if(!m||m.kind!=='video')return;
+  const c=$('s3-tk-canvas'),r=c.getBoundingClientRect(),n=tkMode();
+  const p={u:clamp((e.clientX-r.left)/r.width,.02,.98),v:clamp((e.clientY-r.top)/r.height,.02,.98)};
+  if(tkPts.length>=n)tkPts=[];
+  if(n===2&&tkPts.length===1&&Math.hypot((p.u-tkPts[0].u)*m.w,(p.v-tkPts[0].v)*m.h)/m.w<.12){
+    $('s3-tk-msg').textContent='Titik B terlalu dekat dengan titik A. Pilih titik yang lebih jauh supaya ukuran dan putaran terbaca.';return;
+  }
+  tkPts.push(p);tkRes=null;tkMeta=null;tkFrame(m);
+  const ready=tkPts.length===n;
+  $('s3-tk-start').disabled=!ready;$('s3-tk-apply').disabled=true;$('s3-tk-bar').style.width='0';
+  $('s3-tk-msg').textContent=ready?'Titik dipilih. Tekan Mulai lacak.':'Titik A dipilih. Ketuk titik B di objek yang sama.';
+}
+const tkGray=(el,g,TW,TH)=>{g.drawImage(el,0,0,TW,TH);const d=g.getImageData(0,0,TW,TH).data,a=new Uint8Array(TW*TH);for(let i=0,j=0;i<a.length;i++,j+=4)a[i]=(d[j]*77+d[j+1]*150+d[j+2]*29)>>8;return a};
+function tkGrab(dst,a,TW,cx,cy,w){
+  const H=TK.H,PS=2*H+1;
+  for(let y=0;y<PS;y++)for(let x=0;x<PS;x++){const v=a[(cy-H+y)*TW+(cx-H+x)],i=y*PS+x;dst[i]=w==null?v:dst[i]*(1-w)+v*w}
+}
+function tkSearch(a,TW,TH,tpl,cx,cy,sr,stp,pen){
+  const H=TK.H,PS=2*H+1;let bs=1e18,bx=cx,by=cy,braw=1e18;
+  for(let dy=-sr;dy<=sr;dy+=stp){const yy=cy+dy;if(yy-H<0||yy+H>=TH)continue;
+    for(let dx=-sr;dx<=sr;dx+=stp){const xx=cx+dx;if(xx-H<0||xx+H>=TW)continue;
+      let s=0;
+      for(let y=0;y<PS&&s<bs;y++){const o=(yy-H+y)*TW+xx-H,q=y*PS;for(let x=0;x<PS;x++)s+=Math.abs(a[o+x]-tpl[q+x])}
+      const sc=s+(dx*dx+dy*dy)*pen;if(sc<bs){bs=sc;braw=s;bx=xx;by=yy}}}
+  return{x:bx,y:by,avg:braw/(PS*PS)};
+}
+function tkWide(tr,a,TW,TH,cx,cy,sr){   /* cari di area luas (kasar lalu halus) dengan tampilan awal dan tampilan terakhir */
+  let best=null;
+  for(const tpl of [tr.ref,tr.tpl]){
+    const r1=tkSearch(a,TW,TH,tpl,cx,cy,sr,3,.3),r=tkSearch(a,TW,TH,tpl,r1.x,r1.y,3,1,0);
+    if(!best||r.avg<best.avg)best=r;
+  }
+  return best;
+}
+function tkMk(a,TW,x,y){
+  const PS=2*TK.H+1,p={x,y,vx:0,vy:0,gx:x,gy:y,lost:0,cand:null,tpl:new Float32Array(PS*PS),ref:new Float32Array(PS*PS)};
+  tkGrab(p.tpl,a,TW,x,y);p.ref.set(p.tpl);
+  let m=0;for(const v of p.ref)m+=v;m/=p.ref.length;let c=0;for(const v of p.ref)c+=Math.abs(v-m);p.con=c/p.ref.length;   /* kontras patch */
+  return p;
+}
+/* true = titik terlacak di frame ini. valid(x,y) (mode 2 titik) memeriksa kecocokan geometri sebelum menempel lagi */
+function tkStep(tr,a,TW,TH,hint,valid){
+  const H=TK.H,cl=(x,y)=>[clamp(Math.round(x),H,TW-H-1),clamp(Math.round(y),H,TH-H-1)];
+  if(!tr.lost){
+    const [cx,cy]=cl(tr.x+tr.vx,tr.y+tr.vy),r=tkSearch(a,TW,TH,tr.tpl,cx,cy,TK.SR,1,1.5);
+    if(r.avg<TK.THR){
+      tr.vx=(r.x-tr.x)*.6+tr.vx*.4;tr.vy=(r.y-tr.y)*.6+tr.vy*.4;tr.x=r.x;tr.y=r.y;tr.gx=r.x;tr.gy=r.y;
+      if(r.avg<TK.THR*.7)tkGrab(tr.tpl,a,TW,r.x,r.y,.12);
+      return true;
+    }
+    tr.lost=1;tr.cand=null;
+  }else tr.lost++;
+  tr.x+=tr.vx;tr.y+=tr.vy;tr.vx*=.6;tr.vy*=.6;
+  if(tr.lost>1&&tr.lost<=3){   /* goyangan singkat (blur): coba lagi dekat perkiraan */
+    const [cx,cy]=cl(tr.x,tr.y),r=tkSearch(a,TW,TH,tr.tpl,cx,cy,TK.SR,1,1.5);
+    if(r.avg<TK.THR){tr.x=r.x;tr.y=r.y;tr.gx=r.x;tr.gy=r.y;tr.vx=tr.vy=0;tr.lost=0;return true}
+  }
+  const base=hint||{x:tr.gx,y:tr.gy},[cx,cy]=cl(base.x,base.y),sr=Math.min(TK.WSR,TK.SR+tr.lost*4),b=tkWide(tr,a,TW,TH,cx,cy,sr);
+  if(b.avg<Math.min(TK.RTHR,.8*tr.con)){
+    if(tr.cand&&Math.hypot(b.x-tr.cand.x,b.y-tr.cand.y)<8)tr.cand.n++;else tr.cand={n:1};
+    tr.cand.x=b.x;tr.cand.y=b.y;
+    if(tr.cand.n>=(valid?2:3)&&(!valid||valid(b.x,b.y))){tr.x=b.x;tr.y=b.y;tr.gx=b.x;tr.gy=b.y;tr.vx=tr.vy=0;tr.lost=0;tr.cand=null;return true}
+  }else tr.cand=null;
+  return false;
+}
+function tkGeo(rel,a,b){   /* jarak dan sudut A-B harus mirip dengan terakhir kali keduanya terlacak */
+  const r=[b.x-a.x,b.y-a.y],d0=Math.hypot(rel[0],rel[1])||1,d=Math.hypot(r[0],r[1]);
+  if(d<d0*.6||d>d0*1.7)return false;
+  return Math.abs(Math.atan2(r[0]*rel[1]-r[1]*rel[0],r[0]*rel[0]+r[1]*rel[1])/D)<45;
+}
+function tkBuild(rec,n,TW,TH){
+  let d0=1,a0=0,pa=0;
+  const raw=rec.map((r,i)=>{
+    const p=r.p,o={t:r.t,ok:r.ok};
+    if(r.ok){
+      if(n===2){
+        const dx=p[1][0]-p[0][0],dy=p[1][1]-p[0][1],d=Math.hypot(dx,dy)||1;let an=Math.atan2(dy,dx)/D;
+        if(i===0){d0=d;a0=an;pa=an}
+        while(an-pa>180)an-=360;while(an-pa<-180)an+=360;pa=an;
+        o.u=(p[0][0]+p[1][0])/2/TW;o.v=(p[0][1]+p[1][1])/2/TH;o.s=d/d0;o.a=an-a0;
+      }else{o.u=p[0][0]/TW;o.v=p[0][1]/TH;o.s=1;o.a=0}
+    }
+    return o;
+  });
+  let runs=0,tail=false;
+  for(let i=1;i<raw.length;i++){   /* isi celah: interpolasi ke titik berikutnya, atau tahan di akhir */
+    if(raw[i].ok)continue;
+    let j=i;while(j<raw.length&&!raw[j].ok)j++;
+    const A=raw[i-1],B=j<raw.length?raw[j]:null;
+    if(B)runs++;else tail=true;
+    for(let k=i;k<j;k++){const f=B?(k-i+1)/(j-i+1):0;['u','v','s','a'].forEach(q=>{raw[k][q]=B?A[q]+(B[q]-A[q])*f:A[q]})}
+    i=j;
+  }
+  const path=raw.map((p,i)=>{const a=raw[Math.max(0,i-1)],b=raw[Math.min(raw.length-1,i+1)];
+    return{t:p.t,ok:p.ok,u:(a.u+p.u+b.u)/3,v:(a.v+p.v+b.v)/3,s:(a.s+p.s+b.s)/3,a:(a.a+p.a+b.a)/3}});
+  return{path,runs,tail,bad:raw.filter(p=>!p.ok).length};
 }
 async function runTrack(){
-  const it=sel(),m=getMedia(it.mediaId);if(!tkPt||!m)return;
-  const el=m.el,TW=240,TH=Math.round(TW*m.h/m.w),c=document.createElement('canvas');c.width=TW;c.height=TH;
+  const it=sel(),m=getMedia(it.mediaId),n=tkMode();if(!m||tkPts.length!==n)return;
+  const el=m.el,H=TK.H,TW=TK.TW,TH=Math.max(2*H+4,Math.round(TW*m.h/m.w)),c=document.createElement('canvas');c.width=TW;c.height=TH;
   const g=c.getContext('2d',{willReadFrequently:true});
-  const gray=()=>{g.drawImage(el,0,0,TW,TH);const d=g.getImageData(0,0,TW,TH).data,a=new Uint8Array(TW*TH);for(let i=0,j=0;i<a.length;i++,j+=4)a[i]=(d[j]*77+d[j+1]*150+d[j+2]*29)>>8;return a};
-  const HALF=8,PS=HALF*2+1,SR=18,STEP=.05;
-  const t0s=t,tEnd=Math.min(S.dur,it.dur==null?S.dur:it.start+it.dur,t0s+20);
-  tkAbort=false;trackBusy=true;$('s3-tk-start').disabled=true;$('s3-tk-apply').disabled=true;
-  const vt=ts=>Math.max(0,ts-it.start+(it.trim||0));
+  const t0s=t,tEnd=Math.min(S.dur,it.dur==null?S.dur:it.start+it.dur,t0s+20),vt=ts=>Math.max(0,ts-it.start+(it.trim||0));
+  tkAbort=false;trackBusy=true;tkRes=null;tkMeta=null;$('s3-tk-start').disabled=true;$('s3-tk-apply').disabled=true;
   try{
-    await seek(el,vt(t0s));let img=gray(),px=tkPt.u*TW,py=tkPt.v*TH;
-    px=clamp(px,HALF+1,TW-HALF-2);py=clamp(py,HALF+1,TH-HALF-2);
-    const tpl=new Float32Array(PS*PS);
-    const grab=(a,cx,cy,w)=>{for(let y=0;y<PS;y++)for(let x=0;x<PS;x++){const v=a[(cy-HALF+y)*TW+(cx-HALF+x)];tpl[y*PS+x]=w==null?v:tpl[y*PS+x]*(1-w)+v*w}};
-    grab(img,Math.round(px),Math.round(py));
-    const path=[{t:t0s,u:px/TW,v:py/TH}];let lost=0,vx=0,vy=0;
-    const n=Math.floor((tEnd-t0s)/STEP);
-    for(let i=1;i<=n&&!tkAbort;i++){
-      const ts=t0s+i*STEP;await seek(el,vt(ts));img=gray();
-      const cx=Math.round(px+vx),cy=Math.round(py+vy);let best=1e18,bx=cx,by=cy,bs=1e18;
-      for(let dy=-SR;dy<=SR;dy++){const yy=cy+dy;if(yy-HALF<0||yy+HALF>=TH)continue;
-        for(let dx=-SR;dx<=SR;dx++){const xx=cx+dx;if(xx-HALF<0||xx+HALF>=TW)continue;
-          let s=0;
-          for(let y=0;y<PS&&s<bs;y++){const o=(yy-HALF+y)*TW+xx-HALF,q=y*PS;for(let x=0;x<PS;x++)s+=Math.abs(img[o+x]-tpl[q+x])}
-          const sc=s+(dx*dx+dy*dy)*1.5;if(sc<bs){bs=sc;best=s;bx=xx;by=yy}}}
-      const avg=best/(PS*PS);
-      if(avg<38){vx=(bx-px)*.6+vx*.4;vy=(by-py)*.6+vy*.4;px=bx;py=by;grab(img,bx,by,.12);lost=0}else{lost++;vx*=.5;vy*=.5}
-      path.push({t:ts,u:px/TW,v:py/TH});
-      if(i%4===0){$('s3-tk-bar').style.width=(i/n*100)+'%';$('s3-tk-msg').textContent=`Melacak… ${Math.round(i/n*100)}%`}
+    await seek(el,vt(t0s));let img=tkGray(el,g,TW,TH);
+    const pts=tkPts.map(p=>tkMk(img,TW,clamp(Math.round(p.u*TW),H,TW-H-1),clamp(Math.round(p.v*TH),H,TH-H-1)));
+    const rec=[{t:t0s,ok:true,p:pts.map(q=>[q.x,q.y])}];
+    let rel=n===2?[pts[1].x-pts[0].x,pts[1].y-pts[0].y]:null;
+    const nf=Math.floor((tEnd-t0s)/TK.STEP);
+    for(let i=1;i<=nf&&!tkAbort;i++){
+      const ts=t0s+i*TK.STEP;await seek(el,vt(ts));img=tkGray(el,g,TW,TH);
+      const ok=[false,false],order=(n===2&&pts[0].lost&&!pts[1].lost)?[1,0]:[0,1];
+      for(const k of order){
+        if(k>=n)continue;
+        let hint=null,valid=null;
+        if(n===2){
+          const o=pts[1-k],pi=()=>o.lost===0?{x:o.x,y:o.y}:(o.cand?{x:o.cand.x,y:o.cand.y}:null);
+          if(pts[k].lost&&ok[1-k])hint=k?{x:o.x+rel[0],y:o.y+rel[1]}:{x:o.x-rel[0],y:o.y-rel[1]};
+          valid=(x,y)=>{const p=pi();if(!p)return false;return k?tkGeo(rel,p,{x,y}):tkGeo(rel,{x,y},p)};
+        }
+        ok[k]=tkStep(pts[k],img,TW,TH,hint,valid);
+      }
+      const all=n===2?(ok[0]&&ok[1]):ok[0];
+      if(all&&n===2)rel=[pts[1].x-pts[0].x,pts[1].y-pts[0].y];
+      rec.push({t:ts,ok:all,p:pts.map(q=>[q.x,q.y])});
+      if(i%4===0){$('s3-tk-bar').style.width=(i/nf*100)+'%';$('s3-tk-msg').textContent=`Melacak… ${Math.round(i/nf*100)}%`}
     }
-    /* haluskan 3 titik */
-    const sm=path.map((p,i)=>{const a=path[Math.max(0,i-1)],b=path[Math.min(path.length-1,i+1)];return{t:p.t,u:(a.u+p.u+b.u)/3,v:(a.v+p.v+b.v)/3}});
-    tkPath=sm;$('s3-tk-bar').style.width='100%';
-    $('s3-tk-msg').textContent=tkAbort?'Dibatalkan.':`Selesai: ${sm.length} titik${lost>6?'. Titik sempat hilang (objek tertutup / blur); coba titik lain yang lebih kontras.':'. Pilih layer lalu tekan Terapkan.'}`;
-    $('s3-tk-apply').disabled=!tkPath||tkAbort;
+    if(tkAbort){$('s3-tk-msg').textContent='Dibatalkan.'}
+    else{
+      const r=tkBuild(rec,n,TW,TH);tkRes=r.path;tkMeta={n,runs:r.runs,tail:r.tail};
+      $('s3-tk-bar').style.width='100%';
+      $('s3-tk-msg').textContent=`Selesai: ${r.path.length} titik`+(r.bad?` (${r.bad} frame tak terlacak)`:'')
+        +(r.runs?`. Objek sempat tertutup/hilang ${r.runs}x dan ditemukan lagi; celahnya diisi gerak halus`:'')
+        +(r.tail?'. Di akhir objek tidak ditemukan lagi, posisi terakhir dipertahankan':'')
+        +(r.bad>r.path.length*.5?'. Banyak frame hilang, coba titik yang lebih kontras':'')+'. Pilih layer lalu tekan Terapkan.';
+      $('s3-tk-apply').disabled=false;
+    }
   }catch(err){$('s3-tk-msg').textContent='Gagal melacak: '+(err&&err.message||err)}
-  finally{trackBusy=false;$('s3-tk-start').disabled=false;tkFrame(m);}
+  finally{trackBusy=false;$('s3-tk-start').disabled=false;tkFrame(m)}
 }
 function applyTrack(){
   const vid=sel(),tg=byId($('s3-tk-target').value);
   if(!tg){toast('Tambah teks atau foto dulu untuk ditempel');return}
-  if(!tkPath)return;
-  const m=getMedia(vid.mediaId),cwv=1000*m.w/m.h,chv=1000;
+  if(!tkRes||!tkMeta)return;
+  const m=getMedia(vid.mediaId),cwv=1000*m.w/m.h,chv=1000,P=tkRes,t0=P[0].t,last=P.length-1,n2=tkMeta.n===2;
+  const fs=n2&&chk('s3-tk-sz',true),fr=n2&&chk('s3-tk-rot',true),hide=chk('s3-tk-hide',false)&&P.some(p=>!p.ok);
+  const W0=world(vid,t0),b={s:val(tg,'scale',t0),rz:val(tg,'rz',t0),op:val(tg,'opacity',t0),vr:val(vid,'rz',t0)};
+  const rd=(v,k)=>Math.round(v*k)/k;
   tg.parent=null;['x','y','z'].forEach(p=>delete tg.keys[p]);
-  tkPath.forEach((p,i)=>{
-    if(i%2&&i!==tkPath.length-1)return;
-    const W=world(vid,p.t),lx=(p.u-.5)*cwv*W.s,ly=(p.v-.5)*chv*W.s,q=mv(W.R,[lx,ly,0]);
-    setKey(tg,'x',p.t,Math.round((W.p[0]+q[0])*10)/10,'linear');
-    setKey(tg,'y',p.t,Math.round((W.p[1]+q[1])*10)/10,'linear');
-    setKey(tg,'z',p.t,Math.round((W.p[2]+q[2]-2)*10)/10,'linear');
+  if(fs){delete tg.keys.scale;tg.props.scale=b.s}
+  if(fr){delete tg.keys.rz;tg.props.rz=b.rz}
+  if(hide){delete tg.keys.opacity;tg.props.opacity=b.op}
+  P.forEach((p,i)=>{
+    if(i%2&&i!==last)return;
+    const W=world(vid,p.t),q=mv(W.R,[(p.u-.5)*cwv*W.s,(p.v-.5)*chv*W.s,0]);
+    setKey(tg,'x',p.t,rd(W.p[0]+q[0],10),'linear');
+    setKey(tg,'y',p.t,rd(W.p[1]+q[1],10),'linear');
+    setKey(tg,'z',p.t,rd(W.p[2]+q[2]-2,10),'linear');
+    if(fs)setKey(tg,'scale',p.t,rd(clamp(b.s*p.s*(W.s/W0.s),.05,6),1000),'linear');
+    if(fr)setKey(tg,'rz',p.t,rd(clamp(b.rz+(val(vid,'rz',p.t)-b.vr)+p.a,-720,720),100),'linear');
   });
-  tg.start=Math.min(tg.start,tkPath[0].t);
-  $('s3-dlg-tk').close();select(tg.id);setT(tkPath[0].t);dirty();toast('Tracking diterapkan: layer akan mengikuti titik');
+  if(hide){   /* layer dimatikan selama objek tertutup (pudar singkat), muncul lagi saat objek ditemukan */
+    let prev=false;setKey(tg,'opacity',t0,b.op,'linear');
+    P.forEach((p,i)=>{const h=!p.ok;if(h===prev)return;setKey(tg,'opacity',P[i-1].t,prev?0:b.op,'linear');setKey(tg,'opacity',p.t,h?0:b.op,'linear');prev=h});
+  }
+  tg.start=Math.min(tg.start,t0);
+  $('s3-dlg-tk').close();select(tg.id);setT(t0);dirty();
+  toast('Tracking diterapkan: '+['posisi',fs&&'ukuran',fr&&'putaran'].filter(Boolean).join(', '));
 }
 
-/* ===== EXPORT (rekam kanvas real-time) ===== */
-let exporting=false,exportCancel=false;
-async function doExport(){
+/* ===== EXPORT =====
+   - Frame per frame (disarankan): tiap frame dirender satu per satu (video di-seek tepat), dikodekan WebCodecs (H.264) ke MP4,
+     musik dicampur lewat OfflineAudioContext (AAC). Tidak tergantung kecepatan perangkat, tidak ada frame terlewat, dan tab tidak
+     harus menunggu sepanjang durasi. Memakai pustaka mp4-muxer yang sudah dimuat export.js (window.Mp4Muxer).
+   - Real-time: kanvas direkam MediaRecorder sambil diputar (cadangan kalau WebCodecs tidak ada). */
+let exporting=false,exportCancel=false,wakeLock=null,exPrecise=false;   /* exPrecise: video dikendalikan export (seek per frame), preview tidak boleh ikut menyinkronkan */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const fmtT=s=>{s=Math.max(0,Math.round(s));return s>=60?Math.floor(s/60)+' mnt '+(s%60)+' dtk':s+' dtk'};
+const exProg=(f,txt)=>{$('s3-ex-fill').style.width=Math.round(clamp(f,0,1)*100)+'%';$('s3-ex-status').textContent=txt};
+async function keepAwake(){try{if(navigator.wakeLock)wakeLock=await navigator.wakeLock.request('screen')}catch(_){}}
+function releaseWake(){try{wakeLock&&wakeLock.release()}catch(_){}wakeLock=null}
+function canPrecise(){
+  if(!(window.VideoEncoder&&window.VideoFrame&&window.Mp4Muxer))return false;
+  if(S&&S.music&&!(window.AudioEncoder&&window.AudioData&&(window.OfflineAudioContext||window.webkitOfflineAudioContext)))return false;
+  return true;
+}
+function exNote(){
+  const e=$('s3-ex-note');if(!e)return;
+  e.textContent=opt('s3-ex-mode','rt')==='pre'
+    ?'Frame dirender satu per satu lalu dikodekan ke MP4, jadi tidak ada frame terlewat dan gerakan mulus. Lamanya mengikuti beratnya scene (scene ringan bisa lebih cepat dari durasi video). Musik ikut; audio klip video tidak. Biarkan tab terbuka dan terlihat.'
+    :'Direkam real-time sepanjang durasi: biarkan tab terbuka dan terlihat. Kalau perangkat kurang kuat, frame bisa terlewat. Audio video-klip tidak ikut; musik (♪) ikut.';
+}
+function openExport(){
+  pause();
+  const m=$('s3-ex-mode'),pre=canPrecise(),rt=!!(window.MediaRecorder&&$('s3-cv').captureStream);
+  if(m){m.innerHTML=(pre?'<option value="pre">Frame per frame (disarankan, MP4)</option>':'')+(rt?'<option value="rt">Real-time (direkam saat diputar)</option>':'');m.value=pre?'pre':'rt'}
+  exNote();
+  $('s3-ex-set').hidden=false;$('s3-ex-prog').hidden=true;$('s3-dlg-ex').showModal();
+}
+function doExport(){
+  if(exporting)return;
+  if(opt('s3-ex-mode','rt')==='pre'&&canPrecise())return doExportPrecise();
+  return doExportRT();
+}
+async function mixMusic(len,SR){
+  const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  const rec=await DB.get('media',S.music);if(!rec||!rec.blob)return null;
+  let buf;try{buf=await new OAC(2,1,SR).decodeAudioData(await rec.blob.arrayBuffer())}catch(_){return null}
+  const oc=new OAC(2,Math.max(1,Math.ceil(len*SR)),SR),src=oc.createBufferSource();
+  src.buffer=buf;src.connect(oc.destination);src.start(0,0,Math.min(len,buf.duration));
+  return await oc.startRendering();
+}
+async function prepVideos(tm){   /* semua video yang tampil di-seek tepat ke frame yang dibutuhkan, lalu ditunggu selesai */
+  const jobs=[];
+  S.items.forEach(it=>{
+    if(it.kind!=='video'||!visible(it,tm))return;
+    const m=getMedia(it.mediaId);if(!m||m.kind!=='video')return;
+    const el=m.el;if(!el.paused)el.pause();
+    jobs.push(seek(el,Math.min(Math.max(0,tm-it.start+(it.trim||0)),(el.duration||1e9)-.05)));
+  });
+  if(jobs.length)await Promise.all(jobs);
+}
+async function renderPrecise(cv,short,fps,q,st){
+  const len=S.dur,N=Math.max(1,Math.ceil(len*fps-1e-6)),SR=48000;
+  sizeCanvas(short);
+  const w=cv.width,h=cv.height,bitrate=Math.min(80e6,Math.max(2e6,Math.round(w*h*fps*q)));
+  let vcfg=null;
+  for(const codec of ['avc1.64003e','avc1.640034','avc1.640033','avc1.64002a','avc1.640028','avc1.64001f','avc1.42001f']){
+    const c={codec,width:w,height:h,bitrate,framerate:fps,avc:{format:'avc'},latencyMode:'quality'};
+    try{const s=await VideoEncoder.isConfigSupported(c);if(s&&s.supported){vcfg=c;break}}catch(_){}
+  }
+  if(!vcfg)throw new Error('encoder H.264 tidak tersedia');
+  let mix=null,acfg=null,acodec='aac';
+  if(S.music){
+    exProg(0,'Menyiapkan musik…');mix=await mixMusic(len,SR);
+    if(exportCancel)return null;
+    if(!mix)toast('Musik tidak bisa dibaca, export tanpa musik');
+    else{
+      for(const [cd,mc] of [['mp4a.40.2','aac'],['opus','opus']]){
+        try{const c={codec:cd,sampleRate:SR,numberOfChannels:2,bitrate:192000},s=await AudioEncoder.isConfigSupported(c);if(s&&s.supported){acfg=c;acodec=mc;break}}catch(_){}
+      }
+      if(!acfg)throw new Error('encoder audio tidak tersedia');
+    }
+  }
+  const target=new Mp4Muxer.ArrayBufferTarget(),mo={target,video:{codec:'avc',width:w,height:h,frameRate:fps},fastStart:'in-memory'};
+  if(acfg)mo.audio={codec:acodec,numberOfChannels:2,sampleRate:SR};
+  const muxer=new Mp4Muxer.Muxer(mo);
+  let err=null;
+  const venc=st.venc=new VideoEncoder({output:(c,m)=>{try{muxer.addVideoChunk(c,m)}catch(e){err=err||e}},error:e=>{err=err||e}});
+  venc.configure(vcfg);
+  let aenc=null;
+  if(acfg){aenc=st.aenc=new AudioEncoder({output:(c,m)=>{try{muxer.addAudioChunk(c,m)}catch(e){err=err||e}},error:e=>{err=err||e}});aenc.configure(acfg)}
+  const c0=mix&&acfg?mix.getChannelData(0):null,c1=mix&&acfg?mix.getChannelData(Math.min(1,mix.numberOfChannels-1)):null,total=mix?mix.length:0;
+  let aPos=0;
+  const feed=to=>{
+    while(aPos<to){
+      const n=Math.min(SR,to-aPos),buf=new Float32Array(n*2);
+      buf.set(c0.subarray(aPos,aPos+n),0);buf.set(c1.subarray(aPos,aPos+n),n);
+      const ad=new AudioData({format:'f32-planar',sampleRate:SR,numberOfFrames:n,numberOfChannels:2,timestamp:Math.round(aPos/SR*1e6),data:buf});
+      aenc.encode(ad);ad.close();aPos+=n;
+    }
+  };
+  const fdur=Math.round(1e6/fps),t0e=Date.now();let lastP=0;
+  for(let i=0;i<N;i++){
+    if(exportCancel)return null;
+    if(err)throw err;
+    const tm=Math.min(i/fps,len);
+    t=tm;await prepVideos(tm);
+    if(exportCancel)return null;
+    render();
+    const vf=new VideoFrame(cv,{timestamp:Math.round(i*1e6/fps),duration:fdur});
+    venc.encode(vf,{keyFrame:i%(fps*2)===0});vf.close();
+    if(aenc)feed(Math.min(total,Math.floor((tm+1)*SR)));
+    while(venc.encodeQueueSize>8&&!exportCancel&&!err)await sleep(4);
+    const now=Date.now();
+    if(now-lastP>200){
+      lastP=now;const el=(now-t0e)/1000;
+      exProg(i/N,`Merender frame ${i}/${N} · ${w}×${h} · ${fps} fps`+(i>=15?` · sisa ±${fmtT(el/i*(N-i))}`:''));
+      await sleep(0);
+    }else if(i%3===0)await sleep(0);
+  }
+  if(aenc)feed(total);
+  exProg(1,'Menyelesaikan file…');
+  await venc.flush();
+  if(aenc)await aenc.flush();
+  if(err)throw err;
+  muxer.finalize();
+  return new Blob([target.buffer],{type:'video/mp4'});
+}
+async function doExportPrecise(){
+  if(exporting)return;
+  const cv=$('s3-cv'),short=+$('s3-ex-res').value,fps=+$('s3-ex-fps').value,q=+opt('s3-ex-q','0.15')||.15;
+  exporting=true;exPrecise=true;exportCancel=false;
+  $('s3-ex-set').hidden=true;$('s3-ex-prog').hidden=false;exProg(0,'Menyiapkan…');
+  keepAwake();
+  const st={venc:null,aenc:null};let blob=null,failed=null;
+  try{blob=await renderPrecise(cv,short,fps,q,st)}catch(e){failed=e}
+  try{if(st.venc&&st.venc.state!=='closed')st.venc.close()}catch(_){}
+  try{if(st.aenc&&st.aenc.state!=='closed')st.aenc.close()}catch(_){}
+  releaseWake();exPrecise=false;exporting=false;sizeCanvas(previewShort());t=0;render();
+  if(exportCancel){$('s3-dlg-ex').close();toast('Export dibatalkan');return}
+  if(failed||!blob){
+    console.warn('Export frame per frame gagal',failed);
+    if(window.MediaRecorder&&cv.captureStream){toast('Mode frame per frame gagal ('+((failed&&failed.message)||'tidak diketahui')+'), beralih ke real-time');return doExportRT()}
+    $('s3-ex-set').hidden=false;$('s3-ex-prog').hidden=true;toast('Export gagal');return;
+  }
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(S.name||'edit3d')+'.mp4';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  exProg(1,'Selesai. File sudah diunduh.');
+  setTimeout(()=>{try{$('s3-dlg-ex').close()}catch(_){}},1200);
+}
+
+/* mode real-time (cadangan) */
+async function doExportRT(){
   if(exporting)return;
   if(!window.MediaRecorder||!$('s3-cv').captureStream){toast('Browser ini belum mendukung export video');return}
   exporting=true;exportCancel=false;

@@ -53,3 +53,4 @@
   .s3-side{overflow-y:auto;height:100%}
 }
 @media (max-width:520px){.s3-top #s3-save{display:none}.s3-top{gap:6px}}
+.s3-cuts{margin:4px 0 12px;font-size:13px}.s3-cut{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}.s3-cut button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:2px 8px;cursor:pointer}

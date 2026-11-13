@@ -31,11 +31,15 @@ const PD={
   rx:['Putar 3D sumbu X (°)',-360,360,1,0],ry:['Putar 3D sumbu Y (°)',-360,360,1,0],rz:['Putar datar / roll (°)',-720,720,1,0],
   scale:['Ukuran',0.05,6,0.01,1],opacity:['Opasitas',0,1,0.01,1],fov:['Sudut lensa FOV (°)',20,120,1,60],
   ca:['Chromatic aberration (pisah warna)',0,30,0.5,0],glow:['Glow / cahaya',0,1,0.01,0],shake:['Getar kamera',0,1,0.01,0],flash:['Kilat putih',0,1,0.01,0],
-  speed:['Kecepatan',-360,360,1,30]
+  speed:['Kecepatan',-360,360,1,30],
+  dist:['Jarak kamera ke objek',100,4000,10,900],az:['Sudut keliling kiri/kanan (°)',-180,180,1,0],el:['Sudut atas/bawah (°)',-80,80,1,0],
+  frx:['Bingkai: objek geser kiri/kanan',-0.45,0.45,0.01,0],fry:['Bingkai: objek geser atas/bawah',-0.45,0.45,0.01,0],
+  follow:['Kecepatan ikut (0 pelan ... 1 kaku)',0,1,0.01,0.6],focus:['Fokus: blur di luar jarak fokus',0,1,0.01,0],fd:['Jarak fokus',100,5000,10,900]
 };
+const CAMT=['dist','az','el','frx','fry','follow'];
 const PDK={sunburst:{speed:['Putar otomatis (°/detik)',-360,360,1,25],rz:['Putar tambahan (°)',-720,720,1,0]},
   ribbon:{speed:['Kecepatan gerak',0,6,0.1,1.2]},dust:{speed:['Kecepatan melaju (satuan/detik)',-3000,3000,10,600]}};
-const KINDS={camera:['x','y','z','rx','ry','rz','fov'],fx:['ca','glow','shake','flash'],
+const KINDS={camera:['x','y','z','rx','ry','rz','fov','focus','fd','dist','az','el','frx','fry','follow'],fx:['ca','glow','shake','flash'],
   text:['x','y','z','rx','ry','rz','scale','opacity'],image:['x','y','z','rx','ry','rz','scale','opacity'],video:['x','y','z','rx','ry','rz','scale','opacity'],
   group:['x','y','z','rx','ry','rz','scale'],sunburst:['opacity','rz','scale','speed'],ribbon:['opacity','scale','speed'],dust:['opacity','speed']};
 const NAMES={camera:'Kamera',fx:'Efek',text:'Teks',image:'Foto',video:'Video',group:'Grup',sunburst:'Latar kipas',ribbon:'Pita cahaya',dust:'Debu bintang'};
@@ -52,6 +56,7 @@ let HIT={};
 function mkItem(kind,o){
   const it={id:'i'+rid(),kind,name:NAMES[kind],props:{},keys:{},start:0,dur:null,parent:null,bill:false,vis:true};
   KINDS[kind].forEach(p=>it.props[p]=pd(kind,p)[4]);
+  if(kind==='camera')it.target=null;
   if(kind==='text')Object.assign(it,{text:'TEKS',size:170,color:'#ffffff',glow:true});
   if(kind==='sunburst')Object.assign(it,{beams:8,twist:.7});
   if(kind==='dust')Object.assign(it,{count:220});
@@ -103,17 +108,36 @@ function world(it,tt,depth){
   }
   return L;
 }
+function activeCam(tt){let c=S.items[0];(S.cuts||[]).forEach(k=>{if(k.t<=tt+1e-6){const o=byId(k.cam);if(o&&o.kind==='camera')c=o}});return c}
+function targetPos(c,tt){
+  const tg=c.target&&byId(c.target);if(!tg)return null;
+  const tau=(1-clamp(val(c,'follow',tt)==null?.6:val(c,'follow',tt),0,1))*1.6;
+  if(tau<.03)return world(tg,tt).p;
+  let a=[0,0,0],sw=0;
+  for(let k=0;k<14;k++){const w=Math.exp(-k*.1/tau),p=world(tg,Math.max(0,tt-k*.1)).p;a[0]+=p[0]*w;a[1]+=p[1]*w;a[2]+=p[2]*w;sw+=w}
+  return[a[0]/sw,a[1]/sw,a[2]/sw];
+}
 function camState(tt){
-  const c=S.items[0],f=S.items[1],g=p=>val(c,p,tt),sh=val(f,'shake',tt);
-  let x=g('x'),y=g('y'),rz=g('rz');
-  if(sh>0){x+=sh*14*(Math.sin(tt*53)+.6*Math.sin(tt*97+1));y+=sh*14*(Math.sin(tt*61+2)+.6*Math.sin(tt*89));rz+=sh*.9*Math.sin(tt*71+.5)}
-  const F=(REFH/2)/Math.tan(g('fov')*D/2);
-  return{p:[x,y,g('z')-F],R:rotM(g('rx'),g('ry'),rz),F,rz:g('rz')};
+  const c=activeCam(tt),f=S.items[1],sh=val(f,'shake',tt);
+  const g=p=>{const v=val(c,p,tt);return v==null?pd('camera',p)[4]:v};
+  const F=(REFH/2)/Math.tan(g('fov')*D/2),tp=targetPos(c,tt);
+  let sx=0,sy=0,srz=0;
+  if(sh>0){sx=sh*14*(Math.sin(tt*53)+.6*Math.sin(tt*97+1));sy=sh*14*(Math.sin(tt*61+2)+.6*Math.sin(tt*89));srz=sh*.9*Math.sin(tt*71+.5)}
+  if(tp){
+    const d=Math.max(50,g('dist')),az=g('az')*D,el=g('el')*D,cv=$('s3-cv'),asp=cv.width/cv.height;
+    const fw=[-Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)];
+    const ry=Math.asin(clamp(fw[0],-1,1))/D,rx=Math.atan2(-fw[1],fw[2])/D;
+    const R=mul(mul(rotM(rx,ry,0),rotM(g('rx'),g('ry'),g('rz')+srz)),[1,0,0,0,1,0,0,0,1]);
+    const Hd=2*d*Math.tan(g('fov')*D/2),Wd=Hd*asp,sft=mv(R,[-g('frx')*Wd,-g('fry')*Hd,0]);
+    const p=[tp[0]-fw[0]*d+sft[0]+g('x')+sx,tp[1]-fw[1]*d+sft[1]+g('y')+sy,tp[2]-fw[2]*d+sft[2]+g('z')];
+    return{p,R,F,rz:g('rz'),focus:g('focus'),fd:d};
+  }
+  return{p:[g('x')+sx,g('y')+sy,g('z')-F],R:rotM(g('rx'),g('ry'),g('rz')+srz),F,rz:g('rz'),focus:g('focus'),fd:g('fd')};
 }
 const toCam=(C,w)=>mvT(C.R,[w[0]-C.p[0],w[1]-C.p[1],w[2]-C.p[2]]);
 
 /* ===== kanvas bantu ===== */
-let SC=null,BC=null,TC=null,BL1=null,BL2=null;
+let SC=null,BC=null,BK=null,TC=null,BL1=null,BL2=null;
 const texPool=new Map();
 function fit(c,w,h){if(!c)c=document.createElement('canvas');if(c.width!==w||c.height!==h){c.width=w;c.height=h}return c}
 function tri(g,img,s0,s1,s2,d0,d1,d2){
@@ -243,7 +267,13 @@ function drawLayer(it,tt,C,k,W,H){
     tri(gb,T.c,SRC(i+1,j),SRC(i+1,j+1),SRC(i,j+1),pts[b],pts[d],pts[c]);
   }
   const g=SC.getContext('2d');g.save();g.setTransform(1,0,0,1,0,0);g.globalAlpha=clamp(o,0,1);
-  g.drawImage(BC,x0,y0,x1-x0,y1-y0,x0,y0,x1-x0,y1-y0);g.restore();
+  const nb=1+(C.focus||0)*10*clamp(Math.abs(pc0[2]-C.fd)/Math.max(100,C.fd),0,1.5);
+  if(nb>1.4){
+    const bw=Math.max(2,Math.round((x1-x0)/nb)),bh=Math.max(2,Math.round((y1-y0)/nb));BK=fit(BK,bw,bh);
+    const bg=BK.getContext('2d');bg.setTransform(1,0,0,1,0,0);bg.clearRect(0,0,bw,bh);bg.imageSmoothingEnabled=true;bg.drawImage(BC,x0,y0,x1-x0,y1-y0,0,0,bw,bh);
+    g.imageSmoothingEnabled=true;g.drawImage(BK,0,0,bw,bh,x0,y0,x1-x0,y1-y0);
+  }else g.drawImage(BC,x0,y0,x1-x0,y1-y0,x0,y0,x1-x0,y1-y0);
+  g.restore();
   gb.setTransform(1,0,0,1,0,0);gb.clearRect(x0,y0,x1-x0,y1-y0);
 }
 function drawSunburst(g,it,tt,W,H,C){
@@ -332,7 +362,7 @@ function render(){
   l3.forEach(o=>drawLayer(o.it,t,C,k,W,H));
   post(cv,S.items[1],t,W,H,k);
   const tm=$('s3-time');if(document.activeElement!==tm&&!tm._drag)tm.value=t;
-  $('s3-tlabel').textContent=`${t.toFixed(2)} / ${S.dur.toFixed(1)} dtk`;
+  $('s3-tlabel').textContent=`${t.toFixed(2)} / ${S.dur.toFixed(1)} dtk`+((S.cuts&&S.cuts.length)?' · '+activeCam(t).name:'');
   syncProps();
 }
 
@@ -392,7 +422,7 @@ function row(it,p){
 }
 function props(){
   const it=sel(),sys=it.kind==='camera'||it.kind==='fx';let h='';
-  const hint={camera:'Gerakkan kamera dengan keyframe ◆ (maju = Z naik, miring = Roll). Di preview: seret untuk menggeser kamera.',fx:'Efek untuk seluruh layar. Pakai keyframe ◆ untuk hentakan sesuai beat (Kilat putih, Getar).',
+  const hint={camera:'Kamera menangkap objek yang dilihat di video. Manual: gerakkan dengan keyframe ◆ (maju = Z naik). Atau pilih objek supaya kamera mengikutinya.',fx:'Efek untuk seluruh layar. Pakai keyframe ◆ untuk hentakan sesuai beat (Kilat putih, Getar).',
     text:'Seret teks di preview untuk memindahkan. Hadap kamera = teks selalu menghadap lensa.',image:'Seret foto di preview untuk memindahkan.',video:'Pilih video ini lalu tekan Lacak titik di atas untuk membuat teks/foto mengikuti objek.',
     group:'Grup kosong: jadikan "Induk" layer lain supaya semuanya ikut bergerak dan berputar bersama (misal orbit).',sunburst:'Latar kipas berputar seperti di video referensi.',ribbon:'Pita cahaya biru.',dust:'Debu / bintang yang melaju melewati kamera.'}[it.kind];
   h+=`<p class="s3-hint">${hint}</p>`;
@@ -413,7 +443,19 @@ function props(){
     h+=`<label class="s3-fl">Animasi cepat (dipasang di waktu sekarang)<select data-quick><option value="">Pilih animasi…</option><option value="fly">Terbang dari jauh</option><option value="pass">Lewat melewati kamera</option><option value="spin">Putar 3D masuk</option><option value="snap">Hentak miring</option><option value="wobble">Goyang</option></select></label>`;
   }
   h+=`<label class="s3-fl">Kurva untuk keyframe baru<select data-ease>${Object.keys(EASE).map(e=>`<option value="${e}"${e===curEase?' selected':''}>${EASE[e].n}</option>`).join('')}</select></label>`;
-  h+=KINDS[it.kind].map(p=>row(it,p)).join('');
+  if(it.kind==='camera'){
+    const opts=S.items.filter(o=>IS3D(o.kind)&&o.kind!=='group');
+    h+=`<label class="s3-fl">Objek yang ditangkap kamera<select data-f="target"><option value="">Manual (atur sendiri)</option>${opts.map(o=>`<option value="${o.id}"${it.target===o.id?' selected':''}>${esc(label(o))}</option>`).join('')}</select></label>`;
+    if(it.target)h+=`<label class="s3-fl">Posisi objek di bingkai<select data-frame><option value="">Pilih…</option><option value="0,0">Tengah</option><option value="-0.17,0">Sepertiga kiri</option><option value="0.17,0">Sepertiga kanan</option><option value="0,-0.17">Sepertiga atas</option><option value="0,0.17">Sepertiga bawah</option></select></label>`;
+    h+=`<label class="s3-fl">Gaya gerak kamera (dipasang di waktu sekarang)<select data-camquick><option value="">Pilih gaya…</option><option value="zoom">Zoom in pelan (disarankan)</option><option value="orbit">Orbit mengelilingi objek</option><option value="smooth">Ikuti halus</option><option value="lock">Ikuti kaku (objek selalu di tengah)</option></select></label>`;
+    if(it.id!=='cam')h+=`<button class="btn" data-act="cut">✂ Potong ke kamera ini di ${t.toFixed(2)} dtk</button>`;
+    else h+=`<p class="s3-hint">Tambah kamera lain dengan tombol 🎥+, lalu pilih kamera itu dan tekan Potong untuk berpindah kamera seperti cut film.</p>`;
+    const cuts=S.cuts||[];
+    if(cuts.length)h+=`<div class="s3-cuts"><b>Potongan kamera</b>${cuts.map((k,i)=>{const o=byId(k.cam);return`<div class="s3-cut"><span>${k.t.toFixed(2)} dtk → ${esc(o?o.name:'?')}</span><button type="button" data-delcut="${i}">✕</button></div>`}).join('')}<small>Sebelum potongan pertama dipakai Kamera utama.</small></div>`;
+  }
+  let plist=KINDS[it.kind];
+  if(it.kind==='camera')plist=plist.filter(p=>it.target?p!=='fd':!CAMT.includes(p));
+  h+=plist.map(p=>row(it,p)).join('');
   $('s3-props').innerHTML=h;ticks();
 }
 function syncProps(){
@@ -443,6 +485,19 @@ function quick(kind){
   it.start=Math.min(it.start,a);dirty();props();render();toast('Animasi dipasang di '+a.toFixed(2)+' dtk');
 }
 
+function camQuick(kind){
+  const c=sel(),a=t,K=(p,arr)=>arr.forEach(([tt,v,e])=>setKey(c,p,tt,v,e||'inout'));
+  const cur=p=>val(c,p,a);
+  if(kind==='zoom'){if(c.target)K('dist',[[a,cur('dist')],[a+3,cur('dist')*.65]]);else K('z',[[a,cur('z')],[a+3,cur('z')+350]])}
+  else if(kind==='orbit'){if(!c.target){toast('Orbit butuh objek: pilih "Objek yang ditangkap kamera" dulu');return}K('az',[[a,cur('az')],[a+4,cur('az')+90]])}
+  else if(kind==='smooth'){if(!c.target){toast('Pilih objek yang ditangkap dulu');return}c.props.follow=.55;delete c.keys.follow}
+  else if(kind==='lock'){if(!c.target){toast('Pilih objek yang ditangkap dulu');return}c.props.follow=1;delete c.keys.follow}
+  dirty();props();render();toast('Gaya kamera dipasang');
+}
+function addCamera(){
+  const n=S.items.filter(i=>i.kind==='camera').length+1,c=mkItem('camera',{name:'Kamera '+n});
+  S.items.push(c);selId=c.id;chips();props();render();dirty();toast('Kamera ditambah. Tekan Potong untuk berpindah ke kamera ini.');
+}
 /* ===== event panel ===== */
 function bindUI(){
   const P=$('s3-props');
@@ -459,6 +514,8 @@ function bindUI(){
   P.addEventListener('change',e=>{
     const el=e.target,it=sel(),f=el.dataset.f;
     if(el.dataset.quick!==undefined){if(el.value)quick(el.value);el.value='';return}
+    if(el.dataset.camquick!==undefined){if(el.value)camQuick(el.value);el.value='';return}
+    if(el.dataset.frame!==undefined){if(el.value){const[a,b]=el.value.split(',').map(Number);['frx','fry'].forEach((p,i)=>{const v=i?b:a;if(it.keys[p]&&it.keys[p].length)setKey(it,p,t,v);else it.props[p]=v});props();dirty();render()}return}
     if(el.dataset.ease!==undefined){curEase=el.value;const ks=Object.values(it.keys).flatMap(a=>a.filter(k=>Math.abs(k.t-t)<.02));ks.forEach(k=>k.e=curEase);dirty();return}
     if(f&&(el.type==='checkbox'||el.tagName==='SELECT'))fieldSet(it,f,el);
   });
@@ -470,6 +527,8 @@ function bindUI(){
       const dir=+b.dataset.go,c=dir>0?a.find(k=>k.t>t+.02):[...a].reverse().find(k=>k.t<t-.02);
       if(c){pause();setT(c.t)}else toast(dir>0?'Tidak ada keyframe berikutnya':'Tidak ada keyframe sebelumnya');
     }
+    else if(b.dataset.delcut){S.cuts.splice(+b.dataset.delcut,1);props();dirty();render()}
+    else if(b.dataset.act==='cut'){S.cuts=(S.cuts||[]).filter(k=>Math.abs(k.t-t)>.02);S.cuts.push({t:Math.round(t*100)/100,cam:it.id});S.cuts.sort((a,c)=>a.t-c.t);props();dirty();render();toast('Potong ke '+it.name+' di '+t.toFixed(2)+' dtk')}
     else if(b.dataset.act==='replace'){replaceMode=true;$('s3-file').accept='image/*,video/*';$('s3-file').multiple=false;$('s3-file').click()}
   });
   $('s3-ticks').onclick=e=>{const b=e.target.closest('[data-tt]');if(b){pause();setT(+b.dataset.tt)}};
@@ -487,14 +546,15 @@ function bindUI(){
   /* toolbar tambah */
   $('s3-add-text').onclick=()=>{const it=mkItem('text',{start:t,text:'TEKS'});it.props.z=0;add(it)};
   $('s3-add-media').onclick=()=>{replaceMode=false;$('s3-file').accept='image/*,video/*';$('s3-file').multiple=true;$('s3-file').click()};
+  $('s3-add-cam').onclick=addCamera;
   $('s3-add-group').onclick=()=>add(mkItem('group'));
   $('s3-add-bg').onchange=e=>{const k=e.target.value;e.target.value='';if(!k)return;const it=mkItem(k,{start:0});
     if(k==='sunburst')it.props.opacity=.9;add(it)};
   $('s3-music').onclick=()=>$('s3-file-audio').click();
-  $('s3-dup').onclick=()=>{const it=sel();if(it.kind==='camera'||it.kind==='fx')return toast('Kamera dan Efek tidak bisa diduplikat');
+  $('s3-dup').onclick=()=>{const it=sel();if(it.id==='cam'||it.id==='fx')return toast('Kamera utama dan Efek tidak bisa diduplikat');
     const c=JSON.parse(JSON.stringify(it));c.id='i'+rid();c.name=it.name+' 2';c.props.x=(c.props.x||0)+40;c.props.y=(c.props.y||0)+40;add(c)};
-  $('s3-del').onclick=()=>{const it=sel();if(it.kind==='camera'||it.kind==='fx')return toast('Kamera dan Efek tidak bisa dihapus');
-    S.items=S.items.filter(i=>i!==it);S.items.forEach(i=>{if(i.parent===it.id)i.parent=null});texPool.delete(it.id);select('cam');dirty()};
+  $('s3-del').onclick=()=>{const it=sel();if(it.id==='cam'||it.id==='fx')return toast('Kamera utama dan Efek tidak bisa dihapus');
+    S.items=S.items.filter(i=>i!==it);S.cuts=(S.cuts||[]).filter(k=>k.cam!==it.id);S.items.forEach(i=>{if(i.parent===it.id)i.parent=null});texPool.delete(it.id);select('cam');dirty()};
   $('s3-up').onclick=()=>{const it=sel(),i=S.items.indexOf(it);if(i>2){[S.items[i-1],S.items[i]]=[S.items[i],S.items[i-1]];chips();dirty();render()}};
   $('s3-file').onchange=async e=>{
     const files=[...e.target.files];e.target.value='';if(!files.length)return;
@@ -564,9 +624,10 @@ function fieldSet(it,f,el){
   if(['twist'].includes(f))v=parseFloat(v)||0;
   if(f==='start')v=Math.max(0,parseFloat(v)||0);
   if(f==='dur'){v=parseFloat(v)||0;v=v>0?v:null}
-  if(f==='parent')v=v||null;
+  if(f==='parent'||f==='target')v=v||null;
   it[f]=v;
   if(f==='text'||f==='name')chips();
+  if(f==='target'){props()}
   if(f==='parent'&&v){const L=world(it,t);/* tidak melompat: biarkan posisi lokal apa adanya */}
   dirty();render();
 }

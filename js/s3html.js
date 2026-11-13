@@ -3,13 +3,15 @@
    dijadikan anak dari Grup, dan ikut ke Export / Kirim ke editor.
    - Latar penuh layar: layer dipasang jauh di belakang dan diperbesar supaya memenuhi layar (ikut rasio scene).
    - Elemen biasa: ukuran bebas (lebar x tinggi), dipasang di kedalaman 0 pada detik playhead.
-   GERAK: kalau file HTML / SVG punya animasi CSS (@keyframes), animasinya dirender frame per frame (waktu tiap frame diatur
-   tepat lewat animation-delay negatif + pause) lalu dikodekan jadi video MP4 (WebCodecs + mp4-muxer dari export.js), dan video
-   itu dipasang sebagai layer Video. Jadi latarnya bergerak mulus di preview, Export, dan Kirim ke editor.
-   Kalau tidak ada animasi CSS, atau browser tidak punya WebCodecs, dipasang sebagai gambar diam (PNG).
-   Batas: HTML harus mandiri (CSS di dalam file, gambar dan font lewat data: URI). Script tidak dijalankan, jadi animasi
-   yang digerakkan JavaScript tidak ikut; animasi CSS dan transform/opacity/warna lewat @keyframes ikut. Transition (hover)
-   tidak ikut. Video MP4 tidak punya transparansi: area transparan diisi "Warna dasar". GIF diambil frame pertamanya. */
+   GERAK (dua cara, hasilnya selalu video MP4 lewat WebCodecs + mp4-muxer dari export.js, dipasang sebagai layer Video):
+   1) Animasi CSS (@keyframes) di HTML / SVG: tiap frame dirender pada waktu t dengan animation-delay negatif + pause.
+   2) Animasi JavaScript di HTML (opsional, dicentang sendiri): file dijalankan di iframe terisolasi (sandbox allow-scripts tanpa
+      allow-same-origin, jaringan diblokir lewat CSP). requestAnimationFrame, setTimeout, setInterval, performance.now, dan Date
+      diganti waktu virtual yang maju tepat 1/fps per frame, lalu isi semua elemen <canvas> direkam. Hanya <canvas> yang direkam
+      (Canvas 2D dan WebGL); elemen HTML biasa yang digerakkan script tidak ikut.
+   Kalau tidak ada animasi, atau browser tidak punya WebCodecs, dipasang sebagai gambar diam (PNG).
+   Batas: HTML harus mandiri (CSS dan script di dalam file, gambar dan font lewat data: URI). Video MP4 tidak punya
+   transparansi: area transparan diisi warna dasar. GIF diambil frame pertamanya. */
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
@@ -99,7 +101,7 @@ async function build(file,mode,s){
   return{blob:await rasterHtml(text,w,h),ar:w/h};
 }
 
-/* ===== animasi: tiap frame dirender pada waktu t dengan animation-delay negatif + pause =====
+/* ===== gerak 1: animasi CSS, tiap frame dirender pada waktu t dengan animation-delay negatif + pause =====
    Dokumen dimuat di iframe tersembunyi (sandbox tanpa script) hanya untuk membaca animation-name dan animation-delay tiap
    elemen (juga ::before dan ::after). Untuk waktu t, animation-delay diganti (delay asli - t) dan animasi di-pause, sehingga
    posisi animasinya tepat di detik t. Hasilnya dirender lewat SVG foreignObject seperti gambar diam. */
@@ -135,9 +137,88 @@ async function prepAnim(text,w,h,isSvg,mode){
     return{hasAnim:true,frameSvg,count:rules.length,cleanup};
   }catch(e){cleanup();throw e}
 }
+
+/* ===== gerak 2: animasi JavaScript, waktu virtual di iframe terisolasi, isi <canvas> direkam =====
+   BRIDGE dipasang paling awal di <head>, sebelum script milik file, jadi semua pemanggilan waktu memakai jam virtual. */
+const BRIDGE=`(function(){
+var T0=Date.now(),now=0,id=0,tid=0,raf=[],tm=[],OD=Date;
+function D(){return arguments.length?Reflect.construct(OD,arguments):new OD(T0+now)}
+D.prototype=OD.prototype;D.now=function(){return T0+now};D.parse=OD.parse;D.UTC=OD.UTC;window.Date=D;
+try{performance.now=function(){return now}}catch(e){}
+window.requestAnimationFrame=function(cb){raf.push({i:++id,cb:cb});return id};
+window.cancelAnimationFrame=function(i){raf=raf.filter(function(x){return x.i!==i})};
+window.setTimeout=function(f,ms){var a=[].slice.call(arguments,2);tm.push({i:++tid,t:now+(+ms||0),f:f,a:a,r:0});return tid};
+window.setInterval=function(f,ms){var a=[].slice.call(arguments,2),r=Math.max(1,+ms||0);tm.push({i:++tid,t:now+r,f:f,a:a,r:r});return tid};
+window.clearTimeout=window.clearInterval=function(i){tm=tm.filter(function(x){return x.i!==i})};
+function step(dt){
+  now+=dt;
+  for(var g=0;g<5000;g++){
+    var due=null;
+    for(var k=0;k<tm.length;k++){if(tm[k].t<=now&&(!due||tm[k].t<due.t))due=tm[k]}
+    if(!due)break;
+    if(due.r)due.t+=due.r;else tm=tm.filter(function(x){return x!==due});
+    try{if(typeof due.f==='function')due.f.apply(window,due.a)}catch(e){}
+  }
+  var list=raf;raf=[];
+  list.forEach(function(x){try{x.cb(now)}catch(e){}});
+  if(document.getAnimations)document.getAnimations().forEach(function(a){try{a.pause();a.currentTime=now}catch(e){}});
+}
+async function cap(){
+  var items=[],cs=document.querySelectorAll('canvas');
+  for(var i=0;i<cs.length;i++){
+    var c=cs[i],r=c.getBoundingClientRect(),st=getComputedStyle(c);
+    if(st.display==='none'||st.visibility==='hidden'||r.width<1||r.height<1||!c.width||!c.height)continue;
+    try{items.push({b:await createImageBitmap(c),x:r.left,y:r.top,w:r.width,h:r.height,o:parseFloat(st.opacity)})}catch(e){}
+  }
+  var bg='',els=[document.body,document.documentElement];
+  for(var j=0;j<els.length;j++){
+    if(!els[j])continue;var v=getComputedStyle(els[j]).backgroundColor;
+    if(v&&v!=='rgba(0, 0, 0, 0)'&&v!=='transparent'){bg=v;break}
+  }
+  return{items:items,bg:bg};
+}
+window.addEventListener('message',async function(e){
+  var d=e.data;if(!d||d.apk!=='step')return;
+  try{step(d.dt);var r=await cap();parent.postMessage({apk:'frame',seq:d.seq,bg:r.bg,items:r.items},'*',r.items.map(function(x){return x.b}))}
+  catch(err){parent.postMessage({apk:'frame',seq:d.seq,err:String(err),items:[]},'*')}
+});
+window.addEventListener('load',function(){parent.postMessage({apk:'ready'},'*')});
+})();`;
+const CSP="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:";
+async function openJS(text,w,h){
+  const ifr=document.createElement('iframe');
+  ifr.setAttribute('sandbox','allow-scripts');
+  ifr.setAttribute('csp',CSP);
+  ifr.style.cssText='position:fixed;left:-99999px;top:0;border:0;width:'+w+'px;height:'+h+'px';
+  const ready=new Promise(res=>{
+    const hd=e=>{if(e.source===ifr.contentWindow&&e.data&&e.data.apk==='ready'){window.removeEventListener('message',hd);res()}};
+    window.addEventListener('message',hd);
+    setTimeout(()=>{window.removeEventListener('message',hd);res()},6000);
+  });
+  ifr.srcdoc='<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="'+CSP+'"><script>'+BRIDGE+'</scr'+'ipt></head>'
+    +text.replace(/^\s*<!DOCTYPE[^>]*>/i,'');
+  document.body.appendChild(ifr);
+  await ready;await wait(300);   /* beri waktu gambar / inisialisasi script */
+  let seq=0;
+  const step=dt=>new Promise((res,rej)=>{
+    const s=++seq;
+    const to=setTimeout(()=>{window.removeEventListener('message',hd);rej(new Error('animasi script tidak merespons'))},8000);
+    function hd(e){
+      if(e.source!==ifr.contentWindow)return;const d=e.data;
+      if(!d||d.apk!=='frame'||d.seq!==s)return;
+      clearTimeout(to);window.removeEventListener('message',hd);
+      if(d.err)rej(new Error(d.err));else res(d);
+    }
+    window.addEventListener('message',hd);
+    ifr.contentWindow.postMessage({apk:'step',dt,seq:s},'*');
+  });
+  return{step,cleanup:()=>{try{ifr.remove()}catch(_){}}};
+}
+
 let cancel=false;
 const msg=t=>{const e=$('s3-hx-msg');if(e)e.textContent=t||''};
-async function renderVideo(prep,w,h,fps,dur,bgc,q){
+/* frame(i, g) menggambar frame ke-i ke konteks g; hasilnya dikodekan jadi MP4 */
+async function renderVideo(frame,w,h,fps,dur,q){
   const N=Math.max(1,Math.round(dur*fps)),bitrate=Math.min(40e6,Math.max(2e6,Math.round(w*h*fps*q)));
   let cfg=null;
   for(const codec of ['avc1.640034','avc1.640033','avc1.64002a','avc1.640028','avc1.64001f','avc1.42001f']){
@@ -155,8 +236,8 @@ async function renderVideo(prep,w,h,fps,dur,bgc,q){
     for(let i=0;i<N;i++){
       if(cancel)throw new Error('dibatalkan');
       if(err)throw err;
-      const img=await loadImg(dataUri(prep.frameSvg(i/fps)));
-      g.globalCompositeOperation='source-over';g.fillStyle=bgc;g.fillRect(0,0,w,h);g.drawImage(img,0,0,w,h);
+      g.globalCompositeOperation='source-over';g.globalAlpha=1;
+      await frame(i,g);
       const vf=new VideoFrame(cv,{timestamp:Math.round(i*1e6/fps),duration:fd});
       venc.encode(vf,{keyFrame:i%(fps*2)===0});vf.close();
       while(venc.encodeQueueSize>8&&!err)await wait(4);
@@ -203,22 +284,44 @@ async function go(){
   const f=$('s3-hx-file').files[0];if(!f){msg('Pilih file dulu.');return}
   const mode=$('s3-hx-mode').value,ext=(f.name.split('.').pop()||'').toLowerCase();
   const mv=/^(html?|svg)$/.test(ext)&&$('s3-hx-mv')&&$('s3-hx-mv').checked;
+  const useJS=mv&&/^html?$/.test(ext)&&$('s3-hx-js')&&$('s3-hx-js').checked;
   busy=true;cancel=false;$('s3-hx-go').disabled=true;msg('Memproses…');
-  let prep=null;
+  let prep=null,sess=null;
   try{
     let out=null,vid=false,note='';
     if(mv&&!canVideo())note='Browser ini belum mendukung render animasi (pakai Chrome/Edge terbaru), jadi dipasang sebagai gambar diam';
     else if(mv){
-      const res=+$('s3-hx-res').value||720,fps=+$('s3-hx-fps').value||30,dur=clamp(+$('s3-hx-dur').value||s.dur,1,60);
+      const res=+$('s3-hx-res').value||720,fps=+$('s3-hx-fps').value||30,dur=clamp(+$('s3-hx-dur').value||s.dur,1,60),bgc=$('s3-hx-bgc').value||'#000000';
       let w,h;
       if(mode==='bg')[w,h]=dims(s.aspect,res);
       else{w=clamp(Math.round(+$('s3-hx-w').value)||1080,64,1920);h=clamp(Math.round(+$('s3-hx-h').value)||1080,64,1920);w-=w%2;h-=h%2}
-      msg('Menyiapkan…');
-      prep=await prepAnim(await f.text(),w,h,ext==='svg',mode);
-      if(prep.hasAnim){
-        const blob=await renderVideo(prep,w,h,fps,dur,$('s3-hx-bgc').value||'#000000',.15);
+      if(useJS){
+        msg('Menjalankan animasi script…');
+        sess=await openJS(await f.text(),w,h);
+        let seen=false;
+        const blob=await renderVideo(async(i,g)=>{
+          const d=await sess.step(i?1000/fps:0);
+          if(d.items.length)seen=true;
+          else if(i>=8&&!seen)throw new Error('tidak ada <canvas> yang bisa direkam (mode JavaScript hanya merekam elemen canvas)');
+          g.fillStyle=d.bg||bgc;g.fillRect(0,0,w,h);
+          d.items.forEach(it=>{
+            try{g.globalAlpha=isFinite(it.o)?it.o:1;g.drawImage(it.b,it.x,it.y,it.w,it.h)}catch(_){}
+            try{it.b.close()}catch(_){}
+          });
+          g.globalAlpha=1;
+        },w,h,fps,dur,.15);
         out={blob,ar:w/h};vid=true;
-      }else note='Tidak ada animasi CSS (@keyframes) di file ini, jadi dipasang sebagai gambar diam';
+      }else{
+        msg('Menyiapkan…');
+        prep=await prepAnim(await f.text(),w,h,ext==='svg',mode);
+        if(prep.hasAnim){
+          const blob=await renderVideo(async(i,g)=>{
+            const img=await loadImg(dataUri(prep.frameSvg(i/fps)));
+            g.fillStyle=bgc;g.fillRect(0,0,w,h);g.drawImage(img,0,0,w,h);
+          },w,h,fps,dur,.15);
+          out={blob,ar:w/h};vid=true;
+        }else note='Tidak ada animasi CSS (@keyframes) di file ini, jadi dipasang sebagai gambar diam'+(ext!=='svg'?'. Kalau animasinya dari JavaScript, centang opsi JavaScript':'');
+      }
     }
     if(!out){msg('Memproses…');out=await build(f,mode,s)}
     const base=(f.name.replace(/\.[^.]+$/,'')||'file').slice(0,10),pre=mode==='bg'?'Latar ':'';
@@ -234,12 +337,18 @@ async function go(){
   }catch(err){
     console.warn('Tambah file ke Edit 3D gagal',err);
     msg(cancel?'Dibatalkan.':'Gagal: '+((err&&err.message)||err));
-  }finally{if(prep&&prep.cleanup)prep.cleanup();busy=false;$('s3-hx-go').disabled=false}
+  }finally{
+    if(prep&&prep.cleanup)prep.cleanup();
+    if(sess)sess.cleanup();
+    busy=false;$('s3-hx-go').disabled=false;
+  }
 }
 function isMarkup(){const f=$('s3-hx-file').files[0];return !!f&&/\.(html?|svg)$/i.test(f.name)}
+function isHtml(){const f=$('s3-hx-file').files[0];return !!f&&/\.html?$/i.test(f.name)}
 function vis(){
   const b=$('s3-hx-size');if(b)b.style.display=$('s3-hx-mode').value==='el'?'':'none';
   const a=$('s3-hx-anim');if(a)a.style.display=isMarkup()?'':'none';
+  const j=$('s3-hx-jsl');if(j)j.style.display=isHtml()?'':'none';
 }
 function init(){
   if(!$('s3-add-html'))return;
@@ -247,14 +356,15 @@ function init(){
   const m=$('s3-hx-msg');
   if(m&&!$('s3-hx-anim'))m.insertAdjacentHTML('beforebegin',
     '<div id="s3-hx-anim" style="display:none">'
-    +'<label class="s3-ck"><input type="checkbox" id="s3-hx-mv" checked> Gerakkan: animasi CSS (@keyframes) dirender jadi video</label>'
+    +'<label class="s3-ck"><input type="checkbox" id="s3-hx-mv" checked> Gerakkan: animasi dirender jadi video</label>'
+    +'<label class="s3-ck" id="s3-hx-jsl" style="display:none"><input type="checkbox" id="s3-hx-js"> Animasi dari JavaScript (rekam elemen &lt;canvas&gt;). Script dijalankan di kotak pasir terisolasi tanpa jaringan, tetap hanya pakai file yang kamu percaya</label>'
     +'<div class="s3-two"><label class="s3-fl">Durasi video (dtk)<input type="number" id="s3-hx-dur" min="1" max="60" value="10"></label>'
     +'<label class="s3-fl">Frame rate<select id="s3-hx-fps"><option>24</option><option selected>30</option></select></label></div>'
     +'<div class="s3-two"><label class="s3-fl">Ukuran sisi pendek (latar)<select id="s3-hx-res"><option value="480">480p</option><option value="720" selected>720p</option><option value="1080">1080p (berat)</option></select></label>'
     +'<label class="s3-fl">Warna dasar (isi area transparan)<input type="color" id="s3-hx-bgc" value="#000000"></label></div>'
-    +'<p class="meta">Dirender frame per frame jadi MP4, jadi lamanya mengikuti durasi dan ukuran. Biarkan tab tetap terbuka. Kalau file tidak punya animasi CSS, otomatis dipasang sebagai gambar diam.</p></div>');
+    +'<p class="meta">Dirender frame per frame jadi MP4, jadi lamanya mengikuti durasi dan ukuran. Biarkan tab tetap terbuka. Kalau file tidak punya animasi, otomatis dipasang sebagai gambar diam.</p></div>');
   const p=$('s3-dlg-html')&&$('s3-dlg-html').querySelector('p.meta');
-  if(p)p.textContent='Pilih file HTML, SVG, atau gambar (PNG, JPG, WEBP, GIF). Hasilnya jadi layer 3D biasa: bisa digeser, diputar, diberi keyframe, dijadikan anak Grup, dan ikut Export. HTML harus mandiri (CSS di dalam file, gambar dan font lewat data: URI). Script tidak dijalankan. Animasi CSS (@keyframes) bisa digerakkan, JavaScript tidak.';
+  if(p)p.textContent='Pilih file HTML, SVG, atau gambar (PNG, JPG, WEBP, GIF). Hasilnya jadi layer 3D biasa: bisa digeser, diputar, diberi keyframe, dijadikan anak Grup, dan ikut Export. HTML harus mandiri (CSS dan script di dalam file, gambar dan font lewat data: URI). Animasi CSS (@keyframes) bisa digerakkan; animasi JavaScript bisa dengan mencentang opsinya (hanya elemen canvas yang direkam).';
   $('s3-add-html').onclick=()=>{
     const s=sc();if(!s)return;
     $('s3-hx-file').value='';msg('');

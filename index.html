@@ -18,14 +18,15 @@
 <link rel="stylesheet" href="css/autokey.css?v=18">
 <link rel="stylesheet" href="css/fxclip.css?v=21">
 <link rel="stylesheet" href="css/template.css?v=2">
+<link rel="stylesheet" href="css/scene3d.css?v=1">
 </head>
 <body>
 <section id="home" class="view">
   <header class="home-head">
     <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO · v23 regang, animasi, filter, transisi, efek, performa</small></div></div>
-    <div class="actions"><button class="btn" id="btn-open">Buka Project</button><button class="btn primary" id="btn-new">Project Baru</button></div>
+    <div class="actions"><button class="btn" id="btn-3d" title="Edit 3D: kamera 3D, teks/foto/video di ruang 3D, tracking titik pada video, contoh referensi">✦ Edit 3D</button><button class="btn" id="btn-open">Buka Project</button><button class="btn primary" id="btn-new">Project Baru</button></div>
   </header>
-  <main class="home-main"><h2>Project terakhir</h2><div id="project-list" class="project-grid"></div></main>
+  <main class="home-main"><h2>Project terakhir</h2><div id="project-list" class="project-grid"></div><h2 id="s3d-h" hidden>Project 3D</h2><div id="s3d-list" class="project-grid" hidden></div></main>
 </section>
 
 <section id="editor" class="view" data-tab="timeline" hidden>
@@ -105,6 +106,66 @@
     <div class="dlg-actions"><button class="btn" id="ex-cancel" type="button">Batalkan</button></div>
   </div>
 </form></dialog>
+
+<section id="s3d" class="view" hidden>
+  <header class="s3-top">
+    <button class="btn" id="s3-back" title="Kembali ke beranda (otomatis tersimpan)">Beranda</button>
+    <input id="s3-name" class="name-input" aria-label="Nama project 3D" maxlength="60">
+    <span id="s3-save" class="save-state"></span>
+    <button class="btn" id="s3-export">Export</button>
+    <button class="btn primary" id="s3-savebtn">Simpan</button>
+  </header>
+  <div class="s3-body">
+    <div class="s3-stage">
+      <div class="s3-view"><canvas id="s3-cv" aria-label="Preview ruang 3D"></canvas></div>
+      <div class="s3-ctl">
+        <button class="btn" id="s3-play" aria-label="Putar">▶</button><button class="btn" id="s3-stop" aria-label="Berhenti">■</button>
+        <span class="meta" id="s3-tlabel">0.00</span><span style="flex:1"></span>
+        <select id="s3-aspect" aria-label="Rasio"></select>
+        <label class="meta">Durasi <input type="number" id="s3-dur" min="1" max="300" step="1" value="10"> dtk</label>
+      </div>
+      <div class="s3-tl"><input type="range" id="s3-time" min="0" max="10" step="0.01" value="0" aria-label="Posisi waktu"><div class="s3-ticks" id="s3-ticks"></div></div>
+    </div>
+    <div class="s3-side">
+      <div class="s3-tools">
+        <button class="btn" id="s3-add-text" title="Tambah teks 3D di waktu sekarang">T Teks</button>
+        <button class="btn" id="s3-add-media" title="Tambah foto atau video">🖼 Foto/Video</button>
+        <button class="btn" id="s3-track" title="Pilih layer video, lalu lacak titik supaya teks/foto bisa mengikuti objek">◎ Lacak titik</button>
+        <select id="s3-add-bg" aria-label="Tambah latar"><option value="">+ Latar / efek</option><option value="sunburst">Latar kipas berputar</option><option value="ribbon">Pita cahaya biru</option><option value="dust">Debu bintang</option></select>
+        <button class="btn" id="s3-add-group" title="Grup kosong untuk jadi induk beberapa layer">▣ Grup</button>
+        <button class="btn" id="s3-music">♪ Musik</button>
+        <button class="btn" id="s3-dup">Duplikat</button><button class="btn" id="s3-up" title="Naikkan urutan gambar (untuk latar)">↑</button><button class="btn danger" id="s3-del">Hapus</button>
+      </div>
+      <div class="s3-chips" id="s3-chips"></div>
+      <div class="s3-props" id="s3-props"></div>
+    </div>
+  </div>
+  <input type="file" id="s3-file" hidden><input type="file" id="s3-file-audio" accept="audio/*,.mp3,.wav,.m4a" hidden>
+</section>
+<dialog id="s3-dlg-new"><form method="dialog" onsubmit="return false">
+  <h3>Edit 3D: pilih contoh</h3>
+  <p class="meta" style="margin:0 0 12px">Ini pengedit dan tracking 3D (kamera, teks, foto, video di ruang 3D), bukan pembuat model 3D. Semua contoh bisa diubah bebas.</p>
+  <div id="s3-dlg-list"></div>
+  <div class="dlg-actions"><button class="btn" type="button" id="s3-new-close">Tutup</button></div>
+</form></dialog>
+<dialog id="s3-dlg-tk"><form method="dialog" onsubmit="return false">
+  <h3>Lacak titik pada video</h3>
+  <canvas id="s3-tk-canvas"></canvas>
+  <p class="meta" id="s3-tk-msg"></p>
+  <div class="ex-bar"><i id="s3-tk-bar"></i></div>
+  <label>Tempel ke layer<select id="s3-tk-target"></select></label>
+  <div class="dlg-actions"><button class="btn" type="button" id="s3-tk-close">Tutup</button><button class="btn" type="button" id="s3-tk-start" disabled>Mulai lacak</button><button class="btn primary" type="button" id="s3-tk-apply" disabled>Terapkan</button></div>
+</form></dialog>
+<dialog id="s3-dlg-ex"><form method="dialog" onsubmit="return false">
+  <h3>Export video 3D</h3>
+  <div id="s3-ex-set">
+    <label>Ukuran sisi pendek<select id="s3-ex-res"><option value="540">540p</option><option value="720" selected>720p</option><option value="1080">1080p (berat)</option></select></label>
+    <label>Frame rate<select id="s3-ex-fps"><option>24</option><option selected>30</option><option>60</option></select></label>
+    <p class="meta">Direkam real-time sepanjang durasi: biarkan tab terbuka dan terlihat. Audio video-klip tidak ikut; musik (♪) ikut.</p>
+    <div class="dlg-actions"><button class="btn" type="button" onclick="document.getElementById('s3-dlg-ex').close()">Batal</button><button class="btn primary" type="button" id="s3-ex-start">Mulai Export</button></div>
+  </div>
+  <div id="s3-ex-prog" hidden><div class="ex-bar"><i id="s3-ex-fill"></i></div><p class="meta" id="s3-ex-status"></p><div class="dlg-actions"><button class="btn" type="button" id="s3-ex-cancel">Batalkan</button></div></div>
+</form></dialog>
 <input type="file" id="file-open" accept=".json,.apkedit" hidden>
 <div id="toast" class="toast" role="status"></div>
 
@@ -144,5 +205,6 @@
 <script src="js/replace.js?v=1"></script>
 <script src="js/template.js?v=2"></script>
 <script src="js/p3d.js?v=1"></script>
+<script src="js/scene3d.js?v=1"></script>
 </body>
 </html>

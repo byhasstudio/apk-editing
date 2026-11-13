@@ -37,6 +37,14 @@ https://byhasstudio.github.io/apk-editing/
 - **Parent / grup layer**: tombol ▣ Grup membuat layer kosong; di panel Properti pilih "Induk" pada clip lain. Anak ikut bergerak, membesar, berputar, dan memudar bersama induknya (bisa berantai). Mengganti induk tidak membuat clip melompat selama posisinya tidak beranimasi.
 - **Motion path** (mode Lanjutan): aktifkan "Jalur gerak" di panel Properti, lalu seret titik jalur di preview. Pilihan kecepatan gerak, jalur melengkung atau lurus, dan hadap arah gerak.
 
+### Edit 3D (tombol "✦ Edit 3D" di beranda)
+
+Pengedit dan tracking 3D, **bukan** pembuat model 3D. Ruang 3D dengan kamera (posisi, putar, roll, FOV), layer teks / foto / video, parent (grup/orbit), hadap kamera (billboard), keyframe + kurva gerak, efek layar (pisah warna, glow, getar kamera, kilat), latar kipas, pita cahaya, debu bintang, musik, export video real-time. Seret objek langsung di preview.
+
+- **Tracking titik**: pilih layer video, tekan "Lacak titik", ketuk objek, mulai lacak, lalu tempel ke teks/foto: layer mengikuti objek lewat keyframe otomatis.
+- **Contoh referensi**: Lirik 3D Warp (kata terbang menembus kamera), Foto Terowongan 3D, Kartu Foto Orbit, Tracking teks, Kosong.
+- File: `js/scene3d.js`, `css/scene3d.css`. Project 3D disimpan di IndexedDB sendiri (`apk-3d`).
+
 ### v12 (sistem vektor, bagian 1 dari 3)
 
 - **Pena (✒ Pena atau tombol P)**: ketuk di preview untuk membuat titik, tarik saat mengetuk untuk membuat lengkung bezier, ketuk titik awal (cincin hijau) untuk menutup path. Enter = selesai path, Esc = keluar dari mode Pena. Setiap path baru menjadi layer vektor baru di timeline.

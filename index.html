@@ -133,6 +133,7 @@
       <div class="s3-tools">
         <button class="btn" id="s3-add-text" title="Tambah teks 3D di waktu sekarang">T Teks</button>
         <button class="btn" id="s3-add-media" title="Tambah foto atau video">🖼 Foto/Video</button>
+        <button class="btn" id="s3-add-html" title="Tambah latar atau elemen dari file HTML, SVG, atau gambar">📄 File/HTML</button>
         <button class="btn" id="s3-track" title="Pilih layer video, lalu lacak titik supaya teks/foto bisa mengikuti objek (posisi, ukuran, putaran)">◎ Lacak titik</button>
         <select id="s3-add-bg" aria-label="Tambah latar"><option value="">+ Latar / efek</option><option value="sunburst">Latar kipas berputar</option><option value="ribbon">Pita cahaya biru</option><option value="dust">Debu bintang</option></select>
         <button class="btn" id="s3-add-cam" title="Tambah kamera baru (untuk potong antar kamera)">🎥 +</button>
@@ -185,6 +186,15 @@
   <p class="meta" id="s3-sd-note"></p>
   <div class="dlg-actions"><button class="btn" type="button" id="s3-sd-cancel">Batal</button><button class="btn primary" type="button" id="s3-sd-go">Render &amp; Kirim</button></div>
 </form></dialog>
+<dialog id="s3-dlg-html"><form method="dialog" onsubmit="return false">
+  <h3>Latar / elemen dari file</h3>
+  <p class="meta" style="margin:0 0 12px">Pilih file HTML, SVG, atau gambar (PNG, JPG, WEBP, GIF). Hasilnya jadi layer 3D biasa: bisa digeser, diputar, diberi keyframe, dijadikan anak Grup, dan ikut Export. HTML harus mandiri (CSS di dalam file, gambar dan font lewat data: URI). Script tidak dijalankan dan animasi CSS tidak bergerak, file diambil sebagai gambar diam.</p>
+  <label>File<input type="file" id="s3-hx-file" accept=".html,.htm,.svg,.png,.jpg,.jpeg,.webp,.gif,text/html,image/*"></label>
+  <label>Pakai sebagai<select id="s3-hx-mode"><option value="bg">Latar penuh layar (di belakang semua layer)</option><option value="el">Elemen biasa (ukuran bebas)</option></select></label>
+  <div class="s3-two" id="s3-hx-size"><label class="s3-fl">Lebar (px)<input type="number" id="s3-hx-w" min="64" max="2048" value="1080"></label><label class="s3-fl">Tinggi (px)<input type="number" id="s3-hx-h" min="64" max="2048" value="1080"></label></div>
+  <p class="meta" id="s3-hx-msg"></p>
+  <div class="dlg-actions"><button class="btn" type="button" id="s3-hx-cancel">Batal</button><button class="btn primary" type="button" id="s3-hx-go">Tambahkan</button></div>
+</form></dialog>
 <input type="file" id="file-open" accept=".json,.apkedit" hidden>
 <div id="toast" class="toast" role="status"></div>
 
@@ -226,5 +236,6 @@
 <script src="js/p3d.js?v=1"></script>
 <script src="js/scene3d.js?v=3"></script>
 <script src="js/s3tools.js?v=1"></script>
+<script src="js/s3html.js?v=1"></script>
 </body>
 </html>

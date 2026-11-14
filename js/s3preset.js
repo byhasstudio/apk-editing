@@ -2,7 +2,7 @@
    Selain contoh bawaan di daftar "Edit 3D: pilih contoh", scene 3D sekarang bisa dipakai lewat file preset:
    1) FORMAT: .preset (paket aplikasi, ringkas) dan .json (rapi, bisa dibaca dan diedit). Keduanya isinya sama dan bisa diimpor.
       Isi: semua layer (teks, foto, video, grup, latar kipas / pita / debu), posisi + rotasi + ukuran, keyframe beserta kurva easing,
-      kamera + potongan kamera + objek yang ditangkap, efek layar (chromatic aberration, glow, getar, kilat), warna / font / cahaya teks,
+      kamera + potongan kamera + objek yang ditangkap, model kamera 3D (kerucut pandang, arahkan ke objek, jalur halus), efek layar (chromatic aberration, glow, getar, kilat), warna / font / cahaya / bayangan teks,
       rasio, durasi, musik. Foto / video / musik OPSIONAL ikut tersimpan di dalam file (base64); kalau tidak ikut, diganti kotak placeholder.
    2) IMPOR: tombol "Impor preset" di daftar contoh (beranda) dan tombol "Preset" di panel Edit 3D, atau seret file ke area preview
       (atau ke dialog contoh). File diperiksa dan dibersihkan dulu (id, rentang angka, tipe, jumlah layer / keyframe dibatasi).
@@ -74,12 +74,13 @@ function cleanItem(r,id,kind0,mid,W,S){
     const ded=[];out.forEach(k=>{if(ded.length&&Math.abs(ded[ded.length-1].t-k.t)<.001)ded[ded.length-1]=k;else ded.push(k)});   /* dua keyframe di waktu sama bikin pembagian nol */
     if(ded.length)it.keys[p]=ded;
   });
-  if(kind==='camera')it.target=null;
+  if(kind==='camera'){it.target=null;it.aim=null;it.rig=r.rig===true;it.cone=r.cone!==false;it.msize=clamp(num(r.msize,1),.2,6);it.path=r.path===true}
   if(kind==='text'){
     it.text=(r.text==null?'TEKS':String(r.text)).slice(0,500);
     it.size=clamp(num(r.size,170),20,600);
     it.color=/^#[0-9a-fA-F]{6}$/.test(r.color)?r.color:'#ffffff';
     it.glow=r.glow!==false;
+    it.shadow=r.shadow!==false;
     const f=str(r.font,40);if(/^[A-Za-z0-9 _.&-]+$/.test(f)){it.font=f;S.fonts.add(f)}
   }
   if(kind==='sunburst'){it.beams=Math.round(clamp(num(r.beams,8),2,24));it.twist=clamp(num(r.twist,.7),-4,4)}
@@ -115,6 +116,7 @@ function clean(raw,media,used){
     const it=items[i];
     if(typeof r.parent==='string'){const pid=idMap.get(r.parent),p=pid&&byId.get(pid);if(p&&p!==it&&is3(p.kind)&&is3(it.kind))it.parent=pid}
     if(it.kind==='camera'&&typeof r.target==='string'){const tid=idMap.get(r.target),tg=tid&&byId.get(tid);if(tg&&is3(tg.kind)&&tg.kind!=='group')it.target=tid}
+    if(it.kind==='camera'&&typeof r.aim==='string'){const tid=idMap.get(r.aim),tg=tid&&byId.get(tid);if(tg&&is3(tg.kind)&&tg.kind!=='group')it.aim=tid}
     if(i>1)S.kinds[it.kind]=(S.kinds[it.kind]||0)+1;
   });
   const cuts=[];
@@ -242,7 +244,7 @@ function buildEx(){
   if($('s3p-dlg-ex'))return;
   const d=document.createElement('dialog');d.id='s3p-dlg-ex';
   d.innerHTML='<form method="dialog" onsubmit="return false"><h3>Simpan sebagai preset</h3>'
-    +'<p class="meta" style="margin:0 0 12px">Preset berisi semua layer, keyframe dan kurva, kamera dan potongan kamera, efek layar, warna / font / cahaya teks, rasio, durasi, dan musik. File bisa diimpor lagi lewat tombol Impor preset atau diseret ke preview.</p>'
+    +'<p class="meta" style="margin:0 0 12px">Preset berisi semua layer, keyframe dan kurva, kamera dan potongan kamera, model kamera 3D, efek layar, warna / font / cahaya / bayangan teks, rasio, durasi, dan musik. File bisa diimpor lagi lewat tombol Impor preset atau diseret ke preview.</p>'
     +'<label>Nama preset<input id="s3p-name" maxlength="60"></label>'
     +'<label>Format file<select id="s3p-fmt"><option value="preset">.preset (paket aplikasi, ringkas)</option><option value="json">.json (rapi, bisa dibaca dan diedit)</option></select></label>'
     +'<label class="s3-ck"><input type="checkbox" id="s3p-media"> Sertakan foto, video, dan musik di dalam file</label>'

@@ -5,7 +5,7 @@
    1) BUAT: file preset yang SAMA dengan tombol "⬇ Preset" (2D) / "Simpan preset" (3D) diambil sebagai byte, dikompres gzip bila lebih kecil,
       diubah ke base64, lalu dikirim ke Firebase sebagai presets/<ID> = {name, data, created, ttl, owner}. data = "<jenis>.<gzip 0/1>.<base64>".
       ID dibuat acak 20 karakter (tidak bisa ditebak, dan daftar preset tidak bisa dibaca orang lain). Link = alamat halaman ini + "#p=" + ID.
-   2) BUKA: link dibuka (scan QR pakai kamera HP, atau tempel link di tab Scan QR). Preset diunduh dari  <DB>/presets/<ID>.json,
+   2) BUKA: link dibuka (scan QR pakai kamera HP, scan lewat kamera di tab Scan QR, atau tempel link). Preset diunduh dari  <DB>/presets/<ID>.json,
       dibuka kembali, lalu tampil pratinjau dengan tombol Buka / Simpan file / Batal.
 
    MASA BERLAKU
@@ -334,7 +334,7 @@ function inject(d){
     const w=document.createElement('div');w.id='qrl-scan';
     w.innerHTML='<label class="meta">Atau tempel link preset<input id="qrl-in" placeholder="https://…/#p=…"></label>'
       +'<div class="qrp-row"><button class="btn" type="button" id="qrl-openlink">Buka link</button></div>'
-      +'<p class="meta">QR link dari tab Buat tidak terbaca oleh kamera di sini: scan pakai kamera HP biasa, atau tempel link-nya.</p>';
+      +'<p class="meta">Kamera dan unggah gambar di atas juga bisa membaca QR link. Kalau gagal, tempel link-nya di sini.</p>';
     rs.parentElement.insertAdjacentElement('afterend',w);
     $('qrl-openlink').onclick=()=>{
       const id=idFrom($('qrl-in').value);
@@ -342,6 +342,25 @@ function inject(d){
       d.close();openFromId(id);
     };
   }
+}
+
+/* ===== kamera / unggah gambar di tab Scan QR juga mengenali QR link =====
+   js/qrpreset.js memasukkan setiap teks QR yang terbaca ke Collector.add(). Di sini add() dibungkus: teks berbentuk link dengan #p=<ID>
+   langsung dibuka (dialog scan ditutup, kamera ikut mati lewat event close), sisanya diteruskan ke fungsi aslinya. */
+function hookScan(){
+  const C=APK.qrpreset&&APK.qrpreset.Collector;
+  if(!C||C.prototype.__qrl)return;
+  const orig=C.prototype.add;
+  C.prototype.add=function(text){
+    const t=String(text||''),m=/^https?:\/\/\S*#p=([-\w]{6,60})$/i.exec(t.trim());
+    if(m){
+      const dlg=$('qrp-dlg');if(dlg&&dlg.open)dlg.close();
+      openFromId(m[1]);
+      return'ignored';
+    }
+    return orig.call(this,text);
+  };
+  C.prototype.__qrl=true;
 }
 
 /* ===== pasang ===== */
@@ -360,6 +379,7 @@ function fromHash(){
 }
 APK.qrlink={upload,download,remove,sweep,openFromId,linkFor};
 try{
+  hookScan();
   if(document.body)watch();else document.addEventListener('DOMContentLoaded',watch);
   const start=()=>setTimeout(()=>{fromHash();sweep()},400);
   if(document.readyState==='complete')start();else window.addEventListener('load',start);

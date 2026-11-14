@@ -3,15 +3,22 @@
 
    CARA KERJA
    1) BUAT: file preset yang SAMA dengan tombol "⬇ Preset" (2D) / "Simpan preset" (3D) diambil sebagai byte, dikompres gzip bila lebih kecil,
-      diubah ke base64, lalu dikirim (POST) ke  <DB>/presets.json  sebagai {name, data, created}. data = "<jenis>.<gzip 0/1>.<base64>".
-      Firebase memberi ID unik; link = alamat halaman ini + "#p=" + ID; link itu dijadikan SATU QR.
+      diubah ke base64, lalu dikirim ke Firebase sebagai presets/<ID> = {name, data, created, owner}. data = "<jenis>.<gzip 0/1>.<base64>".
+      ID dibuat acak 20 karakter (tidak bisa ditebak, dan daftar preset tidak bisa dibaca orang lain). Link = alamat halaman ini + "#p=" + ID.
    2) BUKA: link dibuka (scan QR pakai kamera HP, atau tempel link di tab Scan QR). Preset diunduh dari  <DB>/presets/<ID>.json,
       dibuka kembali, lalu tampil pratinjau dengan tombol Buka / Simpan file / Batal.
-   Aturan Realtime Database yang dipakai: baca bebas, tulis hanya untuk data baru, hanya field name/data/created, data < 8 juta karakter. */
+
+   KEAMANAN (pasangan dengan Rules database)
+   - Menulis butuh login anonim Firebase (Identity Toolkit REST). Token disimpan di localStorage perangkat ini.
+   - Satu akun anonim hanya boleh menambah 1 preset per 30 detik (users/<uid>/last, ditulis atomik bersama presets/<ID>, dicek Rules dengan waktu server).
+   - Isi dibatasi: field name/data/created/owner saja, data < 8 juta karakter, created dan owner dicek server, preset tidak bisa diubah.
+   - Pemilik (akun anonim yang sama) bisa menghapus presetnya lewat tombol "Hapus link ini". */
 (function(){
 'use strict';
 window.APK=window.APK||{};
 const DB='https://splineway-default-rtdb.asia-southeast1.firebasedatabase.app';
+const KEY='AIzaSyBahNCBMGHzRBTIT4aE2PMHDdTEQVgQkp4';   /* kunci web Firebase: bukan rahasia, tapi sebaiknya dibatasi ke domain github.io di Google Cloud */
+const AUTHK='apk-qrlink-auth';
 const MAXPACK=5500000;   /* byte setelah kompres (base64 +33% harus tetap < 8 juta karakter sesuai Rules) */
 const $=id=>document.getElementById(id);
 const TE=new TextEncoder(),TD=new TextDecoder();
@@ -73,24 +80,60 @@ async function source3d(name,withMedia){
   return{blob:new Blob([JSON.stringify(pkg)],{type:'application/octet-stream'}),kind:'3'};
 }
 
-/* ===== kirim dan ambil dari Firebase (REST) ===== */
+/* ===== login anonim Firebase (REST) ===== */
+function loadAuth(){try{return JSON.parse(localStorage.getItem(AUTHK)||'null')}catch(_){return null}}
+function saveAuth(a){try{localStorage.setItem(AUTHK,JSON.stringify(a))}catch(_){}}
+async function authToken(){
+  const a=loadAuth();
+  if(a&&a.refresh){
+    try{
+      const r=await fetch('https://securetoken.googleapis.com/v1/token?key='+KEY,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(a.refresh)});
+      if(r.ok){const j=await r.json();saveAuth({uid:j.user_id,refresh:j.refresh_token});return{token:j.id_token,uid:j.user_id}}
+    }catch(_){}
+  }
+  let r;
+  try{r=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({returnSecureToken:true})})}
+  catch(_){throw new Error('tidak bisa terhubung ke internet / Firebase')}
+  if(!r.ok){
+    let m='';try{m=((await r.json()).error||{}).message||''}catch(_){}
+    if(/ADMIN_ONLY_OPERATION|OPERATION_NOT_ALLOWED/.test(m))throw new Error('Anonymous sign-in belum diaktifkan di Firebase (Authentication > Sign-in method > Anonymous)');
+    throw new Error('gagal masuk anonim ('+(m||r.status)+')');
+  }
+  const j=await r.json();
+  saveAuth({uid:j.localId,refresh:j.refreshToken});
+  return{token:j.idToken,uid:j.localId};
+}
+function newId(){const a=new Uint8Array(15);crypto.getRandomValues(a);return b64enc(a).replace(/\+/g,'-').replace(/\//g,'_')}   /* 15 byte = 20 karakter tanpa padding */
+
+/* ===== kirim, ambil, hapus di Firebase (REST) ===== */
 async function upload(bytes,name,kind){
   let data=bytes,z=0;
   if(typeof CompressionStream==='function'){
     try{const g=await gzip(bytes);if(g.length<bytes.length){data=g;z=1}}catch(_){}
   }
   if(data.length>MAXPACK)throw new Error('preset terlalu besar ('+mb(data.length)+', batas '+mb(MAXPACK)+'). Matikan "Sertakan foto, video, dan musik" lalu coba lagi');
-  const body=JSON.stringify({name:String(name).slice(0,60),data:kind+'.'+z+'.'+b64enc(data),created:Date.now()});
+  const au=await authToken(),id=newId(),ts={'.sv':'timestamp'};
+  const upd={};
+  upd['presets/'+id]={name:String(name).slice(0,60),data:kind+'.'+z+'.'+b64enc(data),created:ts,owner:au.uid};
+  upd['users/'+au.uid+'/last']=ts;
   let r;
-  try{r=await fetch(DB+'/presets.json',{method:'POST',body})}
+  try{r=await fetch(DB+'/.json?auth='+encodeURIComponent(au.token),{method:'PATCH',body:JSON.stringify(upd)})}
   catch(_){throw new Error('tidak bisa terhubung ke internet / Firebase')}
   if(!r.ok){
-    if(r.status===401||r.status===403)throw new Error('Firebase menolak (cek Rules database sudah di-Publish)');
+    if(r.status===401||r.status===403)throw new Error('Firebase menolak. Pastikan Rules baru sudah di-Publish. Kalau baru saja membuat link, tunggu 30 detik lalu coba lagi');
     throw new Error('Firebase error '+r.status);
   }
-  const j=await r.json();
-  if(!j||!j.name)throw new Error('jawaban Firebase tidak dikenal');
-  return{id:j.name,packed:data.length,gz:!!z};
+  return{id,packed:data.length,gz:!!z};
+}
+async function remove(id){
+  const au=await authToken();
+  let r;
+  try{r=await fetch(DB+'/presets/'+encodeURIComponent(id)+'.json?auth='+encodeURIComponent(au.token),{method:'DELETE'})}
+  catch(_){throw new Error('tidak bisa terhubung ke internet / Firebase')}
+  if(!r.ok){
+    if(r.status===401||r.status===403)throw new Error('Firebase menolak (hanya perangkat yang membuat link ini yang bisa menghapusnya)');
+    throw new Error('Firebase error '+r.status);
+  }
 }
 async function download(id){
   let r;
@@ -191,12 +234,12 @@ function drawQR(cv,q,px,quiet){
   const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,n,n);g.fillStyle='#000';
   for(let y=0;y<q.size;y++)for(let x=0;x<q.size;x++)if(q.get(x,y))g.fillRect((x+quiet)*px,(y+quiet)*px,px,px);
 }
-let busy=false,lastName='preset';
+let busy=false,lastName='preset',lastId=null;
 async function makeLink(){
   if(busy)return;busy=true;
   const go=$('qrl-go'),st=$('qrl-st');go.disabled=true;
   try{
-    $('qrl-out').hidden=true;st.textContent='';
+    $('qrl-out').hidden=true;st.textContent='';lastId=null;
     const name=($('qrp-name').value||'').trim().slice(0,40)||defaultName(),media=$('qrp-media').checked;
     go.textContent='Menyiapkan preset…';
     const src=inS3d()?await source3d(name,media):await source2d(name,media);
@@ -204,6 +247,7 @@ async function makeLink(){
     go.textContent='Mengunggah…';
     const up=await upload(bytes,name,src.kind);
     const url=linkFor(up.id),q=APK.qr.make(url,{ec:'M'});
+    lastId=up.id;
     drawQR($('qrl-cv'),q,8,4);
     $('qrl-url').value=url;lastName=name;
     $('qrl-info').textContent='Selesai. Ukuran '+mb(bytes.length)+(up.gz?' (terkompres jadi '+mb(up.packed)+')':'')+'. Cukup 1 QR: scan pakai kamera HP biasa.';
@@ -211,6 +255,15 @@ async function makeLink(){
   }catch(e){
     console.warn('Buat link QR gagal',e);st.textContent='Gagal: '+((e&&e.message)||e);
   }finally{busy=false;go.disabled=false;go.textContent='🔗 Buat link QR (cukup 1 QR)'}
+}
+async function delLink(){
+  if(!lastId||busy)return;busy=true;
+  const st=$('qrl-st');
+  try{
+    await remove(lastId);
+    lastId=null;$('qrl-out').hidden=true;st.textContent='Link dihapus. QR yang sudah dibagikan tidak berlaku lagi.';
+  }catch(e){st.textContent='Gagal menghapus: '+((e&&e.message)||e)}
+  finally{busy=false}
 }
 function inject(d){
   if(d.querySelector('#qrl-box'))return;
@@ -224,10 +277,11 @@ function inject(d){
       +'<canvas class="qrp-cv" id="qrl-cv" aria-label="QR link preset"></canvas>'
       +'<p class="meta" id="qrl-info" style="text-align:center"></p>'
       +'<input id="qrl-url" readonly aria-label="Link preset">'
-      +'<div class="qrp-row"><button class="btn" type="button" id="qrl-copy">Salin link</button><button class="btn" type="button" id="qrl-png">⬇ Simpan QR (PNG)</button></div>'
+      +'<div class="qrp-row"><button class="btn" type="button" id="qrl-copy">Salin link</button><button class="btn" type="button" id="qrl-png">⬇ Simpan QR (PNG)</button><button class="btn danger" type="button" id="qrl-del">🗑 Hapus link ini</button></div>'
     +'</div>';
   go.parentElement.insertAdjacentElement('afterend',box);
   $('qrl-go').onclick=makeLink;
+  $('qrl-del').onclick=delLink;
   $('qrl-copy').onclick=async()=>{
     const u=$('qrl-url');
     try{await navigator.clipboard.writeText(u.value);toast('Link disalin')}
@@ -263,7 +317,7 @@ function fromHash(){
   try{history.replaceState(null,'',location.pathname+location.search)}catch(_){}
   openFromId(id);
 }
-APK.qrlink={upload,download,openFromId,linkFor};
+APK.qrlink={upload,download,remove,openFromId,linkFor};
 try{
   if(document.body)watch();else document.addEventListener('DOMContentLoaded',watch);
   if(document.readyState==='complete')setTimeout(fromHash,400);

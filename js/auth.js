@@ -8,20 +8,22 @@
    - Sebelum masuk, aplikasi memakai database kosong "@guest" dan ditutup layar masuk.
    - Masuk berhasil -> sesi disimpan -> halaman dimuat ulang supaya semua modul membuka database akun itu.
    - Sesi: "Tetap masuk" dicentang -> localStorage (bertahan); tidak -> sessionStorage (hilang saat aplikasi ditutup).
+   - Sesi menyimpan refresh token Firebase (rt). Dipakai js/sync.js untuk sinkron project ke cloud (Firebase Storage + Realtime Database).
+     Sesi lama tanpa rt tetap bisa dipakai, tapi sinkron baru aktif setelah Keluar lalu Masuk lagi.
    - Keluar: tombol "Keluar" di beranda (project sudah tersimpan otomatis di sana).
 
    LOGIN LEWAT CHROME (untuk APK / WebView / browser dalam aplikasi):
    Google memblokir login di dalam WebView (disallowed_useragent), jadi di sana tombol Google diganti alur kode:
    1) Aplikasi membuat kode acak 10 karakter dan menampilkannya, lalu memeriksa Realtime Database tiap 2 detik (REST, tanpa SDK).
    2) Pengguna membuka tautan  APP_URL?link=KODE  di Chrome, masuk dengan Google di sana.
-   3) Halaman Chrome menulis loginLinks/KODE = {uid, email, name, created} memakai ID token Firebase (auth=...).
+   3) Halaman Chrome menulis loginLinks/KODE = {uid, email, name, rt, created} memakai ID token Firebase (auth=...).
    4) Aplikasi menemukan data itu, menghapusnya, lalu masuk sebagai akun tersebut. Kode hanya berlaku 10 menit sejak dibuat di aplikasi.
    SYARAT DI FIREBASE CONSOLE: Realtime Database > Rules harus memuat blok "loginLinks" (lihat commit message / README).
    Database yang dipakai sama dengan js/qrlink.js (DB di bawah).
 
    SYARAT DI FIREBASE CONSOLE (umum): Authentication > Sign-in method > Google harus Enabled, dan Authentication > Settings > Authorized domains
    harus memuat domain tempat aplikasi dibuka (mis. byhasstudio.github.io). Cek juga FB_CFG di bawah (authDomain dan projectId).
-   Batas yang jujur: data project tetap tersimpan di perangkat (IndexedDB), tidak ikut ke perangkat lain. Akun hanya memisahkan project per akun Google. */
+   Data project tetap disimpan di perangkat (IndexedDB); salinan cloud dikelola js/sync.js. Akun memisahkan project per akun Google. */
 (function(){
 'use strict';
 if(window.__swAuth)return;window.__swAuth=1;
@@ -78,7 +80,7 @@ function login(user,keep){
     if(!owner){localStorage.setItem(LKEY,id);legacy=true}
     else legacy=owner===id;
   }catch(e){}
-  const v=JSON.stringify({id:id,name:user.email||user.displayName||id,legacy:legacy});
+  const v=JSON.stringify({id:id,name:user.email||user.displayName||id,legacy:legacy,rt:user.refreshToken||''});
   try{(keep?localStorage:sessionStorage).setItem(SKEY,v)}catch(e){return false}
   location.reload();return true;
 }
@@ -130,7 +132,7 @@ async function checkLink(code){
   if(!r.ok){const e=new Error('db');e.status=r.status;throw e}
   const j=await r.json();
   if(!j||typeof j.uid!=='string'||!j.uid)return null;
-  return {uid:j.uid,email:String(j.email||''),displayName:String(j.name||'')};
+  return {uid:j.uid,email:String(j.email||''),displayName:String(j.name||''),refreshToken:String(j.rt||'')};
 }
 function dropLink(code){
   return fetch(LINKS+'/'+code+'.json',{method:'DELETE'}).catch(function(){});
@@ -177,7 +179,7 @@ function mountAuth(){
     '<label class="au-ck"><input type="checkbox" id="au-keep" checked> Tetap masuk di perangkat ini</label>'+
     '<p class="au-err" id="au-err" role="alert"></p>'+
     '<button class="au-go" id="au-go" type="button">'+G_LOGO+'<span id="au-lbl">Masuk dengan Google</span></button>'+
-    '<p class="au-note">Project disimpan di perangkat ini dan dipisah per akun Google. Akun Google pertama yang masuk di perangkat ini otomatis memegang project yang sudah ada.</p>',
+    '<p class="au-note">Project disimpan di perangkat ini dan disalin ke cloud lewat tombol Sinkron, dipisah per akun Google. Akun Google pertama yang masuk di perangkat ini otomatis memegang project yang sudah ada.</p>',
     'Masuk ke SplineWay');
   const go=box.querySelector('#au-go'),lbl=box.querySelector('#au-lbl'),errEl=box.querySelector('#au-err'),keep=box.querySelector('#au-keep');
   let busy=false;
@@ -233,7 +235,7 @@ function mountWebViewAuth(){
     '<a class="au-go" id="au-chrome" target="_blank" rel="noopener">Buka di Chrome</a>'+
     '<button class="au-go au-alt" id="au-copy" type="button">Salin tautan</button>'+
     '<p class="au-st" id="au-st">Menunggu login di Chrome...</p>'+
-    '<p class="au-note">Kalau tombol tidak membuka Chrome, tekan "Salin tautan", buka Chrome, lalu tempel di kolom alamat. Kode berlaku 10 menit. Project tetap disimpan di perangkat ini dan dipisah per akun Google.</p>',
+    '<p class="au-note">Kalau tombol tidak membuka Chrome, tekan "Salin tautan", buka Chrome, lalu tempel di kolom alamat. Kode berlaku 10 menit. Project tetap disimpan di perangkat ini dan disalin ke cloud lewat tombol Sinkron.</p>',
     'Masuk ke SplineWay');
   const keep=box.querySelector('#au-keep'),errEl=box.querySelector('#au-err'),st=box.querySelector('#au-st');
   box.querySelector('#au-chrome').href=url;
@@ -293,7 +295,7 @@ function mountLinkPage(){
       const u=r.user,token=await u.getIdToken();
       const res=await fetch(LINKS+'/'+LINK+'.json?auth='+encodeURIComponent(token),{
         method:'PUT',
-        body:JSON.stringify({uid:u.uid,email:u.email||'',name:u.displayName||'',created:{'.sv':'timestamp'}})
+        body:JSON.stringify({uid:u.uid,email:u.email||'',name:u.displayName||'',rt:u.refreshToken||'',created:{'.sv':'timestamp'}})
       });
       try{await auth.signOut()}catch(x){}
       if(res.status===401||res.status===403){setBusy(false);err('Firebase menolak. Kode ini mungkin sudah dipakai (buka lagi dari aplikasi untuk kode baru), atau Rules database belum dipasang.');return}
@@ -323,5 +325,5 @@ ready(function(){
   else mountAuth();
 });
 window.APK=window.APK||{};
-APK.auth={get user(){return S?S.name:null},logout:logout};
+APK.auth={get user(){return S?S.name:null},get session(){return S},logout:logout};
 })();

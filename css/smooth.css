@@ -1,0 +1,70 @@
+/* ANIMASI HALUS di seluruh sistem. Hanya tampilan: tidak mengubah ID, struktur, atau logika.
+   Dimuat otomatis oleh js/waveform.js (ditaruh paling akhir supaya menimpa transisi lama).
+   Sengaja TIDAK menyentuh clip timeline, playhead, kanvas preview, dan slider, karena itu bergerak mengikuti jari / mouse
+   dan transisi di sana membuat drag terasa lambat. Semua dimatikan otomatis jika perangkat meminta "kurangi gerakan". */
+
+:root{--ease:cubic-bezier(.22,1,.36,1);--ease-io:cubic-bezier(.65,0,.35,1);--dur:.22s}
+
+/* ===== Gulir halus untuk halaman ===== */
+html{scroll-behavior:smooth}
+
+/* ===== Tombol, chip, kartu, tab, input: perubahan warna / bayangan / ukuran mengalir ===== */
+.btn,.s3-chip,.s3-tpl,.tp-card,.tp-slot,.hr-main,.hr-sm,#home .card,.mtabs button,
+.s3-kf button,.s3-cut button,.stk-grid button,.s3tb .btn,summary{
+  transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),
+             box-shadow var(--dur) var(--ease),transform .18s var(--ease),opacity var(--dur) var(--ease);
+}
+input,select,textarea{
+  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),background-color var(--dur) var(--ease),color var(--dur) var(--ease);
+}
+.btn:not(:disabled):hover{box-shadow:0 4px 14px -8px var(--accent)}
+.btn:not(:disabled):active,.s3-chip:active,.stk-grid button:active{transform:scale(.96)}
+.btn.primary:not(:disabled):hover{box-shadow:0 8px 20px -8px var(--accent)}
+.s3-chip.on{box-shadow:0 4px 14px -8px var(--accent)}
+
+/* ===== Pergantian halaman (Beranda / Editor / Edit 3D): memudar masuk ===== */
+@keyframes sm-fade{from{opacity:0}to{opacity:1}}
+@keyframes sm-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes sm-pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+.view:not([hidden]){animation:sm-fade .32s var(--ease) backwards}
+
+/* Panel Media / Properti di ponsel saat tab diganti */
+#editor[data-tab=media] #panel-media,#editor[data-tab=props] #panel-props{animation:sm-fade .22s var(--ease) backwards}
+
+/* ===== Beranda: sapaan, jalan pintas, dan kartu proyek muncul berurutan ===== */
+.hr-hi{animation:sm-rise .45s var(--ease) backwards}
+.hr-main{animation:sm-rise .5s var(--ease) .05s backwards}
+.hr-sm{animation:sm-rise .5s var(--ease) backwards}
+.hr-go>.hr-sm:nth-of-type(2){animation-delay:.1s}
+.hr-go>.hr-sm:nth-of-type(3){animation-delay:.15s}
+.hr-go>.hr-sm:nth-of-type(4){animation-delay:.2s}
+#home .card{animation:sm-rise .45s var(--ease) backwards}
+#home .project-grid>.card:nth-child(1){animation-delay:.05s}
+#home .project-grid>.card:nth-child(2){animation-delay:.1s}
+#home .project-grid>.card:nth-child(3){animation-delay:.15s}
+#home .project-grid>.card:nth-child(4){animation-delay:.2s}
+#home .project-grid>.card:nth-child(5){animation-delay:.25s}
+#home .project-grid>.card:nth-child(6){animation-delay:.3s}
+#home .project-grid>.card:nth-child(n+7){animation-delay:.35s}
+#home .empty-home{animation:sm-fade .4s var(--ease) backwards}
+
+/* ===== Dialog: muncul membesar halus, latar belakang memudar ===== */
+dialog[open]{animation:sm-pop .24s var(--ease)}
+dialog[open]::backdrop{animation:sm-fade .24s var(--ease)}
+
+/* ===== Notifikasi (toast) dan tooltip ===== */
+.toast{transition:opacity .3s var(--ease),transform .3s var(--ease)}
+#tip{transition:opacity .15s var(--ease)}
+
+/* ===== Bilah progres export dan indikator ===== */
+.ex-bar i{transition:width .35s var(--ease)}
+
+/* ===== Bagian lipat (details) di panel Edit 3D ===== */
+details>summary{transition:color var(--dur) var(--ease)}
+details>summary:hover{color:var(--accent)}
+
+/* ===== Dihormati: perangkat yang meminta gerakan dikurangi ===== */
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}

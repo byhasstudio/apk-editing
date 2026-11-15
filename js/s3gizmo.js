@@ -1,7 +1,7 @@
 /* GIZMO KAMERA FISIK untuk Edit 3D (add-on, dimuat setelah js/s3cam.js; butuh 1 baris ekspor di akhir s3cam.js: APK.s3cam).
    - Tombol "✥ Gizmo" melayang di pojok kanan atas viewport (hanya tampil di mode Ruang 3D / 2 Tampilan).
-   - Mode GESER: 3 panah (merah X, hijau Y, biru Z). Seret panah = kamera bergeser sepanjang sumbu itu.
-   - Mode PUTAR: 3 cincin. Seret cincin = kamera berputar mengelilingi sumbu itu.
+   - Mode GESER: 3 panah dua arah (merah X, hijau Y, biru Z), kepala panah di kedua ujung dan huruf sumbu. Seret panah = kamera bergeser sepanjang sumbu itu.
+   - Mode PUTAR: 3 cincin besar. Seret cincin = kamera berputar mengelilingi sumbu itu.
    - Ruang: GLOBAL (sumbu dunia) atau LOKAL (sumbu kamera sendiri).
    Hasilnya ditulis lewat put() milik s3cam.js (x, y, z, rx, ry, rz), jadi otomatis jadi keyframe kalau properti itu beranimasi,
    ikut undo/redo, simpan otomatis, preview, dan export. Digambar di kanvas overlay sendiri, s3cam.js tidak digambar ulang. */
@@ -15,7 +15,9 @@ const r2=v=>Math.round(v*100)/100;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
 const tr=M=>[M[0],M[3],M[6],M[1],M[4],M[7],M[2],M[5],M[8]];
-const COL=['#ff4d4d','#3ddc5b','#4d8dff'],HOT='#ffd166',NAME=['x','y','z'];
+const COL=['#ff4d4d','#3ddc5b','#4d8dff'],HOT='#ffd166',NAME=['x','y','z'],LBL=['X','Y','Z'];
+const ARROW=1.25;   /* panjang panah (kali U) dari titik tengah ke tiap ujung */
+const RING=1.8;     /* jari-jari cincin putar (kali U) */
 const st={on:false,mode:'move',space:'global',hover:null,drag:null};
 
 /* dunia editor: x kanan, y BAWAH, z maju. Panah "atas" = -y supaya tampil seperti gizmo biasa */
@@ -28,7 +30,7 @@ function ctx(){
   if(!lv||!isCam(it)||!lv.width)return null;
   const W=lv.width,H=lv.height,tt=curT(),pose=camPose(it,tt,aspect()),O=obsState(),P=mkProj(O,W,H),o=pose.p,zc=P.cs(o)[2];
   if(zc<30)return null;
-  return{it,W,H,tt,pose,O,P,o,zc,U:.13*H*zc/(O.F*P.k)};   /* U = jari-jari gizmo dalam satuan dunia, ±13% tinggi layar */
+  return{it,W,H,tt,pose,O,P,o,zc,U:.13*H*zc/(O.F*P.k)};   /* U = satuan gizmo dalam dunia, ±13% tinggi layar */
 }
 const lpos=e=>{const lv=S.lv,r=lv.getBoundingClientRect();return[(e.clientX-r.left)*lv.width/r.width,(e.clientY-r.top)*lv.height/r.height]};
 function distSeg(p,a,b){
@@ -38,19 +40,28 @@ function distSeg(p,a,b){
 }
 function basisOf(n){const h=Math.abs(n[1])<.9?[0,1,0]:[1,0,0],u=norm(cross(n,h)),v=cross(n,u);return[u,v]}   /* u x v = n */
 function ringPts(c,n){
-  const[u,v]=basisOf(n),r=c.U*.95,pts=[];
-  for(let i=0;i<=72;i++){const t=i/72*Math.PI*2;pts.push(add(c.o,add(scl(u,Math.cos(t)*r),scl(v,Math.sin(t)*r))))}
+  const[u,v]=basisOf(n),r=c.U*RING,pts=[];
+  for(let i=0;i<=96;i++){const t=i/96*Math.PI*2;pts.push(add(c.o,add(scl(u,Math.cos(t)*r),scl(v,Math.sin(t)*r))))}
   return pts;
 }
-function arrowEnds(c,a){   /* ujung belakang, ujung kepala panah (layar) */
-  const p0=c.P.pt(c.o),p1=c.P.pt(add(c.o,scl(a,c.U)));if(!p0||!p1)return null;
+/* panah dua arah: ujung negatif (pn) dan positif (p1) di layar, dengan puncak kepala panah di luar masing-masing ujung */
+function arrowEnds(c,a){
+  const L=c.U*ARROW,p0=c.P.pt(c.o),p1=c.P.pt(add(c.o,scl(a,L)));if(!p0||!p1)return null;
+  const pn=c.P.pt(add(c.o,scl(a,-L)))||[2*p0[0]-p1[0],2*p0[1]-p1[1]];   /* ujung di belakang kamera pengamat: cerminkan */
   const dx=p1[0]-p0[0],dy=p1[1]-p0[1],l=Math.hypot(dx,dy);if(l<6)return null;
-  const hs=c.H*.04,ux=dx/l,uy=dy/l,pb=c.P.pt(add(c.o,scl(a,-c.U*.35)))||p0;
-  return{pb,p1,ux,uy,hs,apex:[p1[0]+ux*hs*1.5,p1[1]+uy*hs*1.5]};
+  const nx0=pn[0]-p0[0],ny0=pn[1]-p0[1],nl=Math.hypot(nx0,ny0)||1;
+  const hs=c.H*.045,ux=dx/l,uy=dy/l,nx=nx0/nl,ny=ny0/nl;
+  return{pn,p1,ux,uy,nx,ny,hs,
+    apex:[p1[0]+ux*hs*1.6,p1[1]+uy*hs*1.6],
+    apexN:[pn[0]+nx*hs*1.6,pn[1]+ny*hs*1.6]};
 }
 
 /* ===== gambar ===== */
 let cv=null,box=null;
+function head(g,bx,by,ax,ay,dx,dy,hs){   /* kepala panah: dasar di (bx,by), puncak di (ax,ay), arah (dx,dy) */
+  const w=hs*.6;
+  g.beginPath();g.moveTo(ax,ay);g.lineTo(bx-dy*w,by+dx*w);g.lineTo(bx+dy*w,by-dx*w);g.closePath();g.fill();
+}
 function drawGizmo(g,c){
   const axes=axesOf(c.pose),hv=st.drag?{k:st.drag.k,i:st.drag.i}:st.hover;
   g.lineCap='round';g.lineJoin='round';
@@ -58,12 +69,17 @@ function drawGizmo(g,c){
     const hot=hv&&hv.k===st.mode&&hv.i===i,cl=hot?HOT:COL[i];
     g.strokeStyle=cl;g.fillStyle=cl;
     if(st.mode==='move'){
-      g.lineWidth=hot?6:4;
+      g.lineWidth=hot?7:5;
       const e=arrowEnds(c,a);if(!e)return;
-      g.beginPath();g.moveTo(e.pb[0],e.pb[1]);g.lineTo(e.p1[0],e.p1[1]);g.stroke();
-      g.beginPath();g.moveTo(e.apex[0],e.apex[1]);g.lineTo(e.p1[0]-e.uy*e.hs*.55,e.p1[1]+e.ux*e.hs*.55);g.lineTo(e.p1[0]+e.uy*e.hs*.55,e.p1[1]-e.ux*e.hs*.55);g.closePath();g.fill();
+      g.beginPath();g.moveTo(e.pn[0],e.pn[1]);g.lineTo(e.p1[0],e.p1[1]);g.stroke();
+      head(g,e.p1[0],e.p1[1],e.apex[0],e.apex[1],e.ux,e.uy,e.hs);      /* ujung + */
+      head(g,e.pn[0],e.pn[1],e.apexN[0],e.apexN[1],e.nx,e.ny,e.hs);    /* ujung - */
+      g.font='700 '+Math.round(c.H*.036)+'px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';
+      g.lineWidth=3;g.strokeStyle='rgba(0,0,0,.65)';
+      const lx=e.apex[0]+e.ux*c.H*.03,ly=e.apex[1]+e.uy*c.H*.03;
+      g.strokeText(LBL[i],lx,ly);g.fillText(LBL[i],lx,ly);
     }else{
-      g.lineWidth=hot?6:4;
+      g.lineWidth=hot?7:5;
       const pp=ringPts(c,a).map(p=>c.P.pt(p));
       g.beginPath();let pen=false;
       pp.forEach(p=>{if(!p){pen=false;return}if(pen)g.lineTo(p[0],p[1]);else{g.moveTo(p[0],p[1]);pen=true}});
@@ -93,7 +109,7 @@ function hitTest(c,p){
   let best=null,bd=th;
   axesOf(c.pose).forEach((a,i)=>{
     let d=1e9;
-    if(st.mode==='move'){const e=arrowEnds(c,a);if(e)d=distSeg(p,e.pb,e.apex)}
+    if(st.mode==='move'){const e=arrowEnds(c,a);if(e)d=distSeg(p,e.apexN,e.apex)}
     else{const pp=ringPts(c,a).map(q=>c.P.pt(q));for(let j=0;j<pp.length-1;j++)if(pp[j]&&pp[j+1])d=Math.min(d,distSeg(p,pp[j],pp[j+1]))}
     if(d<bd){bd=d;best={k:st.mode,i}}
   });

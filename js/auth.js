@@ -15,6 +15,7 @@
    LOGIN LEWAT BROWSER LAIN (untuk APK / WebView / browser dalam aplikasi):
    Google memblokir login di dalam WebView (disallowed_useragent), jadi di sana tombol Google diganti alur kode:
    1) Aplikasi membuat kode acak 10 karakter dan menampilkannya, lalu memeriksa Realtime Database tiap 2 detik (REST, tanpa SDK).
+      Kalau kode gagal / tidak jalan, tombol "Buat kode baru" membuat kode dan tautan baru (kode lama dihapus).
    2) Pengguna menyalin tautan  APP_URL?link=KODE  (tombol "Salin tautan"), menempelkannya di browser MANA PUN, masuk dengan Google di sana.
    3) Halaman browser itu menulis loginLinks/KODE = {uid, email, name, rt, created} memakai ID token Firebase (auth=...).
    4) Aplikasi menemukan data itu, menghapusnya, lalu masuk sebagai akun tersebut. Kode hanya berlaku 10 menit sejak dibuat di aplikasi.
@@ -233,8 +234,9 @@ function mountWebViewAuth(){
     '<label class="au-ck"><input type="checkbox" id="au-keep" checked> Tetap masuk di perangkat ini</label>'+
     '<p class="au-err" id="au-err" role="alert"></p>'+
     '<button class="au-go" id="au-copy" type="button">Salin tautan</button>'+
+    '<button class="au-go au-alt" id="au-new" type="button">Buat kode baru</button>'+
     '<p class="au-st" id="au-st">Menunggu login di browser...</p>'+
-    '<p class="au-note">Tekan "Salin tautan", buka browser apa pun (Chrome, Firefox, Edge, Safari, dll.), lalu tempel di kolom alamat. Kode berlaku 10 menit. Project tetap disimpan di perangkat ini dan disalin ke cloud lewat tombol Sinkron.</p>',
+    '<p class="au-note">Tekan "Salin tautan", buka browser apa pun (Chrome, Firefox, Edge, Safari, dll.), lalu tempel di kolom alamat. Kalau kode gagal atau sudah kedaluwarsa, tekan "Buat kode baru". Kode berlaku 10 menit. Project tetap disimpan di perangkat ini dan disalin ke cloud lewat tombol Sinkron.</p>',
     'Masuk ke SplineWay');
   const keep=box.querySelector('#au-keep'),errEl=box.querySelector('#au-err'),st=box.querySelector('#au-st');
   function err(m){errEl.textContent=m||''}
@@ -243,6 +245,14 @@ function mountWebViewAuth(){
     p.then(function(){st.textContent='Tautan disalin. Tempel di browser mana pun.'},function(){window.prompt('Salin tautan ini lalu buka di browser:',url)});
   };
   let stop=false,running=false,fails=0,timer=0;
+  /* buat kode baru: hentikan pemeriksaan, hapus kode lama, lalu muat ulang supaya getCode() membuat kode baru */
+  box.querySelector('#au-new').onclick=function(){
+    stop=true;clearTimeout(timer);
+    st.textContent='Membuat kode baru...';
+    try{localStorage.removeItem(CKEY)}catch(e){}
+    dropLink(code).then(function(){location.reload()},function(){location.reload()});
+    setTimeout(function(){location.reload()},1500);
+  };
   async function tick(){
     if(stop||running)return;
     running=true;
@@ -256,7 +266,7 @@ function mountWebViewAuth(){
         running=false;if(stop)return;
       }
     }catch(e){
-      if(++fails>=3)err('Tidak bisa memeriksa login (Rules database belum dipasang, atau koneksi bermasalah).');
+      if(++fails>=3)err('Tidak bisa memeriksa login (Rules database belum dipasang, atau koneksi bermasalah). Coba "Buat kode baru".');
     }
     running=false;
     if(Date.now()-t0>CODE_TTL){stop=true;try{localStorage.removeItem(CKEY)}catch(e){}location.reload();return}
@@ -296,7 +306,7 @@ function mountLinkPage(){
         body:JSON.stringify({uid:u.uid,email:u.email||'',name:u.displayName||'',rt:u.refreshToken||'',created:{'.sv':'timestamp'}})
       });
       try{await auth.signOut()}catch(x){}
-      if(res.status===401||res.status===403){setBusy(false);err('Firebase menolak. Kode ini mungkin sudah dipakai (buka lagi dari aplikasi untuk kode baru), atau Rules database belum dipasang.');return}
+      if(res.status===401||res.status===403){setBusy(false);err('Firebase menolak. Kode ini mungkin sudah dipakai atau kedaluwarsa. Di aplikasi tekan "Buat kode baru", salin tautan baru, lalu coba lagi. Atau Rules database belum dipasang.');return}
       if(!res.ok){setBusy(false);err('Gagal menghubungkan (kode '+res.status+'). Coba lagi.');return}
       box.querySelector('.au-card').innerHTML=
         '<h1>Berhasil</h1><p class="au-sub">Kembali ke aplikasi SplineWay, kamu akan otomatis masuk. Halaman ini boleh ditutup.</p>';

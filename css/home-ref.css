@@ -1,0 +1,58 @@
+/* Beranda gaya referensi (mobile + PC). Hanya menimpa tampilan; ID dan logika lama tidak diubah. */
+#home{--hr-nav:64px}
+#home .home-head{padding:14px 16px;border:0;gap:10px;flex-wrap:wrap;background:transparent}
+#home .brand small{display:none}
+#home .actions{overflow-x:auto;max-width:100%;scrollbar-width:none}
+#home .actions::-webkit-scrollbar{display:none}
+#home .actions .btn{white-space:nowrap;padding:6px 10px;font-size:12px}
+#home .home-main{padding:4px 16px calc(var(--hr-nav) + 28px + env(safe-area-inset-bottom,0px));max-width:1100px;width:100%;margin:0 auto}
+.hr-top{display:flex;align-items:center;gap:12px}
+.hr-promo{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;font-size:14px;background:linear-gradient(90deg,rgba(123,92,255,.22),rgba(0,196,220,.16));border:1px solid var(--line);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hr-srch{width:40px;height:40px;display:grid;place-items:center;border-radius:50%;color:var(--text);cursor:pointer;background:none;border:0}
+.hr svg,.hr-nav svg,.hr-top svg{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.hr-srch svg{font-size:28px}
+.hr-hero{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.hr-big{position:relative;height:150px;border:0;border-radius:22px;background:linear-gradient(135deg,#a9dcff,#6ad9f5);color:#10151a;font:600 20px/1.1 inherit;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;cursor:pointer;transition:transform .15s}
+.hr-big:active{transform:scale(.97)}
+.hr-ico{width:46px;height:46px;border-radius:12px;background:#10151a;color:#fff;display:grid;place-items:center;font-size:28px}
+.hr-badge{position:absolute;top:8px;right:8px;background:#fff;color:#10151a;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px}
+.hr-tools{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 12px;margin-top:22px}
+.hr-tool{display:flex;flex-direction:column;align-items:center;gap:8px;background:none;border:0;color:var(--text);font:13px/1.2 inherit;font-family:inherit;text-align:center;cursor:pointer}
+.hr-tool i{width:100%;aspect-ratio:1.38;border-radius:18px;background:var(--panel);border:1px solid var(--line);display:grid;place-items:center;font-size:30px}
+.hr-tool:hover i{border-color:var(--accent)}
+#home .home-main h2{font-size:22px;margin:0}
+.hr-sec{margin-top:28px}
+.hr-idea{margin-top:12px;display:flex;align-items:center;gap:16px;width:100%;border:0;border-radius:16px;background:var(--panel);overflow:hidden;color:var(--text);text-align:left;font-family:inherit;cursor:pointer}
+.hr-idea .im{width:112px;height:112px;flex:none;display:grid;place-items:center;font-size:40px;background:linear-gradient(135deg,#f6e7d0,#d9b98f)}
+.hr-idea b{display:block;font-size:18px;font-weight:600}
+.hr-idea span{color:#ff8a1f;font-weight:700;display:block;margin-top:6px}
+#home .project-grid{grid-template-columns:1fr;gap:16px;margin-top:14px}
+#home .card{display:flex;align-items:center;gap:16px;background:none;border:0;border-radius:0;overflow:visible}
+#home .card:hover{border:0}
+#home .card .thumb{width:112px;height:112px;flex:none;border-radius:14px;background:#000}
+#home .card .thumb i{background:#15181d;color:#777}
+#home .card-body{flex:1;min-width:0;padding:0}
+#home .card-body b{font-size:18px;font-weight:600}
+#home .card-body small{display:block;color:var(--dim);font-size:14px;margin-top:6px}
+#home .card-foot{flex-direction:column;align-items:flex-start;gap:8px;margin-top:0}
+#home .card-foot .btn{padding:2px 9px;font-size:12px}
+.hr-nav{position:fixed;z-index:20;left:0;right:0;bottom:0;display:flex;background:var(--panel);border-top:1px solid var(--line);padding:6px 0 calc(6px + env(safe-area-inset-bottom,0px))}
+.hr-nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:0;color:var(--dim);font:600 11px/1 inherit;font-family:inherit;cursor:pointer}
+.hr-nav button svg{font-size:26px}
+.hr-nav button.on{color:var(--text)}
+.hr-nav .hr-logo{display:none}
+@media (min-width:900px){
+ #home{padding-left:96px}
+ .hr-nav{top:0;bottom:auto;right:auto;width:96px;flex-direction:column;justify-content:flex-start;gap:20px;border-top:0;border-right:1px solid var(--line);padding:20px 0}
+ .hr-nav .hr-logo{display:block;text-align:center;font-weight:800;font-size:11px;letter-spacing:.5px;color:var(--accent)}
+ #home .home-head{padding:20px 40px 8px}
+ #home .home-main{padding:8px 40px 48px}
+ .hr-top{justify-content:space-between}
+ .hr-promo{flex:none;width:360px}
+ .hr-big{height:190px}
+ .hr-tools{grid-template-columns:repeat(8,1fr);gap:12px}
+ .hr-tool i{aspect-ratio:1.1;font-size:26px}
+ #home .project-grid{grid-template-columns:repeat(2,1fr);gap:20px 32px}
+}
+@media (min-width:1300px){#home .project-grid{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:420px){.hr-big{height:130px;font-size:18px}.hr-tool{font-size:12px}#home .card .thumb{width:96px;height:96px}}

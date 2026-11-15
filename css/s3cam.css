@@ -1,0 +1,14 @@
+/* Kamera fisik Edit 3D (js/s3cam.js) */
+#s3-lv{max-width:100%;max-height:40vh;display:none;touch-action:none;cursor:grab}
+#s3-lv:active{cursor:grabbing}
+#s3d.s3-v3d #s3-lv{display:block}
+#s3d.s3-v3d #s3-cv{display:none}
+@media (min-width:900px){#s3-lv{max-height:62vh}}
+.s3v{display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap}
+.s3v [hidden]{display:none!important}
+.s3v .btn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.s3c{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:10px 10px 2px;margin:0 0 12px}
+.s3c>b{display:block;margin-bottom:8px}
+.s3c .s3-hint{margin:0 0 10px}
+.s3-cutbar{position:relative;height:20px;margin:2px 8px 4px;border-radius:5px;overflow:hidden;background:var(--panel2)}
+.s3-cutbar button{position:absolute;top:0;bottom:0;border:0;border-right:1px solid #0006;color:#fff;font:600 11px system-ui,sans-serif;text-align:left;padding:0 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer}

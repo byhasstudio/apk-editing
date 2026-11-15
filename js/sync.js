@@ -1,11 +1,11 @@
-/* SINKRON CLOUD: salin project (data + media) ke akun Google yang sedang masuk, supaya project yang sama muncul di perangkat lain.
-   Dimuat paling akhir di index.html. Memakai sesi dari js/auth.js (refresh token "rt"), tanpa SDK: semua lewat REST.
+/* SINKRON CLOUD (tanpa Firebase Storage, jadi cukup paket gratis Spark): salin DATA project ke akun Google yang sedang masuk, supaya project yang sama muncul di perangkat lain.
+   Dimuat paling akhir di index.html. Memakai sesi dari js/auth.js (refresh token "rt"), tanpa SDK: semua lewat REST ke Realtime Database.
 
-   DATA DI CLOUD
-   - Realtime Database  sync/<uid>/projects/<id> = {name, updated, deleted?}          (daftar ringan, dipakai membandingkan versi)
-   - Storage            users/<uid>/projects/<id>.json                                (isi project: timeline, efek, metadata media)
-   - Storage            users/<uid>/media/<idMedia>                                   (file media asli, diunggah sekali saja)
-   Bucket Storage dideteksi otomatis (splineway.firebasestorage.app atau splineway.appspot.com) lalu diingat di perangkat ini.
+   DATA DI CLOUD (Realtime Database)
+   - sync/<uid>/projects/<id> = {name, updated, deleted?}   (daftar ringan, dipakai membandingkan versi)
+   - sync/<uid>/data/<id>     = teks JSON isi project       (timeline, efek, keyframe, metadata media; disimpan sebagai teks supaya aman dari aturan nama kunci)
+   FILE MEDIA ASLI (video, foto, audio) TIDAK ikut disinkronkan, karena terlalu besar untuk database. Di perangkat lain, project muncul lengkap
+   tapi media-nya kosong: impor ulang file yang sama, atau pakai fitur Ganti clip.
 
    ATURAN SINKRON (per project, versi terbaru menang berdasarkan waktu "updated")
    - Hanya di perangkat: diunggah. Hanya di cloud: diunduh. Dua-duanya ada: yang updated-nya lebih baru menang.
@@ -20,19 +20,15 @@ window.APK=window.APK||{};
 if(APK.sync)return;
 const KEY='AIzaSyBahNCBMGHzRBTIT4aE2PMHDdTEQVgQkp4';
 const DB='https://splineway-default-rtdb.asia-southeast1.firebasedatabase.app';
-const BUCKETS=['splineway.firebasestorage.app','splineway.appspot.com'];
-const BK='splineway:sync:bucket';
 const $=id=>document.getElementById(id);
 const P=APK.project;
 const sess=()=>APK.auth&&APK.auth.session;
 const enabled=()=>{const s=sess();return !!(s&&s.rt)};
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const mb=b=>b<1048576?Math.max(1,Math.round(b/1024))+' KB':(b/1048576).toFixed(1)+' MB';
 function toast(m){try{APK.app.toast(m)}catch(e){console.log(m)}}
 function setLabel(t){const b=$('btn-sync');if(b)b.textContent=t||'☁ Sinkron'}
 function http(r,w){const e=new Error((w||'permintaan')+' gagal ('+r.status+')');e.status=r.status;return e}
 
-let tok=null,bucket=null,running=false,again=false,timer=0;
+let tok=null,running=false,again=false,timer=0;
 
 /* ===== token Firebase dari refresh token ===== */
 async function token(){
@@ -47,123 +43,47 @@ async function token(){
   return tok;
 }
 
-/* ===== Realtime Database (daftar versi) ===== */
+/* ===== Realtime Database ===== */
 async function rtdb(method,path,body){
   const t=await token();
   const r=await fetch(DB+'/'+path+'.json?auth='+encodeURIComponent(t.idToken),{method:method,body:body===undefined?undefined:JSON.stringify(body)});
-  if(!r.ok){const e=http(r,'database');if(r.status===401||r.status===403)e.message='Rules Realtime Database belum dipasang (blok "sync")';throw e}
+  if(!r.ok){const e=http(r,'database');if(r.status===401||r.status===403)e.message='Rules Realtime Database belum dipasang (blok "sync"), atau project terlalu besar';throw e}
   return r.json();
 }
 
-/* ===== Storage (REST) ===== */
-const base=()=>'https://firebasestorage.googleapis.com/v0/b/'+bucket+'/o';
-async function getBucket(){
-  if(bucket)return bucket;
-  const t=await token();
-  let saved='';try{saved=localStorage.getItem(BK)||''}catch(e){}
-  for(const b of saved?[saved]:BUCKETS){
-    const r=await fetch('https://firebasestorage.googleapis.com/v0/b/'+b+'/o?maxResults=1&prefix='+encodeURIComponent('users/'+t.uid+'/'),{headers:{Authorization:'Firebase '+t.idToken}});
-    if(r.ok||r.status===403||r.status===401){
-      if(!r.ok)throw new Error('Rules Storage belum dipasang (atau menolak akun ini)');
-      bucket=b;try{localStorage.setItem(BK,b)}catch(e){}
-      return b;
-    }
-  }
-  throw new Error('Firebase Storage belum aktif di project splineway');
-}
-async function head(path){
-  const t=await token();
-  const r=await fetch(base()+'/'+encodeURIComponent(path),{headers:{Authorization:'Firebase '+t.idToken}});
-  if(r.status===404)return null;
-  if(!r.ok)throw http(r,'cek file');
-  return r.json();
-}
-async function put(path,blob,mime,prog){
-  mime=mime||'application/octet-stream';
-  const t=await token();
-  const init=await fetch(base()+'?name='+encodeURIComponent(path),{method:'POST',headers:{
-    'Authorization':'Firebase '+t.idToken,
-    'Content-Type':'application/json;charset=utf-8',
-    'X-Goog-Upload-Protocol':'resumable',
-    'X-Goog-Upload-Command':'start',
-    'X-Goog-Upload-Header-Content-Length':String(blob.size),
-    'X-Goog-Upload-Header-Content-Type':mime
-  },body:JSON.stringify({name:path,contentType:mime})});
-  if(!init.ok)throw http(init,'mulai unggah');
-  const url=init.headers.get('x-goog-upload-url');
-  if(!url)throw new Error('alamat unggah tidak diterima');
-  const CH=8*1048576,n=blob.size;
-  let off=0;
-  do{
-    const end=Math.min(off+CH,n),last=end>=n;
-    for(let tries=0;;){
-      try{
-        const r=await fetch(url,{method:'POST',headers:{'X-Goog-Upload-Command':last?'upload, finalize':'upload','X-Goog-Upload-Offset':String(off)},body:blob.slice(off,end)});
-        if(!r.ok)throw http(r,'unggah');
-        break;
-      }catch(e){if(++tries>=3)throw e;await sleep(1500*tries)}
-    }
-    off=end;if(prog)prog(off,n);
-  }while(off<n);
-}
-async function getBlob(path){
-  const t=await token();
-  const r=await fetch(base()+'/'+encodeURIComponent(path)+'?alt=media',{headers:{Authorization:'Firebase '+t.idToken}});
-  if(!r.ok)throw http(r,'unduh');
-  return r.blob();
-}
-async function removeObj(path){
-  const t=await token();
-  const r=await fetch(base()+'/'+encodeURIComponent(path),{method:'DELETE',headers:{Authorization:'Firebase '+t.idToken}});
-  if(!r.ok&&r.status!==404)throw http(r,'hapus file');
-}
-
-/* ===== catatan lokal: media yang sudah di cloud, dan antrean hapus ===== */
-const SK=uid=>'splineway:sync:media:'+uid,QK=uid=>'splineway:sync:del:'+uid;
+/* ===== catatan lokal: antrean hapus ===== */
+const QK=uid=>'splineway:sync:del:'+uid;
 function loadJ(k,d){try{const v=JSON.parse(localStorage.getItem(k)||'null');return v==null?d:v}catch(e){return d}}
 function saveJ(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 
 /* ===== satu project: unggah / unduh ===== */
-async function pushProject(p,uid,label){
-  const have=new Set(loadJ(SK(uid),[]));
-  for(const m of p.media||[]){
-    if(have.has(m.id))continue;
-    const rec=await APK.db.getMedia(m.id);
-    if(!rec||!rec.blob)continue;
-    const path='users/'+uid+'/media/'+m.id;
-    const meta=await head(path);
-    if(!meta||+meta.size!==rec.blob.size){
-      await put(path,rec.blob,m.mime||rec.blob.type,(o,n)=>setLabel('☁ '+label+' · '+Math.round(o/n*100)+'% · '+(m.name||'media').slice(0,14)));
-    }
-    have.add(m.id);saveJ(SK(uid),[...have].slice(-5000));
-  }
-  await put('users/'+uid+'/projects/'+p.id+'.json',new Blob([JSON.stringify(p)],{type:'application/json'}),'application/json');
+async function pushProject(p,uid){
+  /* isi dulu, daftar belakangan: daftar tidak pernah menunjuk ke data yang belum ada */
+  await rtdb('PUT','sync/'+uid+'/data/'+p.id,JSON.stringify(p));
   await rtdb('PUT','sync/'+uid+'/projects/'+p.id,{name:String(p.name||'Project').slice(0,120),updated:p.updated});
 }
-async function pullProject(id,uid,label){
-  const o=JSON.parse(await (await getBlob('users/'+uid+'/projects/'+id+'.json')).text());
+async function pullProject(id,uid){
+  const s=await rtdb('GET','sync/'+uid+'/data/'+id);
+  if(typeof s!=='string')throw new Error('data project di cloud tidak ditemukan');
+  let o;
+  try{o=JSON.parse(s)}catch(e){throw new Error('data project di cloud rusak')}
   if(!P.validate(o))throw new Error('data project di cloud tidak valid');
-  const have=new Set(loadJ(SK(uid),[]));
+  let missing=0;
   for(const m of o.media||[]){
-    if(await APK.db.getMedia(m.id)){have.add(m.id);continue}
-    setLabel('☁ '+label+' · mengunduh '+(m.name||'media').slice(0,14));
-    const b=await getBlob('users/'+uid+'/media/'+m.id);
-    await APK.db.putMedia({id:m.id,projectId:o.id,blob:m.mime&&!b.type?new Blob([b],{type:m.mime}):b});
-    have.add(m.id);
+    try{if(!(await APK.db.getMedia(m.id)))missing++}catch(e){missing++}
   }
-  saveJ(SK(uid),[...have].slice(-5000));
   await APK.db.put(o);
+  return missing;
 }
 
 /* ===== hapus ===== */
 const origRemove=P.remove;
 P.remove=async function(id){
-  let mids=[];
-  try{const p=await APK.db.get(id);if(p&&Array.isArray(p.media))mids=p.media.map(m=>m.id)}catch(e){}
   await origRemove.call(P,id);
   const s=sess();
   if(s&&s.rt){
-    const q=loadJ(QK(s.id.slice(1)),[]);q.push({id:id,mids:mids,ts:Date.now()});saveJ(QK(s.id.slice(1)),q);
+    const uid=s.id.slice(1);
+    const q=loadJ(QK(uid),[]);q.push({id:id,ts:Date.now()});saveJ(QK(uid),q);
     schedule(4000);
   }
 };
@@ -172,8 +92,7 @@ async function flushDeletes(uid){
   const left=[];let n=0;
   for(const d of q){
     try{
-      for(const mid of d.mids||[])await removeObj('users/'+uid+'/media/'+mid);
-      await removeObj('users/'+uid+'/projects/'+d.id+'.json');
+      await rtdb('DELETE','sync/'+uid+'/data/'+d.id);
       await rtdb('PUT','sync/'+uid+'/projects/'+d.id,{name:'-',updated:d.ts,deleted:true});
       n++;
     }catch(e){left.push(d)}
@@ -195,10 +114,9 @@ async function sync(opts){
   if(!enabled()){if(opts.manual)toast('Keluar lalu Masuk lagi dengan Google untuk mengaktifkan sinkron');return}
   if(!navigator.onLine){if(opts.manual)toast('Tidak ada koneksi internet');return}
   running=true;setLabel('☁ Memeriksa…');
-  let up=0,down=0,del=0,fail=0,firstErr='';
+  let up=0,down=0,del=0,fail=0,miss=0,firstErr='';
   try{
     const t=await token(),uid=t.uid;
-    await getBucket();
     del+=await flushDeletes(uid);
     const remote=(await rtdb('GET','sync/'+uid+'/projects'))||{};
     const locals=await APK.db.all();
@@ -213,9 +131,9 @@ async function sync(opts){
         if(R&&R.deleted&&L&&L.updated<=R.updated){
           if(id!==openId){await origRemove.call(P,id);del++}
         }else if(L&&(!R||L.updated>R.updated)){
-          setLabel('☁ '+label);await pushProject(L,uid,label);up++;
+          setLabel('☁ '+label);await pushProject(L,uid);up++;
         }else if(R&&!R.deleted&&(!L||R.updated>L.updated)&&id!==openId){
-          setLabel('☁ '+label);await pullProject(id,uid,label);down++;
+          setLabel('☁ '+label);miss+=await pullProject(id,uid);down++;
         }
       }catch(e){fail++;if(!firstErr)firstErr=explain(e);console.warn('Sinkron gagal untuk',id,e)}
     }
@@ -226,7 +144,7 @@ async function sync(opts){
   }
   if(down||del){const h=$('home');if(h&&!h.hidden&&APK.app&&APK.app.renderHome)APK.app.renderHome()}
   if(fail)toast('Sinkron bermasalah: '+firstErr);
-  else if(up||down||del)toast('Sinkron selesai: '+up+' diunggah, '+down+' diunduh'+(del?', '+del+' dihapus':''));
+  else if(up||down||del)toast('Sinkron selesai: '+up+' diunggah, '+down+' diunduh'+(del?', '+del+' dihapus':'')+(miss?'. '+miss+' media belum ada di perangkat ini, impor ulang atau pakai Ganti clip':''));
   else if(opts.manual)toast('Sudah sinkron');
   if(again){again=false;schedule(1500)}
 }
@@ -242,7 +160,7 @@ function mountBtn(){
   if(!a||$('btn-sync'))return;
   const b=document.createElement('button');
   b.className='btn';b.id='btn-sync';b.textContent='☁ Sinkron';
-  b.title='Sinkronkan project (data dan media) dengan akun Google ini, agar muncul di perangkat lain';
+  b.title='Sinkronkan data project dengan akun Google ini (file media tidak ikut), agar muncul di perangkat lain';
   b.onclick=()=>sync({manual:true});
   a.insertBefore(b,a.firstChild);
 }

@@ -1,0 +1,167 @@
+name: Build APK
+
+# Membuat APK SplineWay dan menerbitkannya di Releases (tag latest-apk).
+# Jalankan manual: tab Actions > Build APK > Run workflow. Otomatis jalan juga kalau file ini atau assets/logo.png diubah.
+#
+# Cara kerja pembaruan: APK hanyalah cangkang (Capacitor) yang memuat situs https://byhasstudio.github.io/apk-editing/.
+# Setiap push ke situs otomatis sampai ke APK: dicek saat dibuka dan tiap 5 menit (lihat js/updater.js).
+# APK baru hanya perlu dibuat kalau nama, ikon, atau pengaturan cangkangnya berubah.
+#
+# Supaya APK baru bisa dipasang di atas yang lama tanpa hapus dulu, buat keystore tetap SEKALI saja dan simpan di
+# Settings > Secrets and variables > Actions: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD.
+# Tanpa itu, APK ditandatangani kunci sementara yang berbeda tiap build.
+#
+# Logo: kalau ada assets/logo.png (disarankan 1024x1024), itu yang dipakai. Kalau tidak ada, logo 128 px dari js/brand.js dipakai.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-apk.yml'
+      - 'assets/logo.png'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk
+  cancel-in-progress: true
+
+env:
+  APP_NAME: SplineWay
+  APP_ID: com.byhasstudio.splineway
+  APP_URL: https://byhasstudio.github.io/apk-editing/
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Siapkan logo
+        run: |
+          mkdir -p shell
+          if [ -f assets/logo.png ]; then
+            cp assets/logo.png shell/logo.png
+          else
+            grep -o 'data:image/png;base64,[A-Za-z0-9+/=]*' js/brand.js | head -1 | sed 's#^data:image/png;base64,##' | base64 -d > shell/logo.png
+          fi
+          test -s shell/logo.png
+
+      - name: Buat proyek Android (Capacitor)
+        working-directory: shell
+        run: |
+          npm init -y > /dev/null
+          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 sharp
+          mkdir -p www
+          cat > www/index.html <<'EOF'
+          <!doctype html><meta charset="utf-8"><title>SplineWay</title>
+          <body style="margin:0;background:#000833"></body>
+          EOF
+          cat > www/offline.html <<'EOF'
+          <!doctype html>
+          <html lang="id"><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>SplineWay</title>
+          <style>
+          html,body{height:100%;margin:0;background:#000833;color:#fff;font:16px system-ui,sans-serif}
+          body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px}
+          button{background:#2bd67b;color:#04122a;border:0;border-radius:10px;padding:10px 18px;font:600 16px system-ui,sans-serif}
+          </style></head>
+          <body><h2>SplineWay</h2>
+          <p>Tidak ada koneksi internet.<br>Menyambungkan ulang otomatis...</p>
+          <button id="b">Coba lagi</button>
+          <script>
+          var U='__APP_URL__';
+          function go(){fetch(U,{mode:'no-cors',cache:'no-store'}).then(function(){location.href=U}).catch(function(){})}
+          document.getElementById('b').onclick=go;setInterval(go,5000);
+          </script></body></html>
+          EOF
+          sed -i "s#__APP_URL__#${APP_URL}#g" www/offline.html
+          cat > capacitor.config.json <<EOF
+          {
+            "appId": "${APP_ID}",
+            "appName": "${APP_NAME}",
+            "webDir": "www",
+            "server": {
+              "url": "${APP_URL}",
+              "errorPath": "offline.html",
+              "allowNavigation": ["byhasstudio.github.io"]
+            }
+          }
+          EOF
+          npx cap add android
+          npx cap sync android
+
+      - name: Pasang ikon dan versi
+        working-directory: shell
+        run: |
+          RES=android/app/src/main/res
+          rm -rf "$RES/mipmap-anydpi-v26" "$RES/drawable-v24" "$RES/drawable/ic_launcher_background.xml"
+          find "$RES" -name 'ic_launcher_foreground.png' -delete
+          cat > icons.js <<'EOF'
+          const sharp = require('sharp');
+          const sizes = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
+          (async () => {
+            for (const [d, s] of Object.entries(sizes)) {
+              for (const n of ['ic_launcher', 'ic_launcher_round']) {
+                await sharp('logo.png').resize(s, s).png().toFile('android/app/src/main/res/mipmap-' + d + '/' + n + '.png');
+              }
+            }
+          })();
+          EOF
+          node icons.js
+          sed -i "s/versionCode 1/versionCode ${GITHUB_RUN_NUMBER}/; s/versionName \"1.0\"/versionName \"1.0.${GITHUB_RUN_NUMBER}\"/" android/app/build.gradle
+          grep -nE 'versionCode|versionName' android/app/build.gradle
+
+      - name: Build APK
+        working-directory: shell/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Tanda tangani APK
+        working-directory: shell/android
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -e
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          SRC=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          OUT="$GITHUB_WORKSPACE/out"
+          mkdir -p "$OUT"
+          "$BT/zipalign" -p -f 4 "$SRC" aligned.apk
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > release.jks
+            "$BT/apksigner" sign --ks release.jks --ks-pass env:KS_PASS --ks-key-alias "$KS_ALIAS" --key-pass env:KEY_PASS --out "$OUT/SplineWay.apk" aligned.apk
+          else
+            keytool -genkeypair -keystore debug.jks -storepass android -keypass android -alias debug -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=SplineWay"
+            "$BT/apksigner" sign --ks debug.jks --ks-pass pass:android --key-pass pass:android --ks-key-alias debug --out "$OUT/SplineWay.apk" aligned.apk
+            echo "::warning::Belum ada keystore tetap (secret KEYSTORE_BASE64). APK memakai kunci sementara; untuk memasang APK baru di atas yang lama, hapus dulu aplikasi lamanya."
+          fi
+          "$BT/apksigner" verify "$OUT/SplineWay.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SplineWay-apk
+          path: out/SplineWay.apk
+
+      - name: Terbitkan ke Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest-apk --cleanup-tag -y --repo "$GITHUB_REPOSITORY" || true
+          gh release create latest-apk out/SplineWay.apk --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "SplineWay APK (terbaru)" --notes "APK SplineWay build #${GITHUB_RUN_NUMBER}. Isi aplikasi diperbarui otomatis dari situs saat dibuka dan tiap 5 menit."

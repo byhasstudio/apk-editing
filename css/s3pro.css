@@ -1,0 +1,22 @@
+/* Alat pro Edit 3D (js/s3pro.js) + mode Dua tampilan (js/s3cam.js) */
+.s3-view{position:relative}
+/* Dua tampilan: kiri hasil render (#s3-cv), kanan ruang 3D (#s3-lv) */
+#s3d.s3-vsplit #s3-lv{display:block}
+#s3d.s3-vsplit .s3-view{grid-template-columns:1fr 1fr;gap:3px;align-items:center}
+#s3d.s3-vsplit #s3-cv,#s3d.s3-vsplit #s3-lv{max-width:100%;max-height:44vh;margin:0 auto}
+@media (min-width:900px){
+  #s3d.s3-vsplit .s3-body{grid-template-columns:minmax(0,2.3fr) minmax(320px,1fr)}
+  #s3d.s3-vsplit #s3-cv,#s3d.s3-vsplit #s3-lv{max-height:62vh}
+}
+/* Panduan komposisi (overlay di atas hasil render, tidak ikut export) */
+#s3-gd{position:absolute;pointer-events:none;z-index:3}
+/* Bilah alat ruang 3D: hanya tampil di mode Ruang 3D / Dua tampilan, bisa digeser ke samping di HP */
+.s3tb{display:none;gap:4px;align-items:center;overflow-x:auto;white-space:nowrap;padding:6px 0 2px;scrollbar-width:thin}
+#s3d.s3-v3d .s3tb,#s3d.s3-vsplit .s3tb{display:flex}
+.s3tb .btn{flex:none;padding:6px 10px;font-size:13px}
+.s3tb .btn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.s3tb [data-tg="ak"].on{background:#e5484d;border-color:#e5484d;color:#fff}
+.s3tb .sep{flex:none;width:1px;align-self:stretch;background:var(--line);margin:0 3px}
+/* Kotak Hapus & reset di properti */
+.s3p-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.s3p-row .btn{padding:7px 10px;font-size:13px}

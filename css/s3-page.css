@@ -1,0 +1,23 @@
+/* Ruang 3D: dialog pilih contoh (#s3-dlg-new) tampil sebagai layar penuh, bukan pop-up melayang. Hanya tampilan. Dimuat dari js/home-ref.js */
+html[data-device] body #s3-dlg-new{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;border-radius:0;background:var(--bg);color:var(--text);overflow:hidden}
+html[data-device] body #s3-dlg-new[open]{display:flex;flex-direction:column;animation:s3p-in .22s ease-out}
+@keyframes s3p-in{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+#s3-dlg-new::backdrop{background:var(--bg);backdrop-filter:none;-webkit-backdrop-filter:none}
+#s3-dlg-new>form{display:flex;flex-direction:column;flex:1;min-height:0;margin:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
+#s3-dlg-new>form>*{flex:none}
+
+/* judul tetap di atas */
+#s3-dlg-new>form>h3{position:sticky;top:0;z-index:2;margin:0;padding:calc(16px + env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right)) 14px max(18px,env(safe-area-inset-left));font-size:20px;letter-spacing:-.01em;background:var(--panel);border-bottom:1px solid var(--line)}
+
+/* isi dibatasi lebarnya */
+#s3-dlg-new>form>:not(h3):not(.dlg-actions){width:min(100%,900px);margin-left:auto;margin-right:auto;padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right));box-sizing:border-box}
+#s3-dlg-new>form>p.meta{margin-top:16px!important;margin-bottom:14px!important;font-size:13px}
+#s3-dlg-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:24px}
+#s3-dlg-list .s3-tpl{margin-bottom:0;height:100%}
+#s3-dlg-list .s3-tpl:active{transform:scale(.98)}
+@media (max-width:560px){#s3-dlg-list{grid-template-columns:1fr}}
+
+/* tombol aksi tetap di bawah */
+#s3-dlg-new>form>.dlg-actions{position:sticky;bottom:0;z-index:2;margin:auto 0 0;padding:12px max(18px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left));background:var(--panel);border-top:1px solid var(--line);justify-content:flex-end}
+@media (max-width:520px){#s3-dlg-new>form>.dlg-actions .btn{flex:1}}
+@media (prefers-reduced-motion:reduce){html[data-device] body #s3-dlg-new[open]{animation:none}}

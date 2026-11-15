@@ -1,6 +1,14 @@
 /* Beranda: 1 kartu utama + 3 jalan pintas ke fitur yang sudah ada. Memakai tombol lama lewat .click(). */
 (function(){
 'use strict';
+/* perbaikan: garis merah / label timeline 3D tidak boleh menembus preview yang menempel di atas saat panel di-scroll */
+try{
+  const fx=document.createElement('style');
+  fx.textContent='#s3x-tl{position:relative;z-index:0;isolation:isolate;contain:paint}'
+   +'#s3x-tl .s3x-ph{z-index:2}#s3x-tl .s3x-ruler{z-index:3}#s3x-tl .s3x-lab{z-index:1}'
+   +'#s3d .s3-stage{z-index:30}';
+  document.head.appendChild(fx);
+}catch(_){}
 /* timeline Edit 3D lalu menu tombol dimuat dari sini supaya index.html tidak perlu diubah (menu harus setelah timeline siap) */
 function load(src,next){
   try{const s=document.createElement('script');s.src=src;s.onload=s.onerror=()=>{if(next)next()};document.body.appendChild(s)}catch(_){if(next)next()}

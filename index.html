@@ -4,8 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache">
-<title>APK EDITING</title>
+<title>SplineWay</title>
 <script src="js/device.js?v=1"></script>
+<script src="js/brand.js?v=1"></script>
 <link rel="stylesheet" href="css/style.css?v=15">
 <link rel="stylesheet" href="css/components.css?v=15">
 <link rel="stylesheet" href="css/home.css?v=15">
@@ -24,11 +25,12 @@
 <link rel="stylesheet" href="css/s3cam.css?v=1">
 <link rel="stylesheet" href="css/device.css?v=1">
 <link rel="stylesheet" href="css/device3d.css?v=1">
+<link rel="stylesheet" href="css/brand.css?v=1">
 </head>
 <body>
 <section id="home" class="view">
   <header class="home-head">
-    <div class="brand"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="2" y="5" width="24" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 10l7 4-7 4z" fill="currentColor"/></svg><div><b>APK EDITING</b><small>by BYHASSSTUDIO · v23 regang, animasi, filter, transisi, efek, performa</small></div></div>
+    <div class="brand"><span class="brand-logo" role="img" aria-label="SplineWay"></span><div><b>SplineWay</b><small>by BYHASSSTUDIO · v23 regang, animasi, filter, transisi, efek, performa</small></div></div>
     <div class="actions"><button class="btn" id="btn-3d" title="Edit 3D: kamera 3D, teks/foto/video di ruang 3D, tracking titik pada video, contoh referensi">✦ Edit 3D</button><button class="btn" id="btn-open">Buka Project</button><button class="btn primary" id="btn-new">Project Baru</button></div>
   </header>
   <main class="home-main"><h2>Project terakhir</h2><div id="project-list" class="project-grid"></div><h2 id="s3d-h" hidden>Project 3D</h2><div id="s3d-list" class="project-grid" hidden></div></main>
@@ -183,7 +185,7 @@
 </form></dialog>
 <dialog id="s3-dlg-send"><form method="dialog" onsubmit="return false">
   <h3>Kirim ke editor video</h3>
-  <p class="meta" style="margin:0 0 12px">Hasil Edit 3D dirender jadi video, lalu dipakai sebagai klip di editor APK EDITING yang biasa. Kamera, efek, hasil tracking, dan musik (♪) sudah menyatu di videonya.</p>
+  <p class="meta" style="margin:0 0 12px">Hasil Edit 3D dirender jadi video, lalu dipakai sebagai klip di editor SplineWay yang biasa. Kamera, efek, hasil tracking, dan musik (♪) sudah menyatu di videonya.</p>
   <label>Kirim ke<select id="s3-sd-target"></select></label>
   <label>Ukuran sisi pendek<select id="s3-sd-res"><option value="540">540p</option><option value="720" selected>720p</option><option value="1080">1080p (berat)</option></select></label>
   <label>Frame rate<select id="s3-sd-fps"><option>24</option><option selected>30</option><option>60</option></select></label>

@@ -60,7 +60,7 @@
 
   /* ===== Tutorial singkat (otomatis sekali saat pertama membuka editor; buka lagi lewat tombol ?) ===== */
   const STEPS=[
-    ['Selamat datang di APK EDITING','Editor video di browser. Alurnya: impor media, susun di timeline, atur dan animasikan, lalu export. Panduan ini muncul sekali saja; buka lagi kapan pun lewat tombol ?.'],
+    ['Selamat datang di SplineWay','Editor video di browser. Alurnya: impor media, susun di timeline, atur dan animasikan, lalu export. Panduan ini muncul sekali saja; buka lagi kapan pun lewat tombol ?.'],
     ['1. Impor media','Klik Import di panel Media atau seret file ke jendela. Klik media untuk menaruhnya di timeline, atau seret ke posisi yang kamu mau.'],
     ['2. Susun di timeline','Seret clip untuk memindah, tarik tepinya untuk memotong, tekan S untuk membelah clip di garis merah (playhead). Geser garis merah untuk melihat hasilnya di preview.'],
     ['3. Ubah objek langsung di preview','Klik objek di preview, lalu seret untuk menggeser. Tarik kotak di sudut untuk memperbesar atau memperkecil, dan tarik titik bulat di atasnya untuk memutar. Garis merah putus-putus menandakan titik tengah layar.'],

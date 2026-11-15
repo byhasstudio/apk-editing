@@ -1,0 +1,46 @@
+/* MODE PERANGKAT OTOMATIS (js/device.js memasang data-device = mobile | pc dan data-input = touch | mouse di <html>).
+   Hanya untuk beranda dan editor video 2D; Edit 3D tidak disentuh. Aturan tata letak mobile di css/mobile.css tetap dipakai
+   (batasnya sama, 900px); file ini menambah beranda, area aman layar berponi, ukuran sentuh, dan perilaku mouse. */
+
+/* ----- beranda: mobile ----- */
+html[data-device=mobile] #home .home-head{padding:calc(14px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 14px calc(14px + env(safe-area-inset-left));gap:10px;flex-wrap:wrap}
+html[data-device=mobile] #home .brand small{display:none}
+html[data-device=mobile] #home .home-head .actions{width:100%}
+html[data-device=mobile] #home .home-head .actions .btn{flex:1 1 auto}
+html[data-device=mobile] #home .home-main{padding:16px calc(14px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left))}
+html[data-device=mobile] #home .project-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+html[data-device=mobile] #home .thumb{height:96px}
+@media(max-width:380px){html[data-device=mobile] #home .project-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* ----- beranda: PC ----- */
+html[data-device=pc] #home .home-main{width:100%;max-width:1500px;margin:0 auto}
+html[data-device=pc] #home .home-head{padding-left:max(32px,calc((100% - 1500px)/2 + 32px));padding-right:max(32px,calc((100% - 1500px)/2 + 32px))}
+
+/* ----- editor: mobile (area aman layar berponi) ----- */
+html[data-device=mobile] #editor .top{padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right));padding-top:max(6px,env(safe-area-inset-top))}
+
+/* ----- editor: PC (panel samping lebih lebar di layar besar) ----- */
+html[data-device=pc] #editor .mtabs{display:none}
+@media(min-width:1500px){html[data-device=pc] #editor .workspace{grid-template-columns:300px minmax(0,1fr) 320px}}
+
+/* ----- input SENTUH: target sentuh lebih besar, tanpa seleksi teks / zoom ketuk dua kali tak sengaja ----- */
+html[data-input=touch]{overscroll-behavior:none}
+html[data-input=touch] :is(#home,#editor,#dlg-new,#dlg-export,#dlg-sticker,#dlg-help,#dlg-keys) :is(.btn,select){min-height:40px}
+html[data-input=touch] :is(#home,#editor) :is(button,select,label,.card,.clip){touch-action:manipulation}
+html[data-input=touch] :is(#home,#editor){-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html[data-input=touch] :is(#home,#editor) :is(input,textarea,[contenteditable]){-webkit-user-select:text;user-select:text}
+html[data-input=touch] #editor .clip .h{width:min(18px,35%)}
+html[data-input=touch] #editor #panel-props input[type=range]{height:32px}
+html[data-input=touch] #editor #tl-scroll{touch-action:pan-x pan-y}   /* cubit 2 jari dipakai untuk zoom timeline (js/controls.js) */
+html[data-input=touch] #btn-keys{display:none}
+
+/* ----- input MOUSE: tombol shortcut tampil, efek hover ----- */
+#btn-keys{display:none}
+html[data-input=mouse] #btn-keys{display:inline-block}
+html[data-input=mouse] #editor .clip:hover{filter:brightness(1.12)}
+
+/* ----- daftar shortcut ----- */
+#dlg-keys{width:min(560px,94vw);max-height:88vh;overflow:auto}
+#dlg-keys .keys-sec{margin:14px 0 6px;font-size:12px;color:var(--dim);font-weight:600}
+#dlg-keys .keys-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+#dlg-keys kbd{display:inline-block;white-space:nowrap;background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 7px;font:600 12px ui-monospace,Menlo,Consolas,monospace}

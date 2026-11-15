@@ -6,6 +6,8 @@ try{const s=document.createElement('script');s.src='js/s3timeline.js?v=1';docume
 /* navigasi (HP: bawah, komputer: kanan) + perapian tombol editor: css/nav.css dan js/nav.js */
 try{const l=document.createElement('link');l.rel='stylesheet';l.href='css/nav.css?v=1';document.head.appendChild(l)}catch(_){}
 try{const s=document.createElement('script');s.src='js/nav.js?v=1';document.body.appendChild(s)}catch(_){}
+/* Preset tampil sebagai layar penuh: css/preset-page.css */
+try{const l=document.createElement('link');l.rel='stylesheet';l.href='css/preset-page.css?v=1';document.head.appendChild(l)}catch(_){}
 const $=id=>document.getElementById(id),home=$('home'),main=home&&home.querySelector('.home-main');
 if(!main)return;
 const I={

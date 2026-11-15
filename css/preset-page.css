@@ -1,0 +1,26 @@
+/* Preset (dialog #dlg-template dari js/template.js) tampil sebagai layar penuh, bukan pop-up melayang. Hanya tampilan. Dimuat dari js/home-ref.js */
+#dlg-template{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;border-radius:0;background:var(--bg);color:var(--text);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
+#dlg-template[open]{display:flex;flex-direction:column;animation:tp-in .22s ease-out}
+@keyframes tp-in{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+#dlg-template::backdrop{background:var(--bg);backdrop-filter:none;-webkit-backdrop-filter:none}
+#dlg-template>*{flex:none}
+
+/* judul tetap di atas */
+#dlg-template>h3{position:sticky;top:0;z-index:2;margin:0;padding:calc(16px + env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right)) 14px max(18px,env(safe-area-inset-left));font-size:20px;letter-spacing:-.01em;background:var(--panel);border-bottom:1px solid var(--line)}
+
+/* isi dibatasi lebarnya supaya enak dibaca di komputer */
+#dlg-template>:not(h3):not(.dlg-actions){width:min(100%,1040px);margin-left:auto;margin-right:auto;padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right));box-sizing:border-box}
+#dlg-template>.tp-note{margin-top:16px;margin-bottom:14px;font-size:13px}
+#dlg-template>.tp-gallery{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px 14px;margin-bottom:24px}
+#dlg-template>.tp-slots{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+#dlg-template>.tp-empty{margin-top:40px}
+#dlg-template>label{margin-bottom:18px}
+#dlg-template .tp-cover{border-radius:14px}
+#dlg-template .tp-card b{font-size:14px}
+#dlg-template .tp-card{transition:transform .15s}
+#dlg-template .tp-card:active{transform:scale(.97)}
+
+/* tombol aksi tetap di bawah */
+#dlg-template>.dlg-actions{position:sticky;bottom:0;z-index:2;margin:auto 0 0;padding:12px max(18px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left));background:var(--panel);border-top:1px solid var(--line);justify-content:flex-end}
+@media (max-width:520px){#dlg-template>.tp-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}#dlg-template>.dlg-actions .btn{flex:1}}
+@media (prefers-reduced-motion:reduce){#dlg-template[open]{animation:none}}

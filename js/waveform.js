@@ -20,5 +20,5 @@ APK.wave=(function(){
   return{RATE,peaks(id){const v=cache.get(id);if(v===undefined){compute(id);return null}return v==='pending'?null:v},clear(){cache.clear()}};
 })();
 
-/* Memuat tambahan kamera Edit 3D (js/s3camfx.js, js/s3camfx2.js) setelah semua script lain selesai dimuat. */
-addEventListener('DOMContentLoaded',()=>{['js/s3camfx.js?v=1','js/s3camfx2.js?v=1'].reduce((p,src)=>p.then(()=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.body.appendChild(s)})),Promise.resolve())});
+/* Memuat tambahan Edit 3D (kamera pro, layer pro) setelah semua script lain selesai dimuat. */
+addEventListener('DOMContentLoaded',()=>{['js/s3camfx.js?v=1','js/s3camfx2.js?v=1','js/s3layerpro.js?v=1'].reduce((p,src)=>p.then(()=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.body.appendChild(s)})),Promise.resolve())});

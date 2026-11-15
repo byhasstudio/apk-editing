@@ -1,3 +1,6 @@
+/* Animasi halus seluruh tampilan: css/smooth.css ditaruh paling akhir di <head> supaya menimpa transisi lama */
+(function(){try{if(!document.getElementById('smooth-css')){const l=document.createElement('link');l.id='smooth-css';l.rel='stylesheet';l.href='css/smooth.css?v=1';document.head.appendChild(l)}}catch(_){}})();
+
 /* Waveform audio: puncak amplitudo per 20 ms, dihitung sekali per media */
 window.APK=window.APK||{};
 APK.wave=(function(){
@@ -24,4 +27,4 @@ APK.wave=(function(){
 window.__S3CAM_TEST=window.__S3CAM_TEST||{};
 
 /* Memuat tambahan Edit 3D (kamera pro, layer pro, animasi lanjutan, tekstur Ruang 3D) setelah semua script lain selesai dimuat. */
-addEventListener('DOMContentLoaded',()=>{['js/s3camfx.js?v=1','js/s3camfx2.js?v=1','js/s3layerpro.js?v=1','js/s3anim.js?v=1','js/s3tex.js?v=3'].reduce((p,src)=>p.then(()=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.body.appendChild(s)})),Promise.resolve())});
+addEventListener('DOMContentLoaded',()=>{['js/s3camfx.js?v=2','js/s3camfx2.js?v=1','js/s3layerpro.js?v=1','js/s3anim.js?v=1','js/s3tex.js?v=3'].reduce((p,src)=>p.then(()=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.body.appendChild(s)})),Promise.resolve())});

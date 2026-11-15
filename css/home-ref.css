@@ -1,3 +1,4 @@
+@import url("ui-polish.css?v=1");
 /* Beranda SplineWay (versi rapi): sapaan, kartu utama, 3 jalan pintas, daftar proyek. Hanya tampilan. */
 #home{--hr-r:18px;--hr-gap:12px}
 #home .home-head{padding:16px 18px 6px;border:0;background:transparent;gap:10px;flex-wrap:wrap}

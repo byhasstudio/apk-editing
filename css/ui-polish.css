@@ -1,0 +1,85 @@
+/* Perapian Edit 3D dan dialog. Hanya tampilan: ID, struktur, dan logika tidak diubah. Dimuat lewat @import dari css/home-ref.css */
+
+/* ===== Dialog (semua) ===== */
+dialog{border-radius:18px;padding:22px 20px;box-shadow:0 24px 70px -20px rgba(0,0,0,.7);max-height:92vh;overflow:auto;overscroll-behavior:contain}
+dialog[open]{animation:ui-pop .18s ease-out}
+@keyframes ui-pop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+dialog::backdrop{background:rgba(5,8,12,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+dialog h3{font-size:18px;letter-spacing:-.01em;margin:0 0 6px}
+dialog h3+p,dialog .tp-note,dialog .meta{line-height:1.45}
+dialog label{margin-bottom:14px;font-size:12.5px;font-weight:500}
+dialog input,dialog select,dialog textarea{border-radius:10px;padding:10px 12px;transition:border-color .15s,box-shadow .15s}
+dialog input:focus,dialog select:focus,dialog textarea:focus,.s3-fl input:focus,.s3-fl select:focus,.s3-fl textarea:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+dialog input[type=checkbox],dialog input[type=range]{width:auto;display:inline-block;margin:0;padding:0;accent-color:var(--accent)}
+dialog input[type=range]{width:100%}
+.dlg-actions{margin-top:20px;padding-top:14px;border-top:1px solid var(--line);gap:10px}
+.dlg-actions .btn{min-height:40px;padding:8px 18px;border-radius:10px}
+.btn{border-radius:10px;transition:border-color .15s,background .15s,transform .1s}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,.s3-chip:focus-visible,.s3-tpl:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ex-bar{height:10px;border-radius:6px}
+.ex-bar i{border-radius:6px;transition:width .2s}
+@media (max-width:520px){
+ dialog{width:94vw;padding:20px 16px}
+ .dlg-actions{flex-direction:row}
+ .dlg-actions .btn{flex:1}
+}
+
+/* ===== Edit 3D: bilah atas ===== */
+.s3-top{gap:8px;padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.s3-top .btn{min-height:36px;padding:6px 12px;border-radius:10px;white-space:nowrap}
+.s3-top .name-input{margin:0;border-radius:10px;padding:8px 12px;font-weight:600}
+.s3-top #s3-send{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
+.s3-top .btn.primary{box-shadow:0 6px 16px -8px var(--accent)}
+
+/* ===== Edit 3D: panggung/preview ===== */
+.s3-stage{padding:12px 12px 8px;background:var(--bg)}
+.s3-view{border-radius:14px;border:1px solid var(--line);box-shadow:0 12px 34px -18px rgba(0,0,0,.8)}
+.s3-ctl{margin-top:10px;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.s3-ctl .btn{min-width:40px;min-height:36px;padding:6px 12px;border-radius:10px}
+.s3-ctl select,.s3-ctl input[type=number]{border-radius:8px;padding:6px 8px}
+.s3-ctl .meta{font-variant-numeric:tabular-nums;color:var(--dim)}
+.s3-tl{margin-top:8px;padding:0 4px}
+#s3-time{accent-color:var(--accent);cursor:pointer}
+.s3-ticks button{border-radius:2px;box-shadow:0 0 0 2px var(--bg)}
+
+/* ===== Edit 3D: panel samping ===== */
+.s3-side{padding:12px 12px 72px}
+.s3-tools{gap:8px;padding:10px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.s3-tools .btn,.s3-tools select{min-height:36px;padding:7px 12px;font-size:13px;border-radius:10px}
+.s3-tools select{padding-right:8px}
+.s3-tools #s3-del{margin-left:auto}
+.s3-chips{gap:8px;padding:12px 2px 8px}
+.s3-chip{padding:7px 14px;border-radius:999px;transition:border-color .15s,background .15s}
+.s3-chip:hover{border-color:var(--accent)}
+.s3-props{border-radius:14px;padding:14px}
+.s3-hint{line-height:1.45}
+.s3-fl{margin-bottom:12px;font-weight:500}
+.s3-fl input,.s3-fl textarea,.s3-fl select{border-radius:10px;padding:9px 11px}
+.s3-two{gap:10px}
+.s3-f{margin-bottom:14px}
+.s3-lab{margin-bottom:4px}
+.s3-in input[type=range]{accent-color:var(--accent)}
+.s3-in input[type=number]{border-radius:8px}
+.s3-kf button{border-radius:8px;width:32px;height:28px}
+.s3-tpl{border-radius:14px;padding:14px;transition:border-color .15s,transform .15s}
+.s3-tpl:hover{transform:translateY(-1px)}
+.s3-cut{padding:6px 0}
+.s3-cut button{border-radius:8px;padding:3px 10px}
+#s3-dlg-new,#s3-dlg-tk,#s3-dlg-ex,#s3-dlg-send,#s3-dlg-html{width:min(480px,94vw)}
+#s3-tk-canvas{border-radius:12px;border:1px solid var(--line)}
+@media (min-width:900px){
+ .s3-top{padding:12px 20px}
+ .s3-stage{padding:16px 16px 12px}
+ .s3-side{padding:16px 20px 40px 4px}
+}
+
+/* ===== Dialog Preset (template.css) ===== */
+.tp-gallery,.tp-slots{gap:12px}
+.tp-card,.tp-slot{border-radius:14px;transition:border-color .15s,transform .15s}
+.tp-card:hover{transform:translateY(-2px)}
+.tp-cover,.tp-thumb{border-radius:10px;overflow:hidden}
+.tp-empty{padding:26px 12px;text-align:center;color:var(--dim);border:1px dashed var(--line);border-radius:12px}
+
+@media (prefers-reduced-motion:reduce){dialog[open]{animation:none}.btn,.s3-chip,.s3-tpl,.tp-card{transition:none}}

@@ -19,3 +19,6 @@ APK.wave=(function(){
   }
   return{RATE,peaks(id){const v=cache.get(id);if(v===undefined){compute(id);return null}return v==='pending'?null:v},clear(){cache.clear()}};
 })();
+
+/* Memuat tambahan kamera Edit 3D (js/s3camfx.js) setelah semua script lain selesai dimuat. */
+addEventListener('DOMContentLoaded',()=>{const s=document.createElement('script');s.src='js/s3camfx.js?v=1';document.body.appendChild(s)});

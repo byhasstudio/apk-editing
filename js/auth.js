@@ -12,11 +12,12 @@
 
    LOGIN LEWAT CHROME (untuk APK / WebView / browser dalam aplikasi):
    Google memblokir login di dalam WebView (disallowed_useragent), jadi di sana tombol Google diganti alur kode:
-   1) Aplikasi membuat kode acak 10 karakter dan menampilkannya, lalu memeriksa Firestore tiap 2 detik (REST, tanpa SDK).
+   1) Aplikasi membuat kode acak 10 karakter dan menampilkannya, lalu memeriksa Realtime Database tiap 2 detik (REST, tanpa SDK).
    2) Pengguna membuka tautan  APP_URL?link=KODE  di Chrome, masuk dengan Google di sana.
-   3) Halaman Chrome menulis dokumen loginLinks/KODE (uid, email, nama, kedaluwarsa 10 menit) memakai ID token Firebase.
-   4) Aplikasi menemukan dokumen itu, menghapusnya, lalu masuk sebagai akun tersebut.
-   SYARAT DI FIREBASE CONSOLE: Firestore Database sudah dibuat, dan aturannya memuat blok loginLinks (lihat README / pesan commit).
+   3) Halaman Chrome menulis loginLinks/KODE = {uid, email, name, created} memakai ID token Firebase (auth=...).
+   4) Aplikasi menemukan data itu, menghapusnya, lalu masuk sebagai akun tersebut. Kode hanya berlaku 10 menit sejak dibuat di aplikasi.
+   SYARAT DI FIREBASE CONSOLE: Realtime Database > Rules harus memuat blok "loginLinks" (lihat commit message / README).
+   Database yang dipakai sama dengan js/qrlink.js (DB di bawah).
 
    SYARAT DI FIREBASE CONSOLE (umum): Authentication > Sign-in method > Google harus Enabled, dan Authentication > Settings > Authorized domains
    harus memuat domain tempat aplikasi dibuka (mis. byhasstudio.github.io). Cek juga FB_CFG di bawah (authDomain dan projectId).
@@ -28,7 +29,8 @@ const FB_CFG={apiKey:'AIzaSyBahNCBMGHzRBTIT4aE2PMHDdTEQVgQkp4',authDomain:'splin
 const SDK='https://www.gstatic.com/firebasejs/10.14.1/';
 const AUTH_DB='splineway-auth',SKEY='splineway:session',LKEY='splineway:legacy-owner',RKEY='splineway:redirect-keep',CKEY='splineway:linkcode';
 const APP_URL='https://byhasstudio.github.io/apk-editing/';
-const FS='https://firestore.googleapis.com/v1/projects/'+FB_CFG.projectId+'/databases/(default)/documents/loginLinks';
+const DB='https://splineway-default-rtdb.asia-southeast1.firebasedatabase.app';
+const LINKS=DB+'/loginLinks';
 const ALPHA='ABCDEFGHJKMNPQRSTUVWXYZ23456789',CODE_RE=/^[A-HJKMNP-Z2-9]{10}$/,CODE_TTL=600000;
 const proto=window.IDBFactory&&IDBFactory.prototype;
 if(!proto||!window.indexedDB)return;
@@ -107,7 +109,7 @@ function explain(e){
   return 'Gagal masuk dengan Google. Coba lagi.';
 }
 
-/* ---------- kode penghubung (APK <-> Chrome) lewat Firestore REST ---------- */
+/* ---------- kode penghubung (APK <-> Chrome) lewat Realtime Database REST ---------- */
 function newCode(){
   const a=new Uint8Array(10);
   try{crypto.getRandomValues(a)}catch(e){for(let i=0;i<10;i++)a[i]=Math.floor(Math.random()*256)}
@@ -123,19 +125,15 @@ function getCode(){
   try{localStorage.setItem(CKEY,JSON.stringify(o))}catch(e){}
   return o;
 }
-function fv(f,k){return f&&f[k]&&f[k].stringValue||''}
 async function checkLink(code){
-  const r=await fetch(FS+'/'+code+'?key='+FB_CFG.apiKey,{cache:'no-store'});
-  if(r.status===404)return null;
-  if(!r.ok){const e=new Error('fs');e.status=r.status;throw e}
-  const d=await r.json(),f=d.fields||{};
-  const exp=f.exp&&Number(f.exp.integerValue)||0;
-  if(exp&&exp<Date.now())return null;
-  const uid=fv(f,'uid');if(!uid)return null;
-  return {uid:uid,email:fv(f,'email'),displayName:fv(f,'name')};
+  const r=await fetch(LINKS+'/'+code+'.json',{cache:'no-store'});
+  if(!r.ok){const e=new Error('db');e.status=r.status;throw e}
+  const j=await r.json();
+  if(!j||typeof j.uid!=='string'||!j.uid)return null;
+  return {uid:j.uid,email:String(j.email||''),displayName:String(j.name||'')};
 }
 function dropLink(code){
-  return fetch(FS+'/'+code+'?key='+FB_CFG.apiKey,{method:'DELETE'}).catch(function(){});
+  return fetch(LINKS+'/'+code+'.json',{method:'DELETE'}).catch(function(){});
 }
 
 /* ---------- tampilan ---------- */
@@ -258,7 +256,7 @@ function mountWebViewAuth(){
         running=false;if(stop)return;
       }
     }catch(e){
-      if(++fails>=3)err('Tidak bisa memeriksa login (Firestore belum aktif, aturan belum dipasang, atau koneksi bermasalah).');
+      if(++fails>=3)err('Tidak bisa memeriksa login (Rules database belum dipasang, atau koneksi bermasalah).');
     }
     running=false;
     if(Date.now()-t0>CODE_TTL){stop=true;try{localStorage.removeItem(CKEY)}catch(e){}location.reload();return}
@@ -293,19 +291,13 @@ function mountLinkPage(){
       const r=await auth.signInWithPopup(provider);
       setBusy(true,'Menghubungkan...');
       const u=r.user,token=await u.getIdToken();
-      const res=await fetch(FS+'?documentId='+LINK+'&key='+FB_CFG.apiKey,{
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-        body:JSON.stringify({fields:{
-          uid:{stringValue:u.uid},
-          email:{stringValue:u.email||''},
-          name:{stringValue:u.displayName||''},
-          exp:{integerValue:String(Date.now()+CODE_TTL)}
-        }})
+      const res=await fetch(LINKS+'/'+LINK+'.json?auth='+encodeURIComponent(token),{
+        method:'PUT',
+        body:JSON.stringify({uid:u.uid,email:u.email||'',name:u.displayName||'',created:{'.sv':'timestamp'}})
       });
       try{await auth.signOut()}catch(x){}
-      if(res.status===409){setBusy(false);err('Kode ini sudah dipakai. Buka lagi dari aplikasi untuk mendapat kode baru.');return}
-      if(!res.ok){setBusy(false);err('Gagal menghubungkan (kode '+res.status+'). Pastikan Firestore sudah aktif dan aturannya sudah dipasang.');return}
+      if(res.status===401||res.status===403){setBusy(false);err('Firebase menolak. Kode ini mungkin sudah dipakai (buka lagi dari aplikasi untuk kode baru), atau Rules database belum dipasang.');return}
+      if(!res.ok){setBusy(false);err('Gagal menghubungkan (kode '+res.status+'). Coba lagi.');return}
       box.querySelector('.au-card').innerHTML=
         '<h1>Berhasil</h1><p class="au-sub">Kembali ke aplikasi SplineWay, kamu akan otomatis masuk. Halaman ini boleh ditutup.</p>';
     }catch(e){setBusy(false);err(explain(e))}

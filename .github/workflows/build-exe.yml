@@ -4,7 +4,7 @@ name: Build EXE
 # Jalankan manual: tab Actions > Build EXE > Run workflow. Otomatis jalan juga kalau file ini atau assets/logo.png diubah.
 #
 # Cara kerja pembaruan: EXE adalah cangkang Electron yang memuat situs https://byhasstudio.github.io/apk-editing/.
-# Setiap push ke situs otomatis sampai ke EXE: dicek saat dibuka dan tiap 5 menit (lihat js/updater.js).
+# Setiap push ke situs otomatis sampai ke EXE: dicek saat dibuka dan tiap 1 jam (lihat js/updater.js).
 # EXE baru hanya perlu dibuat kalau nama, ikon, atau cangkangnya berubah. Tanpa internet, jendela offline tampil
 # dan menyambung ulang sendiri.
 #
@@ -150,4 +150,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest-exe --cleanup-tag -y --repo "$GITHUB_REPOSITORY" || true
-          gh release create latest-exe shell/dist/SplineWay-Setup.exe shell/dist/SplineWay-Portable.exe --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "SplineWay EXE (terbaru)" --notes "EXE SplineWay build #${GITHUB_RUN_NUMBER}: Setup = installer, Portable = tanpa install. Isi aplikasi diperbarui otomatis dari situs saat dibuka dan tiap 5 menit."
+          gh release create latest-exe shell/dist/SplineWay-Setup.exe shell/dist/SplineWay-Portable.exe --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "SplineWay EXE (terbaru)" --notes "EXE SplineWay build #${GITHUB_RUN_NUMBER}: Setup = installer, Portable = tanpa install. Isi aplikasi diperbarui otomatis dari situs saat dibuka dan tiap 1 jam."

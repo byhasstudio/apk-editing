@@ -1,14 +1,11 @@
 /* Beranda: 1 kartu utama + 3 jalan pintas ke fitur yang sudah ada. Memakai tombol lama lewat .click(). */
 (function(){
 'use strict';
-/* timeline Edit 3D dimuat dari sini supaya index.html tidak perlu diubah */
-try{const s=document.createElement('script');s.src='js/s3timeline.js?v=1';document.body.appendChild(s)}catch(_){}
-/* navigasi (HP: bawah, komputer: kanan) + perapian tombol editor: css/nav.css dan js/nav.js */
-try{const s=document.createElement('script');s.src='js/nav.js?v=1';document.body.appendChild(s)}catch(_){}
-/* stylesheet tambahan: navigasi, Preset layar penuh, Ruang 3D layar penuh */
-['css/nav.css?v=1','css/preset-page.css?v=1','css/s3-page.css?v=1'].forEach(function(h){
-  try{const l=document.createElement('link');l.rel='stylesheet';l.href=h;document.head.appendChild(l)}catch(_){}
-});
+/* timeline Edit 3D lalu menu tombol dimuat dari sini supaya index.html tidak perlu diubah (menu harus setelah timeline siap) */
+function load(src,next){
+  try{const s=document.createElement('script');s.src=src;s.onload=s.onerror=()=>{if(next)next()};document.body.appendChild(s)}catch(_){if(next)next()}
+}
+load('js/s3timeline.js?v=1',()=>load('js/menus.js?v=1'));
 const $=id=>document.getElementById(id),home=$('home'),main=home&&home.querySelector('.home-main');
 if(!main)return;
 const I={

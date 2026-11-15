@@ -1,0 +1,153 @@
+name: Build EXE
+
+# Membuat EXE SplineWay (installer dan portable) dan menerbitkannya di Releases (tag latest-exe).
+# Jalankan manual: tab Actions > Build EXE > Run workflow. Otomatis jalan juga kalau file ini atau assets/logo.png diubah.
+#
+# Cara kerja pembaruan: EXE adalah cangkang Electron yang memuat situs https://byhasstudio.github.io/apk-editing/.
+# Setiap push ke situs otomatis sampai ke EXE: dicek saat dibuka dan tiap 5 menit (lihat js/updater.js).
+# EXE baru hanya perlu dibuat kalau nama, ikon, atau cangkangnya berubah. Tanpa internet, jendela offline tampil
+# dan menyambung ulang sendiri.
+#
+# Logo: kalau ada assets/logo.png (disarankan 1024x1024), itu yang dipakai. Kalau tidak ada, logo 128 px dari js/brand.js dipakai.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-exe.yml'
+      - 'assets/logo.png'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-exe
+  cancel-in-progress: true
+
+env:
+  APP_URL: https://byhasstudio.github.io/apk-editing/
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Siapkan logo
+        run: |
+          mkdir -p shell
+          if [ -f assets/logo.png ]; then
+            cp assets/logo.png shell/logo.png
+          else
+            grep -o 'data:image/png;base64,[A-Za-z0-9+/=]*' js/brand.js | head -1 | sed 's#^data:image/png;base64,##' | base64 -d > shell/logo.png
+          fi
+          test -s shell/logo.png
+
+      - name: Buat aplikasi Electron
+        working-directory: shell
+        run: |
+          cat > package.json <<'EOF'
+          {
+            "name": "splineway",
+            "productName": "SplineWay",
+            "version": "1.0.0",
+            "description": "SplineWay: editor video berbasis web oleh BYHASSSTUDIO",
+            "author": "BYHASSSTUDIO",
+            "main": "main.js",
+            "build": {
+              "appId": "com.byhasstudio.splineway",
+              "productName": "SplineWay",
+              "directories": { "output": "dist", "buildResources": "build" },
+              "files": ["main.js", "offline.html", "icon.png", "package.json"],
+              "win": { "target": ["nsis", "portable"], "icon": "build/icon.png" },
+              "nsis": { "oneClick": true, "perMachine": false, "artifactName": "SplineWay-Setup.${ext}" },
+              "portable": { "artifactName": "SplineWay-Portable.${ext}" }
+            }
+          }
+          EOF
+          npm version "1.0.${GITHUB_RUN_NUMBER}" --no-git-tag-version
+          npm i -D electron@33.2.1 electron-builder@25.1.8 sharp
+          mkdir -p build
+          node -e "require('sharp')('logo.png').resize(512,512).png().toFile('build/icon.png').then(function(){require('fs').copyFileSync('build/icon.png','icon.png')})"
+          cat > main.js <<'EOF'
+          const { app, BrowserWindow, Menu, shell } = require('electron');
+          const path = require('path');
+          const APP_URL = '__APP_URL__';
+
+          if (!app.requestSingleInstanceLock()) app.quit();
+
+          let win;
+          function create() {
+            win = new BrowserWindow({
+              width: 1366, height: 860, minWidth: 900, minHeight: 600,
+              backgroundColor: '#000833', title: 'SplineWay',
+              icon: path.join(__dirname, 'icon.png'),
+              webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+            });
+            Menu.setApplicationMenu(null);
+            win.loadURL(APP_URL);
+            win.webContents.on('did-fail-load', (e, code, desc, url, isMainFrame) => {
+              if (isMainFrame && code !== -3) win.loadFile(path.join(__dirname, 'offline.html'));
+            });
+            win.webContents.setWindowOpenHandler(({ url }) => {
+              if (url.startsWith(APP_URL)) return { action: 'allow' };
+              shell.openExternal(url);
+              return { action: 'deny' };
+            });
+          }
+
+          app.on('second-instance', () => {
+            if (!win) return;
+            if (win.isMinimized()) win.restore();
+            win.focus();
+          });
+          app.whenReady().then(create);
+          app.on('window-all-closed', () => app.quit());
+          EOF
+          cat > offline.html <<'EOF'
+          <!doctype html>
+          <html lang="id"><head><meta charset="utf-8">
+          <title>SplineWay</title>
+          <style>
+          html,body{height:100%;margin:0;background:#000833;color:#fff;font:16px system-ui,sans-serif}
+          body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px}
+          button{background:#2bd67b;color:#04122a;border:0;border-radius:10px;padding:10px 18px;font:600 16px system-ui,sans-serif;cursor:pointer}
+          </style></head>
+          <body><h2>SplineWay</h2>
+          <p>Tidak ada koneksi internet.<br>Menyambungkan ulang otomatis...</p>
+          <button id="b">Coba lagi</button>
+          <script>
+          var U='__APP_URL__';
+          function go(){fetch(U,{mode:'no-cors',cache:'no-store'}).then(function(){location.href=U}).catch(function(){})}
+          document.getElementById('b').onclick=go;setInterval(go,5000);
+          </script></body></html>
+          EOF
+          sed -i "s#__APP_URL__#${APP_URL}#g" main.js offline.html
+
+      - name: Build EXE
+        working-directory: shell
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --win --x64 --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SplineWay-exe
+          path: |
+            shell/dist/SplineWay-Setup.exe
+            shell/dist/SplineWay-Portable.exe
+
+      - name: Terbitkan ke Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest-exe --cleanup-tag -y --repo "$GITHUB_REPOSITORY" || true
+          gh release create latest-exe shell/dist/SplineWay-Setup.exe shell/dist/SplineWay-Portable.exe --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "SplineWay EXE (terbaru)" --notes "EXE SplineWay build #${GITHUB_RUN_NUMBER}: Setup = installer, Portable = tanpa install. Isi aplikasi diperbarui otomatis dari situs saat dibuka dan tiap 5 menit."

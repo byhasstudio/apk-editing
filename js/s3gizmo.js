@@ -1,10 +1,15 @@
 /* GIZMO KAMERA FISIK untuk Edit 3D (add-on, dimuat setelah js/s3cam.js; butuh 1 baris ekspor di akhir s3cam.js: APK.s3cam).
-   - Tombol "✥ Gizmo" melayang di pojok kanan atas viewport (hanya tampil di mode Ruang 3D / 2 Tampilan).
+   - Tombol "✥ Gizmo" melayang di pojok kanan atas tampilan Ruang 3D (juga di mode 2 Tampilan, apa pun susunannya).
+     Tombol itu hanya membuka / menutup MENU gizmo. Gizmo di kamera tetap tampil walau menu ditutup; untuk menyembunyikannya pakai "👁 Tampil" di dalam menu.
+   - Semua pilihan (tampil/sembunyi, menu terbuka/tertutup, Geser/Putar, Global/Lokal) disimpan di localStorage 's3gizmo', jadi tidak hilang
+     saat pindah tampilan, keluar-masuk 2 Tampilan, buka project lain, atau muat ulang halaman.
    - Mode GESER: 3 panah dua arah (merah X, hijau Y, biru Z), kepala panah di kedua ujung dan huruf sumbu. Seret panah = kamera bergeser sepanjang sumbu itu.
    - Mode PUTAR: 3 cincin besar. Seret cincin = kamera berputar mengelilingi sumbu itu.
    - Ruang: GLOBAL (sumbu dunia) atau LOKAL (sumbu kamera sendiri).
    Hasilnya ditulis lewat put() milik s3cam.js (x, y, z, rx, ry, rz), jadi otomatis jadi keyframe kalau properti itu beranimasi,
-   ikut undo/redo, simpan otomatis, preview, dan export. Digambar di kanvas overlay sendiri, s3cam.js tidak digambar ulang. */
+   ikut undo/redo, simpan otomatis, preview, dan export. Digambar di kanvas overlay sendiri, s3cam.js tidak digambar ulang.
+   - Di bagian bawah file ini ada pemilih SUSUNAN mode 2 Tampilan (dibuat di js/s3tools.js): kiri-kanan atau atas-bawah, dan mana yang di sisi mana.
+     Pilihannya disimpan di localStorage 's3layout'. */
 (function(){
 'use strict';
 const S=window.APK&&APK.s3cam;
@@ -18,7 +23,17 @@ const tr=M=>[M[0],M[3],M[6],M[1],M[4],M[7],M[2],M[5],M[8]];
 const COL=['#ff4d4d','#3ddc5b','#4d8dff'],HOT='#ffd166',NAME=['x','y','z'],LBL=['X','Y','Z'];
 const ARROW=1.25;   /* panjang panah (kali U) dari titik tengah ke tiap ujung */
 const RING=1.8;     /* jari-jari cincin putar (kali U) */
-const st={on:false,mode:'move',space:'global',hover:null,drag:null};
+/* on = gizmo tampil di kamera terpilih, open = menu gizmo terbuka. Keduanya (dan mode / ruang) diingat, jadi gizmo tidak hilang sendiri */
+const st={on:true,open:true,mode:'move',space:'global',hover:null,drag:null};
+const SKEY='s3gizmo';
+try{
+  const o=JSON.parse(localStorage.getItem(SKEY)||'{}');
+  if(typeof o.on==='boolean')st.on=o.on;
+  if(typeof o.open==='boolean')st.open=o.open;
+  if(o.mode==='move'||o.mode==='rot')st.mode=o.mode;
+  if(o.space==='global'||o.space==='local')st.space=o.space;
+}catch(_){}
+const keep=()=>{try{localStorage.setItem(SKEY,JSON.stringify({on:st.on,open:st.open,mode:st.mode,space:st.space}))}catch(_){}};
 
 /* dunia editor: x kanan, y BAWAH, z maju. Panah "atas" = -y supaya tampil seperti gizmo biasa */
 function axesOf(pose){
@@ -97,6 +112,10 @@ function draw(){
   if(!show)return;
   if(cv.width!==lv.width||cv.height!==lv.height){cv.width=lv.width;cv.height=lv.height}
   cv.style.left=lv.offsetLeft+'px';cv.style.top=lv.offsetTop+'px';cv.style.width=lv.offsetWidth+'px';cv.style.height=lv.offsetHeight+'px';
+  /* tombol melayang selalu di pojok kanan atas tampilan Ruang 3D, juga di 2 Tampilan (kiri-kanan, atas-bawah, atau ditukar) */
+  const vw=box.parentNode;
+  box.style.top=(lv.offsetTop+8)+'px';
+  box.style.right=Math.max(4,vw.clientWidth-(lv.offsetLeft+lv.offsetWidth)+8)+'px';
   const g=cv.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,cv.width,cv.height);
   if(!st.on)return;
   const c=ctx();if(c)drawGizmo(g,c);
@@ -188,11 +207,12 @@ function onUp(e){
 function sync(){
   if(!box)return;
   const q=s=>box.querySelector(s);
-  q('#s3g-toggle').classList.toggle('on',st.on);
-  q('#s3g-opts').style.display=st.on?'flex':'none';
+  const tg=q('#s3g-toggle');tg.classList.toggle('on',st.on);tg.textContent='✥ Gizmo '+(st.open?'▾':'▸');
+  q('#s3g-opts').style.display=st.open?'flex':'none';
+  const sh=q('#s3g-show');sh.classList.toggle('on',st.on);sh.textContent=st.on?'👁 Tampil':'🚫 Sembunyi';
   [['move','#s3g-move'],['rot','#s3g-rot']].forEach(([m,s])=>q(s).classList.toggle('on',st.mode===m));
   [['global','#s3g-glob'],['local','#s3g-loc']].forEach(([m,s])=>q(s).classList.toggle('on',st.space===m));
-  S.bump();
+  keep();S.bump();
 }
 function init(){
   const view=document.querySelector('#s3d .s3-view'),lv=S.lv;
@@ -201,8 +221,9 @@ function init(){
   cv=document.createElement('canvas');cv.id='s3g-cv';cv.style.cssText='position:absolute;pointer-events:none;z-index:3;display:none';
   lv.insertAdjacentElement('afterend',cv);
   box=document.createElement('div');box.id='s3g-box';
-  box.innerHTML='<button class="btn" id="s3g-toggle" type="button" title="Tampilkan / sembunyikan gizmo geser dan putar untuk kamera terpilih">✥ Gizmo</button>'
-    +'<div id="s3g-opts"><div class="s3g-row"><button class="btn on" id="s3g-move" type="button">↔ Geser</button><button class="btn" id="s3g-rot" type="button">⟳ Putar</button></div>'
+  box.innerHTML='<button class="btn" id="s3g-toggle" type="button" title="Buka / tutup menu gizmo. Gizmo tetap tampil di kamera walau menu ditutup">✥ Gizmo ▾</button>'
+    +'<div id="s3g-opts"><div class="s3g-row"><button class="btn on" id="s3g-show" type="button" title="Tampilkan / sembunyikan gizmo di kamera terpilih">👁 Tampil</button></div>'
+    +'<div class="s3g-row"><button class="btn on" id="s3g-move" type="button">↔ Geser</button><button class="btn" id="s3g-rot" type="button">⟳ Putar</button></div>'
     +'<div class="s3g-row"><button class="btn on" id="s3g-glob" type="button" title="Sumbu dunia">🌐 Global</button><button class="btn" id="s3g-loc" type="button" title="Sumbu kamera sendiri">◎ Lokal</button></div></div>';
   view.appendChild(box);
   const st0=document.createElement('style');
@@ -210,7 +231,8 @@ function init(){
     +'#s3g-opts{display:none;flex-direction:column;align-items:flex-end;gap:6px}#s3g-box .s3g-row{display:flex;gap:4px}'
     +'#s3g-box .btn{padding:6px 10px;font-size:13px;background:#0009;backdrop-filter:blur(4px)}#s3g-box .btn.on{outline:2px solid #ffd166}';
   document.head.appendChild(st0);
-  $('s3g-toggle').onclick=()=>{st.on=!st.on;st.hover=null;sync()};
+  $('s3g-toggle').onclick=()=>{st.open=!st.open;sync()};
+  $('s3g-show').onclick=()=>{st.on=!st.on;st.hover=null;sync()};
   $('s3g-move').onclick=()=>{st.mode='move';sync()};$('s3g-rot').onclick=()=>{st.mode='rot';sync()};
   $('s3g-glob').onclick=()=>{st.space='global';sync()};$('s3g-loc').onclick=()=>{st.space='local';sync()};
   view.addEventListener('pointerdown',onDown,true);view.addEventListener('pointermove',onMove,true);
@@ -219,11 +241,78 @@ function init(){
   (function tick(){
     requestAnimationFrame(tick);
     const root=$('s3d');if(!root)return;
-    const sig=[S.rev,curT(),V.mode,V.az,V.el,V.d,String(V.tg),st.on,st.mode,st.space,st.hover?st.hover.k+st.hover.i:'',st.drag?1:0,selId(),root.hidden,lv.width,lv.height,lv.offsetWidth,lv.offsetLeft].join('|');
+    const sig=[S.rev,curT(),V.mode,V.az,V.el,V.d,String(V.tg),st.on,st.mode,st.space,st.hover?st.hover.k+st.hover.i:'',st.drag?1:0,selId(),root.hidden,lv.width,lv.height,lv.offsetWidth,lv.offsetHeight,lv.offsetLeft,lv.offsetTop,view.clientWidth].join('|');
     if(sig!==last){last=sig;try{draw()}catch(err){console.warn('Gizmo gagal digambar',err)}}
   })();
   sync();
   return true;
 }
 try{if(!init())setTimeout(init,500)}catch(e){console.error('Gizmo kamera gagal dimuat',e)}
+})();
+
+/* ===================== SUSUNAN 2 TAMPILAN (Edit 3D) =====================
+   Mode "◫ 2 Tampilan" (dibuat di js/s3tools.js) awalnya hanya kiri = hasil kamera, kanan = ruang 3D. Di sini ditambah pemilih susunan
+   di sebelah tombolnya (muncul hanya saat 2 Tampilan aktif):
+     lr = Hasil kiri · 3D kanan (bawaan)   rl = 3D kiri · Hasil kanan   tb = Hasil atas · 3D bawah   bt = 3D atas · Hasil bawah
+   Pilihan disimpan di localStorage 's3layout'. Susunan diatur lewat kelas s3-lay-xx di #s3d dan CSS grid (order), jadi semua kontrol
+   Ruang 3D tetap bekerja. Label "HASIL KAMERA" / "RUANG 3D" dari s3tools.js dipindahkan mengikuti posisi tiap kanvas. */
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const LAYS={lr:'Hasil kiri · 3D kanan',rl:'3D kiri · Hasil kanan',tb:'Hasil atas · 3D bawah',bt:'3D atas · Hasil bawah'};
+const KEY='s3layout';
+let lay='lr',sel=null;
+try{const v=localStorage.getItem(KEY);if(v&&LAYS[v])lay=v}catch(_){}
+function place(){
+  const view=document.querySelector('#s3d .s3-view'),cv=$('s3-cv'),lv=$('s3-lv');
+  if(!view||!cv||!lv)return;
+  const caps=view.querySelectorAll('.s3x-cap');if(caps.length<2)return;
+  const at=(el,c)=>{el.style.left=(c.offsetLeft+6)+'px';el.style.top=(c.offsetTop+4)+'px'};
+  at(caps[0],cv);at(caps[1],lv);
+}
+function apply(){
+  const r=$('s3d');if(!r)return;
+  Object.keys(LAYS).forEach(k=>r.classList.toggle('s3-lay-'+k,k===lay));
+  if(sel)sel.value=lay;
+  requestAnimationFrame(place);
+}
+function show(){
+  const r=$('s3d');if(!r||!sel)return;
+  sel.hidden=!r.classList.contains('s3-vdual');
+  place();
+}
+function init(){
+  const r=$('s3d'),w=document.querySelector('#s3d .s3v'),b=$('s3-vdual');
+  if(!r||!w||!b)return false;
+  if($('s3-vlay'))return true;
+  sel=document.createElement('select');sel.id='s3-vlay';sel.hidden=true;
+  sel.setAttribute('aria-label','Susunan 2 tampilan');
+  sel.title='Susunan 2 tampilan: kiri-kanan atau atas-bawah, dan mana yang di sisi mana';
+  sel.innerHTML=Object.keys(LAYS).map(k=>'<option value="'+k+'">'+LAYS[k]+'</option>').join('');
+  w.insertBefore(sel,b.nextSibling);
+  sel.onchange=()=>{lay=sel.value;try{localStorage.setItem(KEY,lay)}catch(_){}apply()};
+  const st=document.createElement('style');
+  st.textContent=
+    '#s3d.s3-vdual.s3-lay-rl #s3-cv,#s3d.s3-vdual.s3-lay-bt #s3-cv{order:2}'
+   +'#s3d.s3-vdual.s3-lay-rl #s3-lv,#s3d.s3-vdual.s3-lay-bt #s3-lv{order:1}'
+   +'#s3d.s3-v3d.s3-vdual.s3-lay-tb .s3-view,#s3d.s3-v3d.s3-vdual.s3-lay-bt .s3-view{grid-template-columns:minmax(0,1fr);gap:4px}'
+   +'#s3d.s3-vdual.s3-lay-tb #s3-cv,#s3d.s3-vdual.s3-lay-tb #s3-lv,#s3d.s3-vdual.s3-lay-bt #s3-cv,#s3d.s3-vdual.s3-lay-bt #s3-lv{max-height:24vh}'
+   +'@media (min-width:900px){#s3d.s3-vdual.s3-lay-tb #s3-cv,#s3d.s3-vdual.s3-lay-tb #s3-lv,#s3d.s3-vdual.s3-lay-bt #s3-cv,#s3d.s3-vdual.s3-lay-bt #s3-lv{max-height:34vh}}'
+   +'#s3-vlay{max-width:190px}';
+  document.head.appendChild(st);
+  new MutationObserver(show).observe(r,{attributes:true,attributeFilter:['class']});
+  if(window.ResizeObserver){
+    const ro=new ResizeObserver(place);
+    ['#s3d .s3-view','#s3-cv','#s3-lv'].forEach(q=>{const e=document.querySelector(q);if(e)ro.observe(e)});
+  }
+  addEventListener('resize',place);
+  apply();show();
+  return true;
+}
+/* tombol "◫ 2 Tampilan" dibuat s3tools.js saat halaman selesai dimuat: tunggu sampai ada */
+let tries=0;
+const iv=setInterval(()=>{
+  try{if(init()||++tries>80)clearInterval(iv)}
+  catch(e){clearInterval(iv);console.warn('Susunan 2 tampilan gagal dimuat',e)}
+},250);
 })();

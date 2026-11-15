@@ -41,7 +41,7 @@ https://byhasstudio.github.io/apk-editing/
 
 ### Edit 3D (tombol "✦ Edit 3D" di beranda)
 
-Pengedit dan tracking 3D, **bukan** pembuat model 3D. Ruang 3D dengan kamera (posisi, putar, roll, FOV), layer teks / foto / video, parent (grup/orbit), hadap kamera (billboard), keyframe + kurva gerak, efek layar (pisah warna, glow, getar kamera, kilat), latar kipas, pita cahaya, debu bintang, musik, export video real-time. Seret objek langsung di preview.
+Pengedit dan tracking 3D, **bukan** pembuat model 3D. Ruang 3D dengan kamera (posisi, putar, roll, FOV), layer teks / foto / video, parent (grup/orbit), hadap kamera (billboard), tombol **🌐 360°** di layer foto / video (jadi latar panorama yang memenuhi layar, kamera memutar untuk melihat sekeliling), keyframe + kurva gerak, efek layar (pisah warna, glow, getar kamera, kilat), latar kipas, pita cahaya, debu bintang, musik, export video real-time. Seret objek langsung di preview.
 
 - **Tracking titik**: pilih layer video, tekan "Lacak titik", ketuk objek, mulai lacak, lalu tempel ke teks/foto: layer mengikuti objek lewat keyframe otomatis.
 - **Contoh referensi**: Lirik 3D Warp (kata terbang menembus kamera), Foto Terowongan 3D, Kartu Foto Orbit, Tracking teks, Kosong.

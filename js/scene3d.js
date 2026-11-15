@@ -49,6 +49,7 @@ const NAMES={camera:'Kamera',fx:'Efek',text:'Teks',image:'Foto',video:'Video',gr
 const ICON={camera:'🎥',fx:'✦',text:'T',image:'🖼',video:'🎞',group:'▣',sunburst:'✺',ribbon:'〰',dust:'✧',model:'🧊'};
 const IS3D=k=>k==='text'||k==='image'||k==='video'||k==='group'||k==='model';
 const ISMEDIA=k=>k==='image'||k==='video';
+const ISPANO=it=>!!it&&it.pano===true&&(it.kind==='image'||it.kind==='video');
 const pd=(kind,p)=>(PDK[kind]&&PDK[kind][p])||PD[p];
 const ASPECT={'16:9':[16,9],'9:16':[9,16],'1:1':[1,1],'4:3':[4,3],'21:9':[21,9]};
 
@@ -256,6 +257,62 @@ function mediaTex(it){
   return{c,cw,ch,tw:mw,th:mh};
 }
 
+/* ===== 360°: foto / video jadi latar panorama (equirectangular) yang memenuhi layar =====
+   Tiap piksel layar menembakkan sinar dari kamera. Arah sinar (setelah diputar oleh putaran kamera dan putaran layer 360°)
+   diubah jadi bujur / lintang untuk mengambil warna di foto. Posisi kamera tidak berpengaruh (latar tak terhingga jauhnya),
+   hanya putaran kamera dan Putar 3D X / Y / Z milik layer 360°. Digambar paling belakang, di bawah semua layer lain. */
+let PNG=null,PNC=null;
+const panoCache=new Map();
+function panoTex(it){
+  const m=getMedia(it.mediaId);
+  if(!m||m.kind==='audio')return null;
+  if(m.kind==='image'){
+    if(!m.pano){
+      const s=Math.min(1,2048/m.w,1536/m.h),w=Math.max(2,Math.round(m.w*s)),h=Math.max(2,Math.round(m.h*s)),c=document.createElement('canvas');
+      c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});
+      try{x.drawImage(m.el,0,0,w,h);m.pano={w,h,d:x.getImageData(0,0,w,h).data}}catch(_){return null}
+    }
+    return m.pano;
+  }
+  if(m.el.readyState<2)return null;
+  const s=Math.min(1,1280/m.w,720/m.h),w=Math.max(2,Math.round(m.w*s)),h=Math.max(2,Math.round(m.h*s));
+  let c=panoCache.get(it.id);if(!c){c=document.createElement('canvas');panoCache.set(it.id,c)}
+  if(c.width!==w||c.height!==h){c.width=w;c.height=h}
+  const x=c.getContext('2d',{willReadFrequently:true});
+  try{x.drawImage(m.el,0,0,w,h);return{w,h,d:x.getImageData(0,0,w,h).data}}catch(_){return null}
+}
+function drawPano(it,tt,C,W,H){
+  const o=val(it,'opacity',tt);if(!(o>0.002))return;
+  const T=panoTex(it);if(!T)return;
+  const budget=exPrecise?2.4e6:playing?2.2e5:5.2e5,sc=Math.min(1,Math.sqrt(budget/(W*H))),pw=Math.max(8,Math.round(W*sc)),ph=Math.max(8,Math.round(H*sc));
+  PNC=fit(PNC,pw,ph);
+  const pg=PNC.getContext('2d');
+  if(!PNG||PNG.width!==pw||PNG.height!==ph)PNG=pg.createImageData(pw,ph);
+  /* M = (putaran layer 360°)^T x (putaran kamera): arah dari koordinat kamera ke koordinat panorama */
+  const Rl=world(it,tt).R,Rc=C.R,M=new Array(9);
+  for(let i=0;i<3;i++)for(let j=0;j<3;j++)M[i*3+j]=Rl[i]*Rc[j]+Rl[3+i]*Rc[3+j]+Rl[6+i]*Rc[6+j];
+  const F=C.F*(H/REFH)*sc,d=PNG.data,td=T.d,tw=T.w,th=T.h,PI=Math.PI,cx=pw/2,cy=ph/2;
+  const m0=M[0],m1=M[1],m2=M[2],m3=M[3],m4=M[4],m5=M[5],m6=M[6],m7=M[7],m8=M[8];
+  let p=0;
+  for(let y=0;y<ph;y++){
+    const yy=(y+.5-cy)/F,bx=m1*yy+m2,by=m4*yy+m5,bz=m7*yy+m8;
+    for(let x=0;x<pw;x++,p+=4){
+      const xx=(x+.5-cx)/F,lx=bx+m0*xx,ly=by+m3*xx,lz=bz+m6*xx;
+      const fx=(Math.atan2(lx,lz)/(2*PI)+.5)*tw-.5,fy=(.5+Math.atan2(ly,Math.sqrt(lx*lx+lz*lz))/PI)*th-.5;
+      let x0=Math.floor(fx),y0=Math.floor(fy);const wx=fx-x0,wy=fy-y0;
+      x0=((x0%tw)+tw)%tw;const x1=x0+1===tw?0:x0+1,y1=y0+1<th?y0+1:th-1;
+      if(y0<0)y0=0;else if(y0>=th)y0=th-1;
+      const a=(y0*tw+x0)*4,b=(y0*tw+x1)*4,c=(y1*tw+x0)*4,e=(y1*tw+x1)*4,w00=(1-wx)*(1-wy),w10=wx*(1-wy),w01=(1-wx)*wy,w11=wx*wy;
+      d[p]=td[a]*w00+td[b]*w10+td[c]*w01+td[e]*w11;
+      d[p+1]=td[a+1]*w00+td[b+1]*w10+td[c+1]*w01+td[e+1]*w11;
+      d[p+2]=td[a+2]*w00+td[b+2]*w10+td[c+2]*w01+td[e+2]*w11;
+      d[p+3]=td[a+3]*w00+td[b+3]*w10+td[c+3]*w01+td[e+3]*w11;
+    }
+  }
+  pg.putImageData(PNG,0,0);
+  const g=SC.getContext('2d');g.save();g.setTransform(1,0,0,1,0,0);g.globalAlpha=clamp(o,0,1);g.imageSmoothingEnabled=true;g.drawImage(PNC,0,0,pw,ph,0,0,W,H);g.restore();
+}
+
 /* ===== menggambar ===== */
 /* model 3D: dirender oleh js/s3model.js di kanvas WebGL dengan kamera yang sama, lalu ditempel ke kanvas ini */
 function drawModel(it,tt,C,k,W,H,o){
@@ -391,12 +448,13 @@ function render(){
   const g=SC.getContext('2d');g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';g.fillStyle='#000';g.fillRect(0,0,W,H);
   const C=camState(t);syncMedia();HIT={};
   const layers=S.items.slice(2).filter(i=>visible(i,t));
+  layers.forEach(it=>{if(ISPANO(it))drawPano(it,t,C,W,H)});   /* latar 360° paling belakang */
   layers.forEach(it=>{
     if(it.kind==='sunburst')drawSunburst(g,it,t,W,H,C);
     else if(it.kind==='ribbon')drawRibbon(g,it,t,W,H,k);
     else if(it.kind==='dust')drawDust(g,it,t,W,H,k,C);
   });
-  const l3=layers.filter(i=>IS3D(i.kind)&&i.kind!=='group').map(it=>({it,d:toCam(C,world(it,t).p)[2]})).sort((a,b)=>b.d-a.d);
+  const l3=layers.filter(i=>IS3D(i.kind)&&i.kind!=='group'&&!ISPANO(i)).map(it=>({it,d:toCam(C,world(it,t).p)[2]})).sort((a,b)=>b.d-a.d);
   l3.forEach(o=>drawLayer(o.it,t,C,k,W,H));
   post(cv,S.items[1],t,W,H,k);
   const tm=$('s3-time');if(document.activeElement!==tm&&!tm._drag)tm.value=t;
@@ -449,7 +507,7 @@ async function save(){
 }
 function label(it){return it.kind==='text'?(String(it.text||'').split('\n')[0].slice(0,14)||'Teks'):(it.name||NAMES[it.kind]).slice(0,16)}
 function chips(){
-  $('s3-chips').innerHTML=S.items.map(it=>`<button class="s3-chip${it.id===selId?' on':''}" data-sel="${it.id}">${ICON[it.kind]} ${esc(label(it))}</button>`).join('');
+  $('s3-chips').innerHTML=S.items.map(it=>`<button class="s3-chip${it.id===selId?' on':''}" data-sel="${it.id}">${ISPANO(it)?'🌐':ICON[it.kind]} ${esc(label(it))}</button>`).join('');
   const c=$('s3-chips').querySelector('.on');if(c&&c.scrollIntoView)c.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 function row(it,p){
@@ -472,6 +530,8 @@ function props(){
     <label class="s3-ck"><input type="checkbox" data-f="glow"${it.glow?' checked':''}> Cahaya di huruf</label>`;
   }
   if(ISMEDIA(it.kind))h+=`<button class="btn" data-act="replace">Ganti ${it.kind==='video'?'video / foto':'foto / video'}</button>`;
+  if(ISMEDIA(it.kind))h+=`<button class="btn${it.pano?' primary':''}" type="button" data-act="pano" title="Pasang foto / video ini sebagai latar panorama 360° yang memenuhi layar">🌐 360°: ${it.pano?'ON':'OFF'}</button>`;
+  if(ISPANO(it))h+=`<p class="s3-hint">Mode 360°: ${it.kind==='video'?'video':'foto'} dipasang sebagai latar panorama yang memenuhi layar, digambar paling belakang. Putar Kamera (Putar 3D X / Y / Z) untuk melihat sekeliling, atau putar layer ini untuk memutar panoramanya. Paling pas untuk foto / video 360° (rasio 2:1); gambar biasa akan terlihat melar.</p>`;
   if(it.kind==='model')h+=`<button class="btn" data-act="replacemodel">Ganti model</button>`;
   if(it.kind==='sunburst')h+=`<div class="s3-two"><label class="s3-fl">Jumlah sinar<input type="number" data-f="beams" min="2" max="24" value="${it.beams}"></label><label class="s3-fl">Puntiran<input type="number" step="0.1" data-f="twist" min="-4" max="4" value="${it.twist}"></label></div>`;
   if(it.kind==='dust')h+=`<label class="s3-fl">Jumlah partikel<input type="number" data-f="count" min="10" max="600" value="${it.count}"></label>`;
@@ -479,8 +539,8 @@ function props(){
   if(IS3D(it.kind)){
     const opts=S.items.filter(o=>IS3D(o.kind)&&o!==it);
     h+=`<label class="s3-fl">Induk (ikut bergerak bersama)<select data-f="parent"><option value="">Tidak ada</option>${opts.map(o=>`<option value="${o.id}"${it.parent===o.id?' selected':''}>${esc(label(o))}</option>`).join('')}</select></label>`;
-    if(it.kind!=='group'&&it.kind!=='model')h+=`<label class="s3-ck"><input type="checkbox" data-f="bill"${it.bill?' checked':''}> Hadap kamera (billboard)</label>`;
-    h+=`<label class="s3-fl">Animasi cepat (dipasang di waktu sekarang)<select data-quick><option value="">Pilih animasi…</option><option value="fly">Terbang dari jauh</option><option value="pass">Lewat melewati kamera</option><option value="spin">Putar 3D masuk</option><option value="snap">Hentak miring</option><option value="wobble">Goyang</option></select></label>`;
+    if(it.kind!=='group'&&it.kind!=='model'&&!ISPANO(it))h+=`<label class="s3-ck"><input type="checkbox" data-f="bill"${it.bill?' checked':''}> Hadap kamera (billboard)</label>`;
+    if(!ISPANO(it))h+=`<label class="s3-fl">Animasi cepat (dipasang di waktu sekarang)<select data-quick><option value="">Pilih animasi…</option><option value="fly">Terbang dari jauh</option><option value="pass">Lewat melewati kamera</option><option value="spin">Putar 3D masuk</option><option value="snap">Hentak miring</option><option value="wobble">Goyang</option></select></label>`;
   }
   h+=`<label class="s3-fl">Kurva untuk keyframe baru<select data-ease>${Object.keys(EASE).map(e=>`<option value="${e}"${e===curEase?' selected':''}>${EASE[e].n}</option>`).join('')}</select></label>`;
   if(it.kind==='camera'){
@@ -495,6 +555,7 @@ function props(){
   }
   let plist=KINDS[it.kind];
   if(it.kind==='camera')plist=plist.filter(p=>it.target?p!=='fd':!CAMT.includes(p));
+  if(ISPANO(it))plist=plist.filter(p=>/^(rx|ry|rz|opacity)$/.test(p));   /* latar 360° tidak punya posisi / ukuran */
   h+=plist.map(p=>row(it,p)).join('');
   $('s3-props').innerHTML=h;ticks();
 }
@@ -569,6 +630,12 @@ function bindUI(){
     }
     else if(b.dataset.delcut){S.cuts.splice(+b.dataset.delcut,1);props();dirty();render()}
     else if(b.dataset.act==='cut'){S.cuts=(S.cuts||[]).filter(k=>Math.abs(k.t-t)>.02);S.cuts.push({t:Math.round(t*100)/100,cam:it.id});S.cuts.sort((a,c)=>a.t-c.t);props();dirty();render();toast('Potong ke '+it.name+' di '+t.toFixed(2)+' dtk')}
+    else if(b.dataset.act==='pano'){
+      if(!ISMEDIA(it.kind))return;
+      if(it.pano)delete it.pano;else it.pano=true;
+      chips();props();dirty();render();
+      toast(it.pano?'360° aktif: dipasang sebagai latar panorama. Putar Kamera untuk melihat sekeliling.':'360° dimatikan');
+    }
     else if(b.dataset.act==='replace'){replaceMode=true;$('s3-file').accept='image/*,video/*';$('s3-file').multiple=false;$('s3-file').click()}
     else if(b.dataset.act==='replacemodel'){modelReplace=true;if(mfileEl){mfileEl.value='';mfileEl.click()}}
   });

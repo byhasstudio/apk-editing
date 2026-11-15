@@ -115,7 +115,7 @@ function draw(g){
     let act=s.items[0];(s.cuts||[]).forEach(k=>{if(k.t<=t+1e-6){const o=s.items.find(i=>i.id===k.cam);if(o&&o.kind==='camera')act=o}});
     const pose=api.camPose(act,t,ASPR[s.aspect]||16/9);
     /* urutan tumpuk = kedalaman dari kamera aktif, sama dengan scene3d.js */
-    const L=s.items.slice(2).filter(it=>/^(text|image|video)$/.test(it.kind)&&it.vis!==false&&t>=it.start-1e-6&&(it.dur==null||t<=it.start+it.dur+1e-6))
+    const L=s.items.slice(2).filter(it=>/^(text|image|video)$/.test(it.kind)&&it.pano!==true&&it.vis!==false&&t>=it.start-1e-6&&(it.dur==null||t<=it.start+it.dur+1e-6))
       .map(it=>{const W=A().world(it,t);return{it,W,z:api.mvT(pose.R,[W.p[0]-pose.p[0],W.p[1]-pose.p[1],W.p[2]-pose.p[2]])[2]}}).sort((a,b)=>b.z-a.z);
     g.save();g.setLineDash([]);
     L.forEach(o=>{

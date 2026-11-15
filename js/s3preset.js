@@ -56,6 +56,7 @@ function cleanItem(r,id,kind0,mid,W,S){
     let m=mid(r.mediaId);
     if(!m){W.missing++;m='ph'+((W.missing-1)%6+1);if(kind==='video'){kind='image';it.kind='image'}}
     it.mediaId=m;
+    if(r.pano===true)it.pano=true;   /* mode 360° (latar panorama) ikut tersimpan di preset */
     if(kind==='video')it.trim=clamp(num(r.trim,0),0,3600);
   }
   KP[kind].forEach(p=>{

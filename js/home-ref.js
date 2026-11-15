@@ -1,6 +1,8 @@
 /* Beranda: 1 kartu utama + 3 jalan pintas ke fitur yang sudah ada. Memakai tombol lama lewat .click(). */
 (function(){
 'use strict';
+/* timeline Edit 3D dimuat dari sini supaya index.html tidak perlu diubah */
+try{const s=document.createElement('script');s.src='js/s3timeline.js?v=1';document.body.appendChild(s)}catch(_){}
 const $=id=>document.getElementById(id),home=$('home'),main=home&&home.querySelector('.home-main');
 if(!main)return;
 const I={

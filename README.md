@@ -1,6 +1,8 @@
-# APK EDITING
+# SplineWay
 
-Aplikasi editing video berbasis web oleh BYHASSSTUDIO. Status: **v19** (sistem inti ala Alight Motion / CapCut: gizmo, multi-select, salin-tempel, kunci layer, kurva bezier, gradien, bayangan, motion path, parent/grup layer, pen tool dan layer vektor, preset). Efek, transisi, dan filter sengaja belum dibuat.
+Aplikasi editing video berbasis web oleh BYHASSSTUDIO (sebelumnya bernama "APK EDITING"). Status: **v19** (sistem inti ala Alight Motion / CapCut: gizmo, multi-select, salin-tempel, kunci layer, kurva bezier, gradien, bayangan, motion path, parent/grup layer, pen tool dan layer vektor, preset). Efek, transisi, dan filter sengaja belum dibuat.
+
+Logo: belah ketupat hijau dan putih di latar biru tua, disematkan di `js/brand.js` (ikon tab, ikon layar utama, dan logo di beranda). Nama database, kunci penyimpanan, dan ekstensi file (`.apkedit.json`, `.apkpreset`, `.apktemplate`) sengaja tidak diganti supaya project dan preset lama tetap terbuka.
 
 ## Buka di web
 

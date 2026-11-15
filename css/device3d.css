@@ -1,0 +1,53 @@
+/* MODE PERANGKAT OTOMATIS untuk Edit 3D dan dialog-dialognya (js/device.js memasang data-device = mobile | pc dan data-input = touch | mouse di <html>).
+   Melengkapi css/device.css (beranda + editor video 2D). Tata letak di sini mengikuti data-device, bukan media query lebar, jadi batasnya sama
+   persis dengan bagian lain (<= 900px = mobile) dan tidak ada lebar 900px di mana dua aturan bertabrakan. Logika Edit 3D tidak diubah. */
+
+/* ----- dialog Edit 3D: semua mode ----- */
+:is(#s3-dlg-new,#s3-dlg-tk,#s3-dlg-ex,#s3-dlg-send,#s3-dlg-html){max-height:90vh;max-height:90dvh;overflow:auto}
+
+/* ===== MOBILE: panggung di atas (menempel), panel di bawah bisa digulir ===== */
+html[data-device=mobile] #s3d{height:100vh;height:100dvh}
+html[data-device=mobile] #s3d .s3-top{padding:max(6px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) 6px max(10px,env(safe-area-inset-left))}
+html[data-device=mobile] #s3d .s3-body{display:flex;flex-direction:column;align-items:stretch;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
+html[data-device=mobile] #s3d .s3-stage{position:sticky;top:0;height:auto;overflow:visible;border-bottom:1px solid var(--line);padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}
+html[data-device=mobile] #s3d #s3-cv,html[data-device=mobile] #s3d #s3-lv{max-height:38vh;max-height:38dvh}
+html[data-device=mobile] #s3d.s3-vsplit #s3-cv,html[data-device=mobile] #s3d.s3-vsplit #s3-lv{max-height:34vh;max-height:34dvh}
+html[data-device=mobile] #s3d .s3-side{height:auto;overflow:visible;padding:8px max(10px,env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+/* baris alat: satu baris yang bisa digeser, bukan berbaris-baris yang memakan layar */
+html[data-device=mobile] #s3d .s3-tools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+html[data-device=mobile] #s3d .s3-tools::-webkit-scrollbar{display:none}
+html[data-device=mobile] #s3d .s3-tools>*{flex:none}
+/* 16px mencegah iOS memperbesar layar saat mengetuk kolom isian */
+html[data-device=mobile] #s3d .s3-props :is(input,select,textarea),html[data-device=mobile] #s3d .s3-ctl :is(input,select){font-size:16px}
+html[data-device=mobile] :is(#s3-dlg-new,#s3-dlg-tk,#s3-dlg-ex,#s3-dlg-send,#s3-dlg-html){width:min(460px,calc(100vw - 20px));padding:16px}
+html[data-device=mobile] :is(#s3-dlg-new,#s3-dlg-tk,#s3-dlg-ex,#s3-dlg-send,#s3-dlg-html) :is(input,select){font-size:16px}
+
+/* ===== PC: preview besar di kiri, panel alat di kanan, tinggi mengikuti jendela ===== */
+html[data-device=pc] #s3d .s3-body{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(340px,1fr);overflow:hidden;align-items:start}
+html[data-device=pc] #s3d.s3-vsplit .s3-body{grid-template-columns:minmax(0,2.3fr) minmax(320px,1fr)}
+html[data-device=pc] #s3d .s3-stage{position:static;border-bottom:0;height:100%;overflow:auto}
+html[data-device=pc] #s3d .s3-side{height:100%;overflow-y:auto}
+html[data-device=pc] #s3d #s3-cv,html[data-device=pc] #s3d #s3-lv{max-height:max(240px,calc(100vh - 230px));max-height:max(240px,calc(100dvh - 230px))}
+html[data-device=pc] #s3d.s3-vsplit #s3-cv,html[data-device=pc] #s3d.s3-vsplit #s3-lv{max-height:max(240px,calc(100vh - 230px));max-height:max(240px,calc(100dvh - 230px))}
+@media(min-width:1500px){
+  html[data-device=pc] #s3d .s3-body{grid-template-columns:minmax(0,1.6fr) minmax(400px,1fr)}
+  html[data-device=pc] #s3d.s3-vsplit .s3-body{grid-template-columns:minmax(0,2.6fr) minmax(380px,1fr)}
+}
+
+/* ===== input SENTUH: target sentuh lebih besar, tanpa seleksi teks / zoom ketuk dua kali tak sengaja ===== */
+html[data-input=touch] #s3d{overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html[data-input=touch] #s3d :is(input,textarea,[contenteditable]){-webkit-user-select:text;user-select:text}
+html[data-input=touch] #s3d :is(.btn,select,.s3-chip){min-height:40px}
+html[data-input=touch] #s3d :is(button,select,label,.s3-chip,.s3-tpl){touch-action:manipulation}
+html[data-input=touch] #s3d .s3-in input[type=range]{height:34px}
+html[data-input=touch] #s3d #s3-time{height:36px}
+html[data-input=touch] #s3d .s3-kf button{width:38px;height:34px}
+html[data-input=touch] #s3d .s3-ticks{height:18px}
+html[data-input=touch] #s3d .s3-ticks button{width:16px;height:16px;margin-left:-8px}
+html[data-input=touch] :is(#s3-dlg-new,#s3-dlg-tk,#s3-dlg-ex,#s3-dlg-send,#s3-dlg-html) :is(.btn,select){min-height:40px}
+html[data-input=touch] #btn-keys3{display:none}
+
+/* ===== input MOUSE: tombol shortcut tampil, efek hover ===== */
+#btn-keys3{display:none}
+html[data-input=mouse] #btn-keys3{display:inline-block}
+html[data-input=mouse] #s3d .s3-chip:hover{border-color:var(--accent)}

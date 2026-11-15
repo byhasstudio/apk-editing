@@ -1,0 +1,2 @@
+/* MEREK SplineWay: logo di header beranda (gambar dipasang oleh js/brand.js lewat variabel --brand-logo). */
+.brand-logo{flex:none;width:34px;height:34px;border-radius:9px;background:#010735 var(--brand-logo) center/cover no-repeat;box-shadow:0 0 0 1px var(--line)}

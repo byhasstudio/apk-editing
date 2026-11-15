@@ -1,5 +1,6 @@
-/* EDIT 3D: ruang 3D sungguhan (kamera, layer teks/foto/video, parent, hadap kamera, tracking titik pada video, keyframe,
+/* EDIT 3D: ruang 3D sungguhan (kamera, layer teks/foto/video/model 3D, parent, hadap kamera, tracking titik pada video, keyframe,
    efek chromatic aberration / glow / getar / kilat) + contoh referensi. BUKAN pembuat model 3D: ini pengedit dan tracking.
+   Model 3D (.glb .gltf .obj+.mtl .stl .fbx) dirender oleh js/s3model.js (Three.js, dimuat saat dibutuhkan) memakai kamera yang sama.
    Dunia: tinggi layar = 1000 satuan. Layer z=0 dan kamera z=0 => ukuran asli. z besar = makin jauh dari kamera.
    Kamera memandang ke arah +z. Transformasi layer: skala -> putar Y -> putar X -> putar Z -> geser -> (parent) -> kamera. */
 window.APK=window.APK||{};
@@ -34,17 +35,19 @@ const PD={
   speed:['Kecepatan',-360,360,1,30],
   dist:['Jarak kamera ke objek',100,4000,10,900],az:['Sudut keliling kiri/kanan (°)',-180,180,1,0],el:['Sudut atas/bawah (°)',-80,80,1,0],
   frx:['Bingkai: objek geser kiri/kanan',-0.45,0.45,0.01,0],fry:['Bingkai: objek geser atas/bawah',-0.45,0.45,0.01,0],
-  follow:['Kecepatan ikut (0 pelan ... 1 kaku)',0,1,0.01,0.6],focus:['Fokus: blur di luar jarak fokus',0,1,0.01,0],fd:['Jarak fokus',100,5000,10,900]
+  follow:['Kecepatan ikut (0 pelan ... 1 kaku)',0,1,0.01,0.6],focus:['Fokus: blur di luar jarak fokus',0,1,0.01,0],fd:['Jarak fokus',100,5000,10,900],
+  light:['Terang cahaya model',0,3,0.05,1]
 };
 const CAMT=['dist','az','el','frx','fry','follow'];
 const PDK={sunburst:{speed:['Putar otomatis (°/detik)',-360,360,1,25],rz:['Putar tambahan (°)',-720,720,1,0]},
   ribbon:{speed:['Kecepatan gerak',0,6,0.1,1.2]},dust:{speed:['Kecepatan melaju (satuan/detik)',-3000,3000,10,600]}};
 const KINDS={camera:['x','y','z','rx','ry','rz','fov','focus','fd','dist','az','el','frx','fry','follow'],fx:['ca','glow','shake','flash'],
   text:['x','y','z','rx','ry','rz','scale','opacity'],image:['x','y','z','rx','ry','rz','scale','opacity'],video:['x','y','z','rx','ry','rz','scale','opacity'],
-  group:['x','y','z','rx','ry','rz','scale'],sunburst:['opacity','rz','scale','speed'],ribbon:['opacity','scale','speed'],dust:['opacity','speed']};
-const NAMES={camera:'Kamera',fx:'Efek',text:'Teks',image:'Foto',video:'Video',group:'Grup',sunburst:'Latar kipas',ribbon:'Pita cahaya',dust:'Debu bintang'};
-const ICON={camera:'🎥',fx:'✦',text:'T',image:'🖼',video:'🎞',group:'▣',sunburst:'✺',ribbon:'〰',dust:'✧'};
-const IS3D=k=>k==='text'||k==='image'||k==='video'||k==='group';
+  group:['x','y','z','rx','ry','rz','scale'],sunburst:['opacity','rz','scale','speed'],ribbon:['opacity','scale','speed'],dust:['opacity','speed'],
+  model:['x','y','z','rx','ry','rz','scale','opacity','light']};
+const NAMES={camera:'Kamera',fx:'Efek',text:'Teks',image:'Foto',video:'Video',group:'Grup',sunburst:'Latar kipas',ribbon:'Pita cahaya',dust:'Debu bintang',model:'Model 3D'};
+const ICON={camera:'🎥',fx:'✦',text:'T',image:'🖼',video:'🎞',group:'▣',sunburst:'✺',ribbon:'〰',dust:'✧',model:'🧊'};
+const IS3D=k=>k==='text'||k==='image'||k==='video'||k==='group'||k==='model';
 const ISMEDIA=k=>k==='image'||k==='video';
 const pd=(kind,p)=>(PDK[kind]&&PDK[kind][p])||PD[p];
 const ASPECT={'16:9':[16,9],'9:16':[9,16],'1:1':[1,1],'4:3':[4,3],'21:9':[21,9]};
@@ -187,9 +190,28 @@ async function loadMedia(rec){
   el.addEventListener('seeked',()=>reqRender());
   const m={kind:isAud?'audio':'video',el,w:el.videoWidth||1,h:el.videoHeight||1,name:rec.name,url};media.set(rec.id,m);return m;
 }
+/* modul model 3D (js/s3model.js) dimuat hanya saat ada model */
+let s3mP=null;
+function useModel(){
+  return s3mP||(s3mP=new Promise((res,rej)=>{
+    if(APK.s3model)return res(APK.s3model);
+    const s=document.createElement('script');s.src='js/s3model.js?v=1';
+    s.onload=()=>APK.s3model?res(APK.s3model):(s3mP=null,rej(new Error('modul model tidak termuat')));
+    s.onerror=()=>{s3mP=null;rej(new Error('tidak bisa memuat modul model'))};
+    document.head.appendChild(s);
+  }));
+}
+const mrec=id=>DB.get('media',id);
 async function ensureMedia(){
-  const ids=new Set(S.items.map(i=>i.mediaId).filter(Boolean));if(S.music)ids.add(S.music);
+  const ids=new Set(S.items.filter(i=>i.kind!=='model').map(i=>i.mediaId).filter(Boolean));if(S.music)ids.add(S.music);
   for(const id of ids){if(media.has(id)||/^ph\d+$/.test(id))continue;const rec=await DB.get('media',id);if(rec)await loadMedia(rec)}
+  const ms=S.items.filter(i=>i.kind==='model'&&i.mediaId);
+  if(ms.length){
+    try{
+      const M=await useModel();
+      for(const it of ms){try{await M.load(it,mrec,true)}catch(e){toast('Model "'+it.name+'" gagal dimuat: '+((e&&e.message)||e))}}
+    }catch(e){toast('Model 3D tidak bisa dimuat: '+((e&&e.message)||e))}
+  }
 }
 async function addFile(file){
   const id='m'+Date.now().toString(36)+rid();
@@ -235,9 +257,25 @@ function mediaTex(it){
 }
 
 /* ===== menggambar ===== */
+/* model 3D: dirender oleh js/s3model.js di kanvas WebGL dengan kamera yang sama, lalu ditempel ke kanvas ini */
+function drawModel(it,tt,C,k,W,H,o){
+  const M=APK.s3model;if(!M)return;
+  const s=M.state(it);
+  if(!s.ready){
+    if(!s.loading&&!s.error)M.load(it,mrec).then(()=>reqRender()).catch(e=>toast('Model gagal dimuat: '+((e&&e.message)||e)));
+    return;
+  }
+  const Wd=world(it,tt),pc0=toCam(C,Wd.p);
+  if(pc0[2]<-2000)return;
+  const r=M.draw(it,Wd,C,{W:W,H:H,light:val(it,'light',tt)});
+  if(!r)return;
+  if(r.quad)HIT[it.id]=r.quad;
+  const g=SC.getContext('2d');g.save();g.setTransform(1,0,0,1,0,0);g.globalAlpha=clamp(o,0,1);g.drawImage(r.canvas,0,0,W,H);g.restore();
+}
 function drawLayer(it,tt,C,k,W,H){
   const o=it.kind==='group'?0:val(it,'opacity',tt);
   if(o<=0.002||it.kind==='group')return;
+  if(it.kind==='model')return drawModel(it,tt,C,k,W,H,o);
   const Wd=world(it,tt),pc0=toCam(C,Wd.p),F=C.F;
   if(pc0[2]<F*0.05)return;
   const dens=clamp(k*Wd.s*F/pc0[2],0.3,3);
@@ -424,7 +462,8 @@ function props(){
   const it=sel(),sys=it.kind==='camera'||it.kind==='fx';let h='';
   const hint={camera:'Kamera menangkap objek yang dilihat di video. Manual: gerakkan dengan keyframe ◆ (maju = Z naik). Atau pilih objek supaya kamera mengikutinya.',fx:'Efek untuk seluruh layar. Pakai keyframe ◆ untuk hentakan sesuai beat (Kilat putih, Getar).',
     text:'Seret teks di preview untuk memindahkan. Hadap kamera = teks selalu menghadap lensa.',image:'Seret foto di preview untuk memindahkan.',video:'Pilih video ini lalu tekan Lacak titik di atas untuk membuat teks/foto mengikuti objek.',
-    group:'Grup kosong: jadikan "Induk" layer lain supaya semuanya ikut bergerak dan berputar bersama (misal orbit).',sunburst:'Latar kipas berputar seperti di video referensi.',ribbon:'Pita cahaya biru.',dust:'Debu / bintang yang melaju melewati kamera.'}[it.kind];
+    group:'Grup kosong: jadikan "Induk" layer lain supaya semuanya ikut bergerak dan berputar bersama (misal orbit).',sunburst:'Latar kipas berputar seperti di video referensi.',ribbon:'Pita cahaya biru.',dust:'Debu / bintang yang melaju melewati kamera.',
+    model:'Model 3D: seret di preview untuk memindahkan. Putar dengan Putar 3D sumbu X/Y/Z (pakai keyframe ◆ untuk memutar otomatis), ukuran dengan Ukuran. Model otomatis dikecilkan supaya muat di layar.'}[it.kind];
   h+=`<p class="s3-hint">${hint}</p>`;
   if(!sys)h+=`<label class="s3-fl">Nama<input data-f="name" value="${esc(it.name)}" maxlength="40"></label>`;
   if(it.kind==='text'){
@@ -433,13 +472,14 @@ function props(){
     <label class="s3-ck"><input type="checkbox" data-f="glow"${it.glow?' checked':''}> Cahaya di huruf</label>`;
   }
   if(ISMEDIA(it.kind))h+=`<button class="btn" data-act="replace">Ganti ${it.kind==='video'?'video / foto':'foto / video'}</button>`;
+  if(it.kind==='model')h+=`<button class="btn" data-act="replacemodel">Ganti model</button>`;
   if(it.kind==='sunburst')h+=`<div class="s3-two"><label class="s3-fl">Jumlah sinar<input type="number" data-f="beams" min="2" max="24" value="${it.beams}"></label><label class="s3-fl">Puntiran<input type="number" step="0.1" data-f="twist" min="-4" max="4" value="${it.twist}"></label></div>`;
   if(it.kind==='dust')h+=`<label class="s3-fl">Jumlah partikel<input type="number" data-f="count" min="10" max="600" value="${it.count}"></label>`;
   if(!sys)h+=`<div class="s3-two"><label class="s3-fl">Muncul di detik<input type="number" step="0.1" min="0" data-f="start" value="${it.start}"></label><label class="s3-fl">Durasi (0 = sampai akhir)<input type="number" step="0.1" min="0" data-f="dur" value="${it.dur==null?0:it.dur}"></label></div>`;
   if(IS3D(it.kind)){
     const opts=S.items.filter(o=>IS3D(o.kind)&&o!==it);
     h+=`<label class="s3-fl">Induk (ikut bergerak bersama)<select data-f="parent"><option value="">Tidak ada</option>${opts.map(o=>`<option value="${o.id}"${it.parent===o.id?' selected':''}>${esc(label(o))}</option>`).join('')}</select></label>`;
-    if(it.kind!=='group')h+=`<label class="s3-ck"><input type="checkbox" data-f="bill"${it.bill?' checked':''}> Hadap kamera (billboard)</label>`;
+    if(it.kind!=='group'&&it.kind!=='model')h+=`<label class="s3-ck"><input type="checkbox" data-f="bill"${it.bill?' checked':''}> Hadap kamera (billboard)</label>`;
     h+=`<label class="s3-fl">Animasi cepat (dipasang di waktu sekarang)<select data-quick><option value="">Pilih animasi…</option><option value="fly">Terbang dari jauh</option><option value="pass">Lewat melewati kamera</option><option value="spin">Putar 3D masuk</option><option value="snap">Hentak miring</option><option value="wobble">Goyang</option></select></label>`;
   }
   h+=`<label class="s3-fl">Kurva untuk keyframe baru<select data-ease>${Object.keys(EASE).map(e=>`<option value="${e}"${e===curEase?' selected':''}>${EASE[e].n}</option>`).join('')}</select></label>`;
@@ -530,6 +570,7 @@ function bindUI(){
     else if(b.dataset.delcut){S.cuts.splice(+b.dataset.delcut,1);props();dirty();render()}
     else if(b.dataset.act==='cut'){S.cuts=(S.cuts||[]).filter(k=>Math.abs(k.t-t)>.02);S.cuts.push({t:Math.round(t*100)/100,cam:it.id});S.cuts.sort((a,c)=>a.t-c.t);props();dirty();render();toast('Potong ke '+it.name+' di '+t.toFixed(2)+' dtk')}
     else if(b.dataset.act==='replace'){replaceMode=true;$('s3-file').accept='image/*,video/*';$('s3-file').multiple=false;$('s3-file').click()}
+    else if(b.dataset.act==='replacemodel'){modelReplace=true;if(mfileEl){mfileEl.value='';mfileEl.click()}}
   });
   $('s3-ticks').onclick=e=>{const b=e.target.closest('[data-tt]');if(b){pause();setT(+b.dataset.tt)}};
   $('s3-chips').onclick=e=>{const b=e.target.closest('[data-sel]');if(b)select(b.dataset.sel)};
@@ -554,7 +595,7 @@ function bindUI(){
   $('s3-dup').onclick=()=>{const it=sel();if(it.id==='cam'||it.id==='fx')return toast('Kamera utama dan Efek tidak bisa diduplikat');
     const c=JSON.parse(JSON.stringify(it));c.id='i'+rid();c.name=it.name+' 2';c.props.x=(c.props.x||0)+40;c.props.y=(c.props.y||0)+40;add(c)};
   $('s3-del').onclick=()=>{const it=sel();if(it.id==='cam'||it.id==='fx')return toast('Kamera utama dan Efek tidak bisa dihapus');
-    S.items=S.items.filter(i=>i!==it);S.cuts=(S.cuts||[]).filter(k=>k.cam!==it.id);S.items.forEach(i=>{if(i.parent===it.id)i.parent=null});texPool.delete(it.id);select('cam');dirty()};
+    S.items=S.items.filter(i=>i!==it);S.cuts=(S.cuts||[]).filter(k=>k.cam!==it.id);S.items.forEach(i=>{if(i.parent===it.id)i.parent=null});texPool.delete(it.id);if(APK.s3model)APK.s3model.drop(it.id);select('cam');dirty()};
   $('s3-up').onclick=()=>{const it=sel(),i=S.items.indexOf(it);if(i>2){[S.items[i-1],S.items[i]]=[S.items[i],S.items[i-1]];chips();dirty();render()}};
   $('s3-file').onchange=async e=>{
     const files=[...e.target.files];e.target.value='';if(!files.length)return;
@@ -576,6 +617,13 @@ function bindUI(){
       S.music=id;if(m.el.duration>S.dur&&isFinite(m.el.duration)){S.dur=Math.ceil(Math.min(m.el.duration,300));$('s3-dur').value=S.dur;$('s3-time').max=S.dur}
       $('s3-music').textContent='♪ '+f.name.slice(0,10);dirty();toast('Musik dipasang')}catch(_){toast('Gagal membuka audio')}
   };
+  /* tombol Model 3D (dibuat lewat kode, jadi index.html tidak perlu diubah): pilih berkas model sekaligus mtl / tekstur / bin */
+  mfileEl=document.createElement('input');mfileEl.type='file';mfileEl.multiple=true;mfileEl.hidden=true;document.body.appendChild(mfileEl);
+  const mb=document.createElement('button');mb.type='button';mb.id='s3-add-model';mb.className=$('s3-add-media').className;
+  mb.textContent='🧊 Model';mb.title='Upload model 3D: .glb, .gltf, .obj (+ .mtl dan tekstur), .stl, .fbx. Pilih semua berkas sekaligus.';
+  $('s3-add-media').insertAdjacentElement('afterend',mb);
+  mb.onclick=()=>{modelReplace=false;mfileEl.value='';mfileEl.click()};
+  mfileEl.onchange=async e=>{const files=[...e.target.files];e.target.value='';if(files.length)await addModelFiles(files)};
   /* seret objek di preview */
   const cv=$('s3-cv');let drag=null;
   const pos=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]};
@@ -618,8 +666,28 @@ function bindUI(){
     if(e.code==='Space'){e.preventDefault();playing?pause():play()}
   });
 }
-let replaceMode=false;
+let replaceMode=false,modelReplace=false,mfileEl=null;
 function add(it){S.items.push(it);selId=it.id;chips();props();render();dirty()}
+/* pasang model 3D dari berkas yang dipilih (berkas utama + mtl / tekstur / bin) */
+async function addModelFiles(files){
+  try{
+    toast('Membaca model…');
+    const M=await useModel();
+    const info=await M.prepare(files,async f=>{
+      const id='m'+Date.now().toString(36)+rid();
+      await DB.put('media',{id,name:f.name,type:f.type||'application/octet-stream',blob:f});
+      return id;
+    });
+    let it;
+    if(modelReplace){it=sel();if(it.kind!=='model'){toast('Pilih layer model dulu');return}}
+    else it=mkItem('model',{start:t});
+    Object.assign(it,{mediaId:info.mediaId,files:info.files,fmt:info.fmt,name:info.name});
+    M.drop(it.id);
+    await M.load(it,mrec,true);
+    if(modelReplace){select(it.id);dirty()}else add(it);
+    toast('Model dipasang');
+  }catch(err){toast('Model gagal: '+((err&&err.message)||err))}
+}
 function fieldSet(it,f,el){
   let v=el.type==='checkbox'?el.checked:el.value;
   if(['size','beams','count'].includes(f))v=parseFloat(v)||0;

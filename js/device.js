@@ -43,5 +43,5 @@ APK.device={
   onChange(fn){addEventListener('apk-device',e=>fn(e.detail));fn({mode:cur.mode,input:cur.input})}
 };
 })();
-/* Pembaruan otomatis: js/updater.js dimuat dari sini supaya index.html tidak perlu diubah. */
-(function(){var s=document.createElement('script');s.src='js/updater.js?v=1';s.async=true;document.head.appendChild(s)})();
+/* Pembaruan otomatis: js/updater.js dimuat dari sini supaya index.html tidak perlu diubah. Naikkan ?v= kalau updater.js diubah. */
+(function(){var s=document.createElement('script');s.src='js/updater.js?v=2';s.async=true;document.head.appendChild(s)})();

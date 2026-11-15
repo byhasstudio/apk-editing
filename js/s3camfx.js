@@ -61,12 +61,16 @@ function run(kind){
   touch();toast('Gerakan dipasang di '+t0.toFixed(2)+' dtk. Tekan ↶ untuk membatalkan.');
 }
 
+/* Tata letak baris tombol: dibungkus ke baris berikutnya (tidak meluap), teks tombol tidak terpotong, panah ikut di dalam tombol */
+const CSS='.s3x-row{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}'
+  +'.s3x-row .btn{flex:0 0 auto;white-space:nowrap;padding:6px 10px;font-size:13px;line-height:1.2}';
+
 function inject(){
   const P=$('s3-props'),it=byId(selId());
   if(!P||!it||it.kind!=='camera'||P.querySelector('#s3x-pro'))return;
   const d=document.createElement('div');d.id='s3x-pro';d.className='s3c';
   d.innerHTML='<b>🎬 Gerakan Pro</b><div class="s3x-row">'
-    +[['crash','Crash zoom'],['whipl','Whip pan ◀'],['whipr','Whip pan ▶'],['punch','Impact punch'],['dutch','Dutch angle'],['kenburns','Ken Burns'],['drift','Drift melayang'],['fast','Percepat 2x'],['slow','Perlambat 2x']]
+    +[['crash','Crash zoom'],['whipl','◀ Whip pan kiri'],['whipr','Whip pan kanan ▶'],['punch','Impact punch'],['dutch','Dutch angle'],['kenburns','Ken Burns'],['drift','Drift melayang'],['fast','Percepat 2x'],['slow','Perlambat 2x']]
       .map(([k,t])=>'<button class="btn" type="button" data-sxp="'+k+'">'+t+'</button>').join('')
     +'</div><label class="s3-fl">Durasi Ken Burns / Drift (dtk)<input type="number" id="s3x-pdur" step="0.5" min="0.5" max="60" value="'+DUR+'"></label>'
     +'<p class="s3-hint">Dipasang di waktu sekarang. Whip pan dan Crash zoom ikut menambah getar dan pisah warna. Percepat / Perlambat mengubah semua keyframe kamera setelah waktu sekarang.</p>';
@@ -75,6 +79,7 @@ function inject(){
 }
 function boot(){
   if(!$('s3d'))return;
+  if(!document.getElementById('s3x-style')){const st=document.createElement('style');st.id='s3x-style';st.textContent=CSS;document.head.appendChild(st)}
   const P=$('s3-props');if(P)new MutationObserver(inject).observe(P,{childList:true});
   document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-sxp]');if(b&&$('s3d').contains(b))run(b.dataset.sxp)});
   document.addEventListener('change',e=>{if(e.target&&e.target.id==='s3x-pdur')DUR=clamp(parseFloat(e.target.value)||3,.5,60)});

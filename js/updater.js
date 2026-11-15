@@ -2,16 +2,16 @@
    Cara kerja: mengambil index.html terbaru tanpa cache, lalu membandingkan tanda-tangannya (hash) dengan yang tersimpan.
    Index.html memuat semua file js dan css dengan nomor ?v=, jadi setiap kali satu file diubah, NAIKKAN nomor ?v= file itu di index.html
    supaya pembaruan terdeteksi.
-   - Saat aplikasi dibuka: kalau ada pembaruan, langsung dimuat ulang (belum ada yang sedang diedit).
-   - Setiap EVERY milidetik, dan saat aplikasi kembali ke layar depan atau internet tersambung lagi: cek lagi.
-   - Kalau ada pembaruan di tengah mengedit: muncul pesan di bawah layar. Dimuat ulang otomatis setelah tidak ada sentuhan atau
+   Cek hanya dua kali kejadian: saat aplikasi dibuka, dan setiap EVERY milidetik (1 jam) selama aplikasi terbuka.
+   - Saat dibuka: kalau ada pembaruan, langsung dimuat ulang (belum ada yang sedang diedit).
+   - Tiap jam: kalau ada pembaruan di tengah mengedit, muncul pesan di bawah layar. Dimuat ulang otomatis setelah tidak ada sentuhan atau
      ketikan selama IDLE milidetik (autosave sudah jalan tiap 4 detik), atau langsung kalau sedang di beranda.
      Tidak pernah memuat ulang saat ada dialog terbuka (termasuk export). */
 (function(){
 'use strict';
 if(window.__swUpdater)return;window.__swUpdater=1;
-const EVERY=5*60*1000,IDLE=15000,COOL=60000,KEY='splineway:index',KEY_AT='splineway:updated-at';
-let lastAct=Date.now(),lastCheck=0,pending=null,bar=null;
+const EVERY=60*60*1000,IDLE=15000,COOL=60000,KEY='splineway:index',KEY_AT='splineway:updated-at';
+let lastAct=Date.now(),pending=null,bar=null;
 ['pointerdown','keydown','wheel','touchstart'].forEach(function(e){addEventListener(e,function(){lastAct=Date.now()},{passive:true,capture:true})});
 function get(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function set(k,v){try{localStorage.setItem(k,v)}catch(e){}}
@@ -45,7 +45,6 @@ function tryApply(){
   reload(pending);
 }
 async function check(atOpen){
-  lastCheck=Date.now();
   let sig;try{sig=await signature()}catch(e){return}
   const known=get(KEY);
   if(!known){set(KEY,sig);return}
@@ -57,8 +56,6 @@ async function check(atOpen){
 }
 setInterval(tryApply,5000);
 setInterval(function(){check(false)},EVERY);
-document.addEventListener('visibilitychange',function(){if(!document.hidden&&Date.now()-lastCheck>30000)check(false)});
-addEventListener('online',function(){check(false)});
 setTimeout(function(){check(true)},1500);
 window.APK=window.APK||{};
 APK.updater={check:function(){return check(false)}};

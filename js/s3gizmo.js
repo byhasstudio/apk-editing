@@ -1,11 +1,14 @@
-/* GIZMO KAMERA FISIK untuk Edit 3D (add-on, dimuat setelah js/s3cam.js; butuh 1 baris ekspor di akhir s3cam.js: APK.s3cam).
+/* GIZMO untuk Edit 3D: kamera DAN layer (teks, foto, video, model 3D, grup). Add-on, dimuat setelah js/s3cam.js; butuh 1 baris ekspor di akhir s3cam.js: APK.s3cam.
    - Tombol "✥ Gizmo" melayang di pojok kanan atas tampilan Ruang 3D (juga di mode 2 Tampilan, apa pun susunannya).
-     Tombol itu hanya membuka / menutup MENU gizmo. Gizmo di kamera tetap tampil walau menu ditutup; untuk menyembunyikannya pakai "👁 Tampil" di dalam menu.
+     Tombol itu hanya membuka / menutup MENU gizmo. Gizmo tetap tampil walau menu ditutup; untuk menyembunyikannya pakai "👁 Tampil" di dalam menu.
+   - Gizmo muncul di objek yang sedang dipilih (kamera atau layer). Pilih lewat chip di atas properti, atau ketuk kotaknya di Ruang 3D.
    - Semua pilihan (tampil/sembunyi, menu terbuka/tertutup, Geser/Putar, Global/Lokal) disimpan di localStorage 's3gizmo', jadi tidak hilang
      saat pindah tampilan, keluar-masuk 2 Tampilan, buka project lain, atau muat ulang halaman.
-   - Mode GESER: 3 panah dua arah (merah X, hijau Y, biru Z), kepala panah di kedua ujung dan huruf sumbu. Seret panah = kamera bergeser sepanjang sumbu itu.
-   - Mode PUTAR: 3 cincin besar. Seret cincin = kamera berputar mengelilingi sumbu itu.
-   - Ruang: GLOBAL (sumbu dunia) atau LOKAL (sumbu kamera sendiri).
+   - Mode GESER: 3 panah dua arah (merah X, hijau Y, biru Z), kepala panah di kedua ujung dan huruf sumbu. Seret panah = objek bergeser sepanjang sumbu itu.
+   - Mode PUTAR: 3 cincin besar. Seret cincin = objek berputar mengelilingi sumbu itu.
+   - Ruang: GLOBAL (sumbu dunia) atau LOKAL (sumbu objek sendiri).
+   - Layer yang punya Induk (parent): gizmo berada di posisi dunia layer, dan hasil seretan dikonversi ke nilai lokal terhadap induknya,
+     jadi layer bergerak / berputar tepat sesuai arah panah dan cincin.
    Hasilnya ditulis lewat put() milik s3cam.js (x, y, z, rx, ry, rz), jadi otomatis jadi keyframe kalau properti itu beranimasi,
    ikut undo/redo, simpan otomatis, preview, dan export. Digambar di kanvas overlay sendiri, s3cam.js tidak digambar ulang.
    - Di bagian bawah file ini ada pemilih SUSUNAN mode 2 Tampilan (dibuat di js/s3tools.js): kiri-kanan atau atas-bawah, dan mana yang di sisi mana.
@@ -23,7 +26,7 @@ const tr=M=>[M[0],M[3],M[6],M[1],M[4],M[7],M[2],M[5],M[8]];
 const COL=['#ff4d4d','#3ddc5b','#4d8dff'],HOT='#ffd166',NAME=['x','y','z'],LBL=['X','Y','Z'];
 const ARROW=1.25;   /* panjang panah (kali U) dari titik tengah ke tiap ujung */
 const RING=1.8;     /* jari-jari cincin putar (kali U) */
-/* on = gizmo tampil di kamera terpilih, open = menu gizmo terbuka. Keduanya (dan mode / ruang) diingat, jadi gizmo tidak hilang sendiri */
+/* on = gizmo tampil di objek terpilih, open = menu gizmo terbuka. Keduanya (dan mode / ruang) diingat, jadi gizmo tidak hilang sendiri */
 const st={on:true,open:true,mode:'move',space:'global',hover:null,drag:null};
 const SKEY='s3gizmo';
 try{
@@ -35,6 +38,10 @@ try{
 }catch(_){}
 const keep=()=>{try{localStorage.setItem(SKEY,JSON.stringify({on:st.on,open:st.open,mode:st.mode,space:st.space}))}catch(_){}};
 
+/* objek yang bisa diberi gizmo: yang punya posisi dan putaran (kamera, teks, foto, video, model, grup). Efek dan latar tidak punya */
+const hasXf=it=>!!it&&!!it.props&&['x','y','z','rx','ry','rz'].every(p=>p in it.props);
+const w3=()=>{const a=window.APK&&APK.s3d;return a&&a.world?a:null};
+
 /* dunia editor: x kanan, y BAWAH, z maju. Panah "atas" = -y supaya tampil seperti gizmo biasa */
 function axesOf(pose){
   if(st.space==='local'){const R=pose.R;return[col(R,0),scl(col(R,1),-1),col(R,2)]}
@@ -42,8 +49,12 @@ function axesOf(pose){
 }
 function ctx(){
   const lv=S.lv,it=byId(selId());
-  if(!lv||!isCam(it)||!lv.width)return null;
-  const W=lv.width,H=lv.height,tt=curT(),pose=camPose(it,tt,aspect()),O=obsState(),P=mkProj(O,W,H),o=pose.p,zc=P.cs(o)[2];
+  if(!lv||!hasXf(it)||!lv.width)return null;
+  const W=lv.width,H=lv.height,tt=curT(),cam=isCam(it);
+  let pose;
+  if(cam)pose=camPose(it,tt,aspect());
+  else{const A=w3();if(!A)return null;const Wd=A.world(it,tt);pose={p:Wd.p,R:Wd.R}}   /* layer: posisi dan arah di dunia (sudah termasuk induk) */
+  const O=obsState(),P=mkProj(O,W,H),o=pose.p,zc=P.cs(o)[2];
   if(zc<30)return null;
   return{it,W,H,tt,pose,O,P,o,zc,U:.13*H*zc/(O.F*P.k)};   /* U = satuan gizmo dalam dunia, ±13% tinggi layar */
 }
@@ -136,14 +147,21 @@ function hitTest(c,p){
 }
 
 /* ===== geser ===== */
+/* layer yang punya induk: selisih di dunia diubah ke selisih lokal (putar balik oleh arah induk, bagi skala induk) */
+function parentMap(it,tt){
+  const pa=!isCam(it)&&it.parent&&byId(it.parent),A=w3();
+  if(!pa||pa===it||!A)return null;
+  const Wp=A.world(pa,tt);
+  return{Rt:tr(Wp.R),k:1/(Wp.s||1)};
+}
 function startMove(c,h,p){
   const a=axesOf(c.pose)[h.i],p0=c.P.pt(c.o),p1=c.P.pt(add(c.o,scl(a,c.U)));if(!p0||!p1)return null;
-  return{k:'move',i:h.i,a,U:c.U,p:p,s:[p1[0]-p0[0],p1[1]-p0[1]],base:NAME.map(q=>gv(c.it,q,c.tt))};
+  return{k:'move',i:h.i,a,U:c.U,p:p,s:[p1[0]-p0[0],p1[1]-p0[1]],base:NAME.map(q=>gv(c.it,q,c.tt)),lp:parentMap(c.it,c.tt)};
 }
 function moveDrag(d,p,it,tt){
   const ss=d.s[0]*d.s[0]+d.s[1]*d.s[1];if(ss<64)return;
-  const t=((p[0]-d.p[0])*d.s[0]+(p[1]-d.p[1])*d.s[1])/ss,dv=scl(d.a,d.U*t);
-  NAME.forEach((q,i)=>put(it,q,tt,r2(d.base[i]+dv[i])));
+  const t=((p[0]-d.p[0])*d.s[0]+(p[1]-d.p[1])*d.s[1])/ss,dv=scl(d.a,d.U*t),dl=d.lp?scl(mv(d.lp.Rt,dv),d.lp.k):dv;
+  NAME.forEach((q,i)=>put(it,q,tt,r2(d.base[i]+dl[i])));
 }
 
 /* ===== putar ===== */
@@ -161,7 +179,7 @@ function planeAngle(c,p,n,u,v){   /* sudut pointer pada bidang cincin (sinar dar
 function startRot(c,h,p){
   const n=axesOf(c.pose)[h.i],[u,v]=basisOf(n),th=planeAngle(c,p,n,u,v);
   const e0=NAME.slice(0).map(()=>0),rp=[gv(c.it,'rx',c.tt),gv(c.it,'ry',c.tt),gv(c.it,'rz',c.tt)];
-  const Rp=rotM(rp[0],rp[1],rp[2]),R0=c.pose.R,B=mul(R0,tr(Rp));   /* R0 = B * Rp (B = arah dasar; identitas untuk kamera manual) */
+  const Rp=rotM(rp[0],rp[1],rp[2]),R0=c.pose.R,B=mul(R0,tr(Rp));   /* R0 = B * Rp (B = arah dasar: arah induk untuk layer, identitas untuk kamera manual) */
   return{k:'rot',i:h.i,n,u,v,c,last:th,total:0,R0,Bt:tr(B),rp,e0};
 }
 function rotDrag(d,p,it,tt){
@@ -189,7 +207,7 @@ function onMove(e){
   if(d){
     if(e.pointerId!==d.pid)return;
     e.preventDefault();e.stopPropagation();
-    const it=byId(d.id);if(!isCam(it))return;
+    const it=byId(d.id);if(!hasXf(it))return;
     const tt=curT(),p=lpos(e);
     if(d.k==='move')moveDrag(d,p,it,tt);else rotDrag(d,p,it,tt);
     touch();return;
@@ -221,10 +239,10 @@ function init(){
   cv=document.createElement('canvas');cv.id='s3g-cv';cv.style.cssText='position:absolute;pointer-events:none;z-index:3;display:none';
   lv.insertAdjacentElement('afterend',cv);
   box=document.createElement('div');box.id='s3g-box';
-  box.innerHTML='<button class="btn" id="s3g-toggle" type="button" title="Buka / tutup menu gizmo. Gizmo tetap tampil di kamera walau menu ditutup">✥ Gizmo ▾</button>'
-    +'<div id="s3g-opts"><div class="s3g-row"><button class="btn on" id="s3g-show" type="button" title="Tampilkan / sembunyikan gizmo di kamera terpilih">👁 Tampil</button></div>'
+  box.innerHTML='<button class="btn" id="s3g-toggle" type="button" title="Buka / tutup menu gizmo. Gizmo tetap tampil walau menu ditutup">✥ Gizmo ▾</button>'
+    +'<div id="s3g-opts"><div class="s3g-row"><button class="btn on" id="s3g-show" type="button" title="Tampilkan / sembunyikan gizmo di kamera atau layer terpilih">👁 Tampil</button></div>'
     +'<div class="s3g-row"><button class="btn on" id="s3g-move" type="button">↔ Geser</button><button class="btn" id="s3g-rot" type="button">⟳ Putar</button></div>'
-    +'<div class="s3g-row"><button class="btn on" id="s3g-glob" type="button" title="Sumbu dunia">🌐 Global</button><button class="btn" id="s3g-loc" type="button" title="Sumbu kamera sendiri">◎ Lokal</button></div></div>';
+    +'<div class="s3g-row"><button class="btn on" id="s3g-glob" type="button" title="Sumbu dunia">🌐 Global</button><button class="btn" id="s3g-loc" type="button" title="Sumbu objek sendiri">◎ Lokal</button></div></div>';
   view.appendChild(box);
   const st0=document.createElement('style');
   st0.textContent='#s3g-box{position:absolute;top:8px;right:8px;z-index:4;display:none;flex-direction:column;align-items:flex-end;gap:6px}'
@@ -247,7 +265,7 @@ function init(){
   sync();
   return true;
 }
-try{if(!init())setTimeout(init,500)}catch(e){console.error('Gizmo kamera gagal dimuat',e)}
+try{if(!init())setTimeout(init,500)}catch(e){console.error('Gizmo gagal dimuat',e)}
 })();
 
 /* ===================== SUSUNAN 2 TAMPILAN (Edit 3D) =====================

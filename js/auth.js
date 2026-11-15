@@ -12,11 +12,11 @@
      Sesi lama tanpa rt tetap bisa dipakai, tapi sinkron baru aktif setelah Keluar lalu Masuk lagi.
    - Keluar: tombol "Keluar" di beranda (project sudah tersimpan otomatis di sana).
 
-   LOGIN LEWAT CHROME (untuk APK / WebView / browser dalam aplikasi):
+   LOGIN LEWAT BROWSER LAIN (untuk APK / WebView / browser dalam aplikasi):
    Google memblokir login di dalam WebView (disallowed_useragent), jadi di sana tombol Google diganti alur kode:
    1) Aplikasi membuat kode acak 10 karakter dan menampilkannya, lalu memeriksa Realtime Database tiap 2 detik (REST, tanpa SDK).
-   2) Pengguna membuka tautan  APP_URL?link=KODE  di Chrome, masuk dengan Google di sana.
-   3) Halaman Chrome menulis loginLinks/KODE = {uid, email, name, rt, created} memakai ID token Firebase (auth=...).
+   2) Pengguna menyalin tautan  APP_URL?link=KODE  (tombol "Salin tautan"), menempelkannya di browser MANA PUN, masuk dengan Google di sana.
+   3) Halaman browser itu menulis loginLinks/KODE = {uid, email, name, rt, created} memakai ID token Firebase (auth=...).
    4) Aplikasi menemukan data itu, menghapusnya, lalu masuk sebagai akun tersebut. Kode hanya berlaku 10 menit sejak dibuat di aplikasi.
    SYARAT DI FIREBASE CONSOLE: Realtime Database > Rules harus memuat blok "loginLinks" (lihat commit message / README).
    Database yang dipakai sama dengan js/qrlink.js (DB di bawah).
@@ -46,7 +46,7 @@ const WV=(function(){
   if(/Android/.test(u)&&/Chrome\//.test(u)&&/Version\/\d+\.\d+/.test(u)&&!/SamsungBrowser|OPR\/|EdgA/.test(u))return true;
   return false;
 })();
-/* Halaman Chrome yang dibuka dari tautan ?link=KODE */
+/* Halaman browser yang dibuka dari tautan ?link=KODE */
 const LINK=(function(){
   try{const c=(new URLSearchParams(location.search).get('link')||'').toUpperCase();return CODE_RE.test(c)?c:''}catch(e){return ''}
 })();
@@ -111,7 +111,7 @@ function explain(e){
   return 'Gagal masuk dengan Google. Coba lagi.';
 }
 
-/* ---------- kode penghubung (APK <-> Chrome) lewat Realtime Database REST ---------- */
+/* ---------- kode penghubung (APK <-> browser) lewat Realtime Database REST ---------- */
 function newCode(){
   const a=new Uint8Array(10);
   try{crypto.getRandomValues(a)}catch(e){for(let i=0;i<10;i++)a[i]=Math.floor(Math.random()*256)}
@@ -224,25 +224,23 @@ function mountAuth(){
   }
 }
 
-/* --- layar masuk di APK / WebView: tampilkan kode, login dilakukan di Chrome --- */
+/* --- layar masuk di APK / WebView: tampilkan kode, login dilakukan di browser lain (salin tautan lalu tempel) --- */
 function mountWebViewAuth(){
   const cr=getCode(),code=cr.c,t0=cr.t,url=APP_URL+'?link='+code;
   const box=makeBox(
-    '<h1>SplineWay</h1><p class="au-sub">Google tidak mengizinkan login di dalam aplikasi. Masuk lewat Chrome, aplikasi ini akan otomatis ikut masuk.</p>'+
+    '<h1>SplineWay</h1><p class="au-sub">Google tidak mengizinkan login di dalam aplikasi. Salin tautan di bawah, tempel di browser mana pun, lalu masuk dengan Google di sana. Aplikasi ini akan otomatis ikut masuk.</p>'+
     '<div class="au-code" id="au-code" aria-label="Kode login">'+fmtCode(code)+'</div>'+
     '<label class="au-ck"><input type="checkbox" id="au-keep" checked> Tetap masuk di perangkat ini</label>'+
     '<p class="au-err" id="au-err" role="alert"></p>'+
-    '<a class="au-go" id="au-chrome" target="_blank" rel="noopener">Buka di Chrome</a>'+
-    '<button class="au-go au-alt" id="au-copy" type="button">Salin tautan</button>'+
-    '<p class="au-st" id="au-st">Menunggu login di Chrome...</p>'+
-    '<p class="au-note">Kalau tombol tidak membuka Chrome, tekan "Salin tautan", buka Chrome, lalu tempel di kolom alamat. Kode berlaku 10 menit. Project tetap disimpan di perangkat ini dan disalin ke cloud lewat tombol Sinkron.</p>',
+    '<button class="au-go" id="au-copy" type="button">Salin tautan</button>'+
+    '<p class="au-st" id="au-st">Menunggu login di browser...</p>'+
+    '<p class="au-note">Tekan "Salin tautan", buka browser apa pun (Chrome, Firefox, Edge, Safari, dll.), lalu tempel di kolom alamat. Kode berlaku 10 menit. Project tetap disimpan di perangkat ini dan disalin ke cloud lewat tombol Sinkron.</p>',
     'Masuk ke SplineWay');
   const keep=box.querySelector('#au-keep'),errEl=box.querySelector('#au-err'),st=box.querySelector('#au-st');
-  box.querySelector('#au-chrome').href=url;
   function err(m){errEl.textContent=m||''}
   box.querySelector('#au-copy').onclick=function(){
     const p=(navigator.clipboard&&navigator.clipboard.writeText)?navigator.clipboard.writeText(url):Promise.reject();
-    p.then(function(){st.textContent='Tautan disalin. Tempel di Chrome.'},function(){window.prompt('Salin tautan ini lalu buka di Chrome:',url)});
+    p.then(function(){st.textContent='Tautan disalin. Tempel di browser mana pun.'},function(){window.prompt('Salin tautan ini lalu buka di browser:',url)});
   };
   let stop=false,running=false,fails=0,timer=0;
   async function tick(){
@@ -270,7 +268,7 @@ function mountWebViewAuth(){
   tick();
 }
 
-/* --- halaman Chrome (?link=KODE): masuk Google lalu hubungkan ke aplikasi --- */
+/* --- halaman browser (?link=KODE): masuk Google lalu hubungkan ke aplikasi --- */
 function mountLinkPage(){
   const box=makeBox(
     '<h1>Hubungkan ke aplikasi</h1><p class="au-sub">Masuk dengan Google di sini, lalu kembali ke aplikasi SplineWay. Kode: <b>'+fmtCode(LINK)+'</b></p>'+

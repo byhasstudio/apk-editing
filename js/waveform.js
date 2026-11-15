@@ -1,3 +1,6 @@
+/* Animasi halus seluruh tampilan: css/smooth.css ditaruh paling akhir di <head> supaya menimpa transisi lama */
+(function(){try{if(!document.getElementById('smooth-css')){const l=document.createElement('link');l.id='smooth-css';l.rel='stylesheet';l.href='css/smooth.css?v=1';document.head.appendChild(l)}}catch(_){}})();
+
 /* Waveform audio: puncak amplitudo per 20 ms, dihitung sekali per media */
 window.APK=window.APK||{};
 APK.wave=(function(){

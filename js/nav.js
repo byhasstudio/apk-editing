@@ -39,18 +39,35 @@ const press=id=>{const b=$(id);if(b)b.click();else try{APK.app.toast('Fitur belu
 
 /* ===== bilah navigasi beranda ===== */
 const nav=document.createElement('nav');nav.id='app-nav';nav.setAttribute('aria-label','Menu utama');
-const items=[['home','home','Beranda'],['preset','preset','Preset'],['cube','3d','Ruang 3D'],['folder','open','Buka'],['user','me','Saya']];
+const items=[['home','home','Beranda'],['preset','preset','Preset'],['cube','3d','Ruang 3D'],['folder','open','Buka'],['user','me','Profil']];
 nav.innerHTML=items.map(i=>'<button type="button" data-n="'+i[1]+'"'+(i[1]==='home'?' class="on" aria-current="page"':'')+'>'+svg(i[0],'ic nv')+'<span>'+i[2]+'</span></button>').join('');
 home.appendChild(nav);
 
+/* ===== Profil: lembar dari bawah (HP) / panel samping (komputer) ===== */
 const dlg=document.createElement('dialog');dlg.id='dlg-me';
-dlg.innerHTML='<form method="dialog"><h3>Akun</h3><div class="me-card">'+svg('user','ic nv')+'<div><b id="me-name"></b><small>Project tersimpan di perangkat ini</small></div></div>'+
- '<div class="me-list"><button type="button" class="btn" id="me-sync">'+svg('cloud')+'Sinkron sekarang</button><button type="button" class="btn danger" id="me-out">'+svg('out')+'Keluar</button></div>'+
- '<div class="dlg-actions"><button class="btn" value="cancel">Tutup</button></div></form>';
+dlg.innerHTML='<div class="pf"><div class="pf-head"><div class="pf-av">'+svg('user','ic nv')+'</div><div class="pf-id"><b id="pf-name"></b><small id="pf-sub"></small></div><button type="button" class="btn pf-x" id="pf-close" aria-label="Tutup">\u2715</button></div>'+
+ '<div class="pf-stats"><div><b id="pf-n2d">0</b><span>Project video</span></div><div><b id="pf-n3d">0</b><span>Project 3D</span></div></div>'+
+ '<h4>Pengaturan</h4><div class="pf-list"><button type="button" class="pf-row" id="pf-mode"><span>Mode editor</span><em id="pf-mode-v"></em></button><button type="button" class="pf-row" id="pf-help"><span>Tutorial singkat</span><em>Buka</em></button></div>'+
+ '<h4>Cloud</h4><div class="pf-list"><div class="pf-row"><span>Status sinkron</span><em id="pf-sync-v"></em></div><button type="button" class="pf-row" id="pf-sync"><span>Sinkron sekarang</span><em>Jalankan</em></button></div>'+
+ '<button type="button" class="btn danger pf-out" id="pf-out">'+svg('out')+'Keluar</button></div>';
 document.body.appendChild(dlg);
+const modeTxt=()=>document.body.classList.contains('mode-simple')?'Sederhana':'Lanjutan';
+const syncTxt=()=>{let on=false;try{on=!!(APK.sync&&APK.sync.enabled())}catch(_){}const b=$('btn-sync'),l=b?b.textContent.trim():'';
+  if(!on)return 'Belum aktif';return l&&l!=='\u2601 Sinkron'?l.replace('\u2601','Berjalan'):'Aktif'};
+async function fill(){
+  let u='';try{u=APK.auth.user||''}catch(_){}
+  $('pf-name').textContent=u||'Belum masuk';$('pf-sub').textContent=u?'Akun Google':'Masuk untuk memakai akun';
+  $('pf-mode-v').textContent=modeTxt();$('pf-sync-v').textContent=syncTxt();
+  $('pf-sync').hidden=!$('btn-sync');$('pf-out').hidden=!u;
+  let a=0;try{a=(await APK.db.all()).length}catch(_){}
+  $('pf-n2d').textContent=a;$('pf-n3d').textContent=document.querySelectorAll('#s3d-list .card').length;
+}
 dlg.addEventListener('click',e=>{if(e.target===dlg)dlg.close()});
-$('me-sync').onclick=()=>{dlg.close();press('btn-sync')};
-$('me-out').onclick=()=>{dlg.close();try{APK.auth.logout()}catch(_){press('btn-logout')}};
+$('pf-close').onclick=()=>dlg.close();
+$('pf-mode').onclick=()=>{press('btn-mode');setTimeout(()=>{$('pf-mode-v').textContent=modeTxt()},60)};
+$('pf-help').onclick=()=>{dlg.close();press('btn-help')};
+$('pf-sync').onclick=()=>{press('btn-sync');setTimeout(()=>{$('pf-sync-v').textContent=syncTxt()},500)};
+$('pf-out').onclick=()=>{dlg.close();try{APK.auth.logout()}catch(_){press('btn-logout')}};
 
 nav.addEventListener('click',e=>{
   const b=e.target.closest('[data-n]');if(!b)return;
@@ -59,7 +76,7 @@ nav.addEventListener('click',e=>{
   else if(n==='preset')press('btn-preset-home');
   else if(n==='3d')press('btn-3d');
   else if(n==='open')press('btn-open');
-  else if(n==='me'){let u='';try{u=APK.auth.user||''}catch(_){}$('me-name').textContent=u||'Belum masuk';$('me-sync').hidden=!$('btn-sync');dlg.showModal()}
+  else if(n==='me'){fill();dlg.showModal()}
 });
 
 /* ===== tab bawah editor 2D (HP): ikon di atas teks ===== */

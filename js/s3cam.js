@@ -542,5 +542,7 @@ function initUI(){
   return true;
 }
 try{initUI()}catch(e){console.error('Kamera fisik Edit 3D gagal dimuat',e)}
+/* dipakai add-on js/s3gizmo.js (gizmo geser/putar kamera) */
+window.APK=window.APK||{};APK.s3cam={V,get lv(){return lv},get rev(){return rev},bump,touch,selId,curT,byId,isCam,aspect,gv,put,camPose,obsState,mkProj,rotM,mul,mv,mvT,eulerOf,col,add,sub,scl,norm};
 if(window.__S3CAM_TEST)window.__S3CAM_TEST.api={rotM,mul,mv,mvT,eulerOf,camPose,mmToFov,fovToMm,apToBlur,blurToAp,noiseFn,hash,obsState,mkProj,inPoly,setView};
 })();

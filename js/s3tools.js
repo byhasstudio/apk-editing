@@ -4,7 +4,10 @@
       Tombol ↶ ↷ di bilah atas, atau Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z).
    2) KIRIM KE EDITOR VIDEO: scene dirender lewat export bawaan Edit 3D (frame per frame kalau didukung), lalu hasilnya
       dipasang sebagai klip video di project editor APK EDITING yang biasa (project baru atau project yang sudah ada),
-      dan editor langsung terbuka. Kalau pengiriman gagal, hasil render diunduh sebagai file supaya tidak sia-sia. */
+      dan editor langsung terbuka. Kalau pengiriman gagal, hasil render diunduh sebagai file supaya tidak sia-sia.
+   3) HAPUS: kotak "Hapus" di properti (layer, keyframe di waktu ini, semua keyframe, musik), tombol ✕ per properti,
+      ketuk 2x tanda ◆ di bawah slider waktu, dan tombol Delete / Backspace. Semuanya bisa di-undo.
+   4) 2 TAMPILAN: tombol "◫ 2 Tampilan" menampilkan hasil kamera (kiri) dan ruang 3D (kanan) sekaligus. */
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
@@ -222,4 +225,160 @@ function init(){
   ui();
 }
 try{init()}catch(e){console.error('Alat tambahan Edit 3D gagal dimuat',e)}
+})();
+
+/* ===================== HAPUS + 2 TAMPILAN (Edit 3D) =====================
+   Dijalankan setelah semua script dimuat (DOMContentLoaded), karena tombol "▦ Ruang 3D" dibuat oleh js/s3cam.js.
+   Mode 2 tampilan memakai mode Ruang 3D milik s3cam.js (kamera fisik, seret kamera, orbit) dan hanya menampilkan
+   kanvas hasil di sebelah kirinya, jadi semua kontrol Ruang 3D tetap bekerja. */
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const toast=m=>{try{APK.app&&APK.app.toast&&APK.app.toast(m)}catch(_){}};
+const A=()=>(window.APK&&APK.s3d)||null;
+const scn=()=>{try{return A().scene}catch(_){return null}};
+const root=()=>$('s3d');
+const selId=()=>{const c=document.querySelector('#s3-chips .on');return c&&c.dataset.sel||'cam'};
+const curT=()=>parseFloat(($('s3-time')||{}).value)||0;
+const byId=id=>{const s=scn();return s?s.items.find(i=>i.id===id)||null:null};
+const dlgOpen=()=>!!document.querySelector('dialog[open]');
+const pausePlay=()=>{const p=$('s3-play');if(p&&p.textContent.trim()==='❚❚')p.click()};
+const sysItem=it=>it.id==='cam'||it.id==='fx';
+/* memicu simpan otomatis + riwayat undo (lewat input nama), lalu bangun ulang panel dan render */
+function touch(){
+  const nm=$('s3-name');if(nm)nm.dispatchEvent(new Event('input',{bubbles:true}));
+  try{A().select(selId())}catch(_){}
+}
+
+/* ----- hapus ----- */
+function delLayer(it){
+  if(sysItem(it)){toast('Kamera utama dan Efek tidak bisa dihapus. Pakai "Hapus semua keyframe" untuk mengosongkan animasinya.');return}
+  const nm=it.name||it.kind;
+  pausePlay();A().select(it.id);$('s3-del').click();   /* memakai penghapusan bawaan (induk, potongan kamera, dll ikut dibereskan) */
+  toast('Dihapus: '+nm+'. Tekan ↶ untuk membatalkan.');
+}
+function clearKeys(it,p){
+  const a=it.keys[p];if(!a||!a.length)return false;
+  it.props[p]=A().val(it,p,curT());delete it.keys[p];return true;   /* nilai di waktu sekarang dipertahankan */
+}
+function delKeysAt(it,tt){
+  let n=0;
+  Object.keys(it.keys).forEach(p=>{
+    const a=it.keys[p],i=a.findIndex(k=>Math.abs(k.t-tt)<.02);if(i<0)return;
+    if(a.length===1)it.props[p]=a[0].v;
+    a.splice(i,1);if(!a.length)delete it.keys[p];n++;
+  });
+  return n;
+}
+function delMusic(){
+  const s=scn();if(!s||!s.music){toast('Belum ada musik');return}
+  pausePlay();s.music=null;$('s3-music').textContent='♪ Musik';touch();toast('Musik dihapus');
+}
+function injectDel(){
+  const P=$('s3-props'),it=byId(selId());if(!P||!it)return;
+  /* tombol ✕ per properti */
+  P.querySelectorAll('.s3-kf').forEach(k=>{
+    const kb=k.querySelector('[data-kf]');if(!kb||k.querySelector('[data-sxc]'))return;
+    const b=document.createElement('button');b.type='button';b.dataset.sxc=kb.dataset.kf;b.textContent='✕';
+    b.title='Hapus semua keyframe properti ini (nilai sekarang dipertahankan)';k.appendChild(b);
+  });
+  if(P.querySelector('#s3x-del'))return;
+  const d=document.createElement('div');d.id='s3x-del';d.className='s3c';
+  d.innerHTML='<b>🗑 Hapus</b><div class="s3x-row">'
+    +(sysItem(it)?'':'<button class="btn danger" type="button" data-sxd="layer">Hapus layer ini</button>')
+    +'<button class="btn" type="button" data-sxd="at">Hapus keyframe di waktu ini</button>'
+    +'<button class="btn" type="button" data-sxd="all">Hapus semua keyframe</button>'
+    +(scn()&&scn().music?'<button class="btn" type="button" data-sxd="music">Hapus musik</button>':'')
+    +'</div><p class="s3-hint">Ketuk 2x tanda ◆ kuning di bawah slider waktu untuk menghapus keyframe di titik itu. Tombol Delete di keyboard menghapus layer terpilih. Semua bisa dibatalkan dengan ↶.</p>';
+  const h=P.querySelector('.s3-hint');
+  if(h)h.insertAdjacentElement('afterend',d);else P.insertBefore(d,P.firstChild);
+}
+function onClick(e){
+  const r=root(),b=e.target.closest&&e.target.closest('[data-sxd],[data-sxc]');
+  if(!b||!r||!r.contains(b))return;
+  const it=byId(selId());if(!it)return;
+  if(b.dataset.sxc){
+    if(clearKeys(it,b.dataset.sxc)){touch();toast('Keyframe properti dihapus')}else toast('Properti ini belum punya keyframe');
+    return;
+  }
+  const x=b.dataset.sxd;
+  if(x==='layer')delLayer(it);
+  else if(x==='at'){const n=delKeysAt(it,curT());if(n){touch();toast(n+' keyframe dihapus')}else toast('Tidak ada keyframe di waktu ini')}
+  else if(x==='all'){let n=0;Object.keys(it.keys).forEach(p=>{if(clearKeys(it,p))n++});if(n){touch();toast('Semua keyframe dihapus ('+n+' properti)')}else toast('Layer ini belum punya keyframe')}
+  else if(x==='music')delMusic();
+}
+function onKey(e){
+  const v=root();if(!v||v.hidden||!scn()||dlgOpen())return;
+  if(e.key!=='Delete'&&e.key!=='Backspace')return;
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  const ae=document.activeElement,tg=ae?ae.tagName:'';if(/INPUT|TEXTAREA|SELECT/.test(tg))return;
+  const it=byId(selId());if(!it)return;
+  e.preventDefault();delLayer(it);
+}
+
+/* ----- 2 tampilan: kiri hasil kamera, kanan ruang 3D ----- */
+let wantDual=false;
+function setDual(on){
+  const r=root();if(!r||!scn()||!$('s3-v3d'))return;
+  if(on){if(!r.classList.contains('s3-v3d'))$('s3-v3d').click();r.classList.add('s3-vdual')}
+  else r.classList.remove('s3-vdual');
+  syncDual();
+  try{A().render()}catch(_){}
+}
+function syncDual(){
+  const r=root(),b=$('s3-vdual');if(!r||!b)return;
+  if(!r.classList.contains('s3-v3d')&&r.classList.contains('s3-vdual'))r.classList.remove('s3-vdual');   /* keluar dari Ruang 3D = keluar dari 2 tampilan */
+  const d=r.classList.contains('s3-vdual');
+  b.classList.toggle('on',d);if(d)$('s3-v3d').classList.remove('on');
+}
+function initDual(){
+  const r=root(),w=document.querySelector('#s3d .s3v'),view=document.querySelector('#s3d .s3-view');
+  if(!r||!w||!view||!$('s3-v3d')||$('s3-vdual'))return false;
+  const b=document.createElement('button');b.type='button';b.className='btn';b.id='s3-vdual';b.textContent='◫ 2 Tampilan';
+  b.title='Dua tampilan sekaligus: kiri hasil kamera, kanan ruang 3D';
+  w.insertBefore(b,$('s3-vfit')||null);
+  b.onclick=()=>setDual(!r.classList.contains('s3-vdual'));
+  $('s3-v3d').addEventListener('click',()=>{r.classList.remove('s3-vdual');syncDual()});   /* "Ruang 3D" = tampilan penuh */
+  new MutationObserver(syncDual).observe(r,{attributes:true,attributeFilter:['class']});
+  [['HASIL KAMERA','left:6px'],['RUANG 3D','left:calc(50% + 6px)']].forEach(([t,pos])=>{
+    const c=document.createElement('span');c.className='s3x-cap';c.style.cssText=pos;c.textContent=t;view.appendChild(c);
+  });
+  /* export / kirim ke editor memaksa kembali ke tampilan kamera (s3cam.js): ingat 2 tampilan lalu pulihkan setelah dialog export ditutup */
+  document.addEventListener('click',e=>{
+    if(e.target.closest&&e.target.closest('#s3-export,#s3-send')&&r.classList.contains('s3-vdual'))wantDual=true;
+  },true);
+  const ex=$('s3-dlg-ex');
+  if(ex)ex.addEventListener('close',()=>{if(wantDual){wantDual=false;setTimeout(()=>setDual(true),80)}});
+  const st=document.createElement('style');
+  st.textContent=
+    '#s3d.s3-v3d.s3-vdual .s3-view{position:relative;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3px}'
+   +'#s3d.s3-v3d.s3-vdual #s3-cv{display:block}'
+   +'#s3d.s3-vdual #s3-cv,#s3d.s3-vdual #s3-lv{max-width:100%;max-height:40vh}'
+   +'.s3x-cap{display:none;position:absolute;top:4px;z-index:2;pointer-events:none;font:700 10px system-ui,sans-serif;letter-spacing:.04em;color:#fff;background:#0009;padding:2px 6px;border-radius:4px}'
+   +'#s3d.s3-v3d.s3-vdual .s3x-cap{display:block}'
+   +'@media (min-width:900px){#s3d.s3-v3d.s3-vdual .s3-body{grid-template-columns:minmax(0,2.2fr) minmax(320px,1fr)}#s3d.s3-vdual #s3-cv,#s3d.s3-vdual #s3-lv{max-height:56vh}}'
+   +'#s3x-del .s3x-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}#s3x-del .btn{padding:6px 10px;font-size:13px}'
+   +'.s3-kf button[data-sxc]{color:#ff6b6b}';
+  document.head.appendChild(st);
+  syncDual();
+  return true;
+}
+
+function boot(){
+  if(!$('s3d'))return;
+  const P=$('s3-props');
+  if(P)new MutationObserver(injectDel).observe(P,{childList:true});
+  document.addEventListener('click',onClick);
+  addEventListener('keydown',onKey);
+  const tk=$('s3-ticks');
+  if(tk)tk.addEventListener('dblclick',e=>{
+    const b=e.target.closest('[data-tt]'),it=byId(selId());if(!b||!it)return;
+    const n=delKeysAt(it,+b.dataset.tt);if(n){touch();toast(n+' keyframe dihapus')}
+  });
+  if(!initDual())setTimeout(initDual,400);
+  injectDel();
+}
+try{
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+}catch(e){console.error('Fitur hapus / 2 tampilan Edit 3D gagal dimuat',e)}
 })();

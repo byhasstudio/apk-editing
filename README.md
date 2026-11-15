@@ -80,6 +80,16 @@ Pengedit dan tracking 3D, **bukan** pembuat model 3D. Ruang 3D dengan kamera (po
 - **Media ikut tersimpan.** Kalau layer yang disimpan memakai foto, video, atau audio, isi filenya ikut dimasukkan ke file preset (jadi `nama.apkpreset`, bukan `.json`), sehingga preset bisa dibuka di project baru tanpa impor ulang media. Ukuran file preset ikut membesar sesuai ukuran media; kalau lebih dari 300 MB kamu ditanya dulu. Saat dibuka, media yang sudah ada di project (id sama, atau nama, jenis, dan ukuran sama) dipakai lagi, hanya yang belum ada yang diimpor. Preset tanpa media tetap berupa file `.apkpreset.json` kecil. Preset lama yang tidak menyimpan media tetap bisa dibuka; clip medianya tersambung kalau project punya media dengan nama dan jenis yang sama.
 - Membuka preset ke project yang sama TIDAK menumpuk salinan: layer yang isinya sama persis dengan yang sudah ada dilewati (kamu diberi tahu jumlahnya), jadi aman dibuka berkali-kali. Hanya layer yang belum ada yang ditambahkan.
 
+### Mode perangkat otomatis (mobile dan PC)
+
+Seluruh sistem (beranda, editor video 2D, Edit 3D, semua dialog) menyesuaikan diri sendiri, tanpa tombol manual.
+- `js/device.js` (dimuat paling awal di `<head>`) memasang dua atribut di `<html>`: `data-device` = `mobile` (lebar <= 900px) atau `pc`, dan `data-input` = `touch` atau `mouse`. Laptop layar sentuh mengikuti alat yang terakhir dipakai. Berubah sendiri saat layar diputar, jendela diubah ukurannya, atau input berganti.
+- `css/device.css`: beranda dan editor 2D. `css/device3d.css`: Edit 3D dan dialognya. Keduanya memakai `data-device` / `data-input`, jadi batas 900px sama persis di semua bagian.
+- **Mobile**: tata letak satu kolom (preview di atas, panel di tab / bawah), area aman layar berponi, target sentuh 40px, font isian 16px (mencegah zoom otomatis iOS), baris alat 3D yang bisa digeser.
+- **PC**: preview besar di kiri dan panel di kanan, panel lebih lebar di layar >= 1500px, efek hover, tombol ⌨ daftar shortcut (juga lewat `?`).
+- `js/controls.js`: kontrol per perangkat. PC: shortcut tambahan (di Edit 3D: Ctrl+S, `?`). Sentuh: cubit untuk zoom timeline, geser kiri / kanan pindah tab, ketuk 2 jari di preview = play / pause, getar singkat.
+- Pengujian cepat: buka di browser, ubah ukuran jendela melewati 900px, atau pakai mode perangkat di DevTools. Cek `document.documentElement.dataset`.
+
 ## Rencana berikutnya
 
 Sistem vektor bagian 2 (gambar bebas dengan penghalusan, gabung/kurangi/irisan path), bagian 3 (path vektor sebagai motion path dan mask), lalu keyframe lanjutan (titik path, anchor, skew, graph editor penuh), mask/matte, precomp, teks lanjutan, audio, presisi, dan export. Efek dan transisi menyusul belakangan. Perpustakaan preset di dalam aplikasi (tanpa file) termasuk prioritas 7.

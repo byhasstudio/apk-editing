@@ -1,4 +1,4 @@
-/* KONTROL PER PERANGKAT (beranda + editor video 2D). Dimuat setelah js/ui.js; butuh js/device.js.
+/* KONTROL PER PERANGKAT (beranda + editor video 2D + Edit 3D untuk shortcut, tombol ⌨, dan getar). Dimuat setelah js/ui.js; butuh js/device.js.
    PC / keyboard : shortcut tambahan (+ - zoom timeline, F layar penuh, N snap, Ctrl+E export, ? daftar shortcut; di beranda N / O),
                    tombol ⌨ di bilah atas (hanya saat input mouse) yang membuka daftar shortcut.
    Mobile / sentuh: cubit 2 jari di timeline = zoom (berpusat di playhead / jari), geser kiri-kanan di panel Media / Properti / Efek
@@ -34,6 +34,7 @@ const KEYS=[
   ['Umum',[['Spasi','Play / Pause'],['Ctrl + S','Simpan'],['Ctrl + Z / Ctrl + Y','Undo / Redo'],['Ctrl + E','Export video'],['F','Layar penuh preview'],['?','Daftar shortcut ini']]],
   ['Timeline',[['S','Belah clip di playhead'],['Delete','Hapus clip terpilih'],['Ctrl + D','Duplikat'],['Ctrl + C / X / V','Salin / potong / tempel'],['Ctrl + A','Pilih semua clip'],['Shift / Ctrl + klik','Pilih banyak clip'],['Esc','Batal pilih'],['T','Tambah teks'],['N','Snap nyala / mati'],['+ / −','Zoom timeline'],['Ctrl + scroll','Zoom timeline'],['Alt + seret','Seret playhead tanpa snap']]],
   ['Playhead dan keyframe',[['← / →','Mundur / maju 1 frame (Shift: 1 detik)'],['Home / End','Ke awal / akhir'],['K','Keyframe semua properti'],['[ / ]','Loncat ke keyframe sebelum / sesudah']]],
+  ['Edit 3D',[['Spasi','Play / Pause'],['Ctrl + S','Simpan'],['Ctrl + Z / Ctrl + Y','Undo / Redo'],['Q / W / E / R','Alat Pilih / Geser / Putar / Skala'],['F','Fokus ke objek terpilih'],['Delete','Hapus objek terpilih'],['?','Daftar shortcut ini']]],
   ['Beranda',[['N','Project baru'],['O','Buka project']]]
 ];
 function openKeys(){
@@ -52,6 +53,13 @@ function openKeys(){
   b.title='Daftar shortcut keyboard (?)';b.setAttribute('aria-label','Shortcut keyboard');b.onclick=openKeys;
   help.insertAdjacentElement('beforebegin',b);
 })();
+/* tombol ⌨ yang sama di bilah atas Edit 3D (tampil hanya saat input mouse, lihat css/device3d.css) */
+(function(){
+  const anchor=$('s3-export');if(!anchor||$('btn-keys3'))return;
+  const b=document.createElement('button');b.className='btn';b.id='btn-keys3';b.type='button';b.textContent='⌨';
+  b.title='Daftar shortcut keyboard (?)';b.setAttribute('aria-label','Shortcut keyboard');b.onclick=openKeys;
+  anchor.insertAdjacentElement('beforebegin',b);
+})();
 
 /* ===== shortcut tambahan (tidak aktif saat mengetik atau saat dialog terbuka; melengkapi js/keyboard.js) ===== */
 addEventListener('keydown',e=>{
@@ -63,6 +71,9 @@ addEventListener('keydown',e=>{
     else if(!ctrl&&lk==='f'){e.preventDefault();const b=$('pv-full');if(b)b.click()}
     else if(!ctrl&&lk==='n'){e.preventDefault();const b=$('tl-snap');if(b){b.click();toast(b.classList.contains('on')?'Snap nyala':'Snap mati')}}
     else if(ctrl&&!e.shiftKey&&lk==='e'){e.preventDefault();const b=$('btn-export');if(b)b.click()}
+    else if(k==='?'){e.preventDefault();openKeys()}
+  }else if(shown('s3d')){
+    if(ctrl&&!e.shiftKey&&lk==='s'){e.preventDefault();const b=$('s3-savebtn');if(b)b.click()}
     else if(k==='?'){e.preventDefault();openKeys()}
   }else if(shown('home')){
     if(!ctrl&&lk==='n'){e.preventDefault();const b=$('btn-new');if(b)b.click()}
@@ -144,7 +155,7 @@ function secondFinger(e,area){
 /* getar singkat saat menekan tombol (Android; iOS mengabaikan) */
 document.addEventListener('click',e=>{
   if(!dev().isTouch||!navigator.vibrate||!e.target.closest)return;
-  const b=e.target.closest('#editor button,#home button');
+  const b=e.target.closest('#editor button,#home button,#s3d button');
   if(b&&!b.disabled)navigator.vibrate(6);
 },true);
 

@@ -26,11 +26,11 @@ try{
    +'.hr-bar .hr-logo{display:block;text-align:center;font-weight:800;font-size:11px;letter-spacing:.5px;color:var(--accent);margin-bottom:6px}}';
   document.head.appendChild(fx);
 }catch(_){}
-/* tambahan Edit 3D dimuat berurutan dari sini supaya index.html tidak perlu diubah: timeline -> menu tombol -> animasi/panduan -> fitur pro -> beat -> gerak pro */
+/* tambahan Edit 3D dimuat berurutan dari sini supaya index.html tidak perlu diubah: timeline -> menu tombol -> animasi/panduan -> fitur pro -> beat -> gerak pro -> audio & lirik */
 function load(src,next){
   try{const s=document.createElement('script');s.src=src;s.onload=s.onerror=()=>{if(next)next()};document.body.appendChild(s)}catch(_){if(next)next()}
 }
-load('js/s3timeline.js?v=1',()=>load('js/menus.js?v=1',()=>load('js/s3extra.js?v=1',()=>load('js/s3pro.js?v=1',()=>load('js/s3beat.js?v=1',()=>load('js/s3move.js?v=1'))))));
+load('js/s3timeline.js?v=1',()=>load('js/menus.js?v=1',()=>load('js/s3extra.js?v=1',()=>load('js/s3pro.js?v=1',()=>load('js/s3beat.js?v=1',()=>load('js/s3move.js?v=1',()=>load('js/s3audio.js?v=1')))))));
 const $=id=>document.getElementById(id),home=$('home'),main=home&&home.querySelector('.home-main');
 if(!main)return;
 const I={

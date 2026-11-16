@@ -9,11 +9,11 @@ try{
    +'#s3d .s3-stage{z-index:30}';
   document.head.appendChild(fx);
 }catch(_){}
-/* tambahan Edit 3D dimuat berurutan dari sini supaya index.html tidak perlu diubah: timeline -> menu tombol -> animasi/panduan */
+/* tambahan Edit 3D dimuat berurutan dari sini supaya index.html tidak perlu diubah: timeline -> menu tombol -> animasi/panduan -> fitur pro */
 function load(src,next){
   try{const s=document.createElement('script');s.src=src;s.onload=s.onerror=()=>{if(next)next()};document.body.appendChild(s)}catch(_){if(next)next()}
 }
-load('js/s3timeline.js?v=1',()=>load('js/menus.js?v=1',()=>load('js/s3extra.js?v=1')));
+load('js/s3timeline.js?v=1',()=>load('js/menus.js?v=1',()=>load('js/s3extra.js?v=1',()=>load('js/s3pro.js?v=1'))));
 const $=id=>document.getElementById(id),home=$('home'),main=home&&home.querySelector('.home-main');
 if(!main)return;
 const I={

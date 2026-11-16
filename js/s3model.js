@@ -65,18 +65,21 @@ function buildChar(it,s){
   torso.add(mesh(sph(55),body,0,60,0,1,1.15,.8));
   head.position.set(0,150,0);
   head.add(mesh(sph(58),skin,0,22,0));
-  head.add(mesh(new T.SphereGeometry(61,28,14,0,Math.PI*2,0,Math.PI*.38),hair,0,24,-6));
+  head.add(mesh(new T.SphereGeometry(61,28,14,0,Math.PI*2,0,Math.PI*.34),hair,0,24,-6));
+  const eyeW=[],eyeP=[],brows=[];
   for(const sx of[-1,1]){
-    head.add(mesh(sph(13),white,sx*22,28,50,1,1.25,.7));
-    head.add(mesh(sph(6.5),dark,sx*22,28,58.5,.9,1.2,.5));
+    const w=mesh(sph(13),white,sx*22,28,50,1,1.25,.7),p=mesh(sph(6.5),dark,sx*22,28,58.5,.9,1.2,.5);
+    head.add(w,p);eyeW.push(w);eyeP.push(p);
+    const b=mesh(new T.BoxGeometry(20,4.5,4),hair,sx*22,50,48);head.add(b);brows.push(b);
   }
   head.add(mesh(sph(7),skin,0,14,58));
-  const mouth=mesh(new T.TorusGeometry(14,2.6,8,20,Math.PI),dark,0,5,54);mouth.rotation.z=Math.PI;head.add(mouth);
+  const smile=mesh(new T.TorusGeometry(14,2.6,8,20,Math.PI),dark,0,2,54);smile.rotation.z=Math.PI;head.add(smile);
+  const mouthO=mesh(sph(10),dark,0,-2,53,1.3,.05,.5);mouthO.visible=false;head.add(mouthO);
   const arm=sx=>{const g=new G();g.position.set(sx*66,108,0);g.add(mesh(new T.CylinderGeometry(13,12,70,16),body,0,-35,0));g.add(mesh(sph(14),skin,0,-78,0));return g};
   const leg=sx=>{const g=new G();g.position.set(sx*28,5,0);g.add(mesh(new T.CylinderGeometry(17,15,70,16),pants,0,-35,0));g.add(mesh(sph(18),shoe,0,-76,10,1,.6,1.6));return g};
   const armL=arm(-1),armR=arm(1),legL=leg(-1),legR=leg(1);
   root.add(torso,head,armL,armR,legL,legR);
-  s.char={root:root,torso:torso,head:head,armL:armL,armR:armR,legL:legL,legR:legR,mats:{body:body,skin:skin,hair:hair}};
+  s.char={root:root,torso:torso,head:head,armL:armL,armR:armR,legL:legL,legR:legR,mats:{body:body,skin:skin,hair:hair},eyeW:eyeW,eyeP:eyeP,brows:brows,smile:smile,mouthO:mouthO};
   s.anims=CHAR_CLIPS.map(c=>({name:c[0],duration:c[1],proc:c[2]}));
   return root;
 }
@@ -113,6 +116,18 @@ function poseChar(c,proc,t){
     c.legL.rotation.x=.25*sn(ph*2);c.legR.rotation.x=-.25*sn(ph*2);c.head.rotation.z=.15*sn(ph*2);
   }
   if(proc!=='idle')c.head.position.y=150;
+}
+/* wajah tokoh: f = {smile -1..1 (sedih..senyum), brow -1..1 (marah..alis naik), mouth 0..1 (mulut terbuka)}; kedip otomatis tiap ±3,4 detik */
+function faceChar(c,f,t){
+  f=f||{};
+  const cl=(v,a,b)=>Math.min(b,Math.max(a,+v||0)),sm=cl(f.smile,-1,1),br=cl(f.brow,-1,1),mo=cl(f.mouth,0,1);
+  const ph=((t%3.4)+3.4)%3.4/3.4,bl=ph<.04?Math.sin(Math.PI*ph/.04):0;
+  c.eyeW.forEach(e=>e.scale.set(1,1.25*(1-.92*bl),.7));c.eyeP.forEach(e=>e.scale.set(.9,1.2*(1-.92*bl),.5));
+  c.brows.forEach((b,i)=>{const sx=i?1:-1;b.rotation.z=sx*(-br)*.45;b.position.y=50+(br>0?10*br:4*br)});
+  const a=Math.abs(sm);
+  c.smile.rotation.z=sm>=0?Math.PI:0;c.smile.scale.set(1+.1*a,.12+.58*a,1);
+  c.mouthO.visible=mo>.04;c.mouthO.scale.set(1.3,.05+1.0*mo,.5);c.mouthO.position.y=-2-4*mo;
+  c.smile.visible=mo<.6;
 }
 function makePrim(it,s){
   const T=THREE,k=it.prim||'cube',S=300;
@@ -219,14 +234,15 @@ function clipTime(it,mc,dur,t){
   if(mc.mode==='ping'){const p=lt%(dur*2);return p>dur?dur*2-p:p}
   return lt%dur;
 }
-function pose(it,s,t){
+function pose(it,s,t,face){
   const T=THREE;
   if(s.mat&&it.color)s.mat.color.set(it.color);
   if(s.char){
     const c=s.char;c.mats.body.color.set(it.color||'#ff7a59');c.mats.skin.color.set(it.skin||'#f4c7a1');c.mats.hair.color.set(it.hair||'#4a2f20');
     const mc=it.mc,clip=mc&&mc.clip!=null&&mc.clip>=0?s.anims[mc.clip]:null;
-    if(!clip||t==null){poseChar(c,'',0);return}
-    poseChar(c,clip.proc,clipTime(it,mc,Math.max(clip.duration,1e-3),t));return;
+    if(!clip||t==null)poseChar(c,'',0);
+    else poseChar(c,clip.proc,clipTime(it,mc,Math.max(clip.duration,1e-3),t));
+    faceChar(c,face,t==null?0:t);return;
   }
   if(!s.anims||!s.anims.length||!s.root||t==null)return;
   const mc=it.mc,clip=mc&&mc.clip!=null&&mc.clip>=0?s.anims[mc.clip]:null;
@@ -313,7 +329,7 @@ function draw(it,Wd,C,o){
   const T=THREE,cam=r.cam,L=o.light==null?1:o.light;
   cam.fov=2*Math.atan((1000/2)/C.F)*180/Math.PI;cam.aspect=o.W/o.H;cam.near=20;cam.far=30000;cam.updateProjectionMatrix();
   setM(cam.matrix,C.R,C.p,1);cam.matrixWorld.copy(cam.matrix);cam.matrixWorldInverse.copy(cam.matrixWorld).invert();cam.matrixWorldNeedsUpdate=false;
-  try{pose(it,s,o.t)}catch(e){}
+  try{pose(it,s,o.t,o.face)}catch(e){}
   setM(s.pivot.matrix,Wd.R,Wd.p,Wd.s);s.pivot.matrixWorldNeedsUpdate=true;
   try{lighting(r,s,it,Wd,cam,L)}catch(e){}
   r.scene.add(s.pivot);

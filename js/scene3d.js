@@ -39,12 +39,12 @@ const PD={
   light:['Terang cahaya model',0,3,0.05,1]
 };
 const CAMT=['dist','az','el','frx','fry','follow'];
-const PDK={sunburst:{speed:['Putar otomatis (°/detik)',-360,360,1,25],rz:['Putar tambahan (°)',-720,720,1,0]},
+const PDK={model:{smile:['Senyum (− sedih, + senyum)',-1,1,0.05,0],brow:['Alis (− marah, + naik)',-1,1,0.05,0],mouth:['Mulut terbuka',0,1,0.05,0]},sunburst:{speed:['Putar otomatis (°/detik)',-360,360,1,25],rz:['Putar tambahan (°)',-720,720,1,0]},
   ribbon:{speed:['Kecepatan gerak',0,6,0.1,1.2]},dust:{speed:['Kecepatan melaju (satuan/detik)',-3000,3000,10,600]}};
 const KINDS={camera:['x','y','z','rx','ry','rz','fov','focus','fd','dist','az','el','frx','fry','follow'],fx:['ca','glow','shake','flash'],
   text:['x','y','z','rx','ry','rz','scale','opacity'],image:['x','y','z','rx','ry','rz','scale','opacity'],video:['x','y','z','rx','ry','rz','scale','opacity'],
   group:['x','y','z','rx','ry','rz','scale'],sunburst:['opacity','rz','scale','speed'],ribbon:['opacity','scale','speed'],dust:['opacity','speed'],
-  model:['x','y','z','rx','ry','rz','scale','opacity','light']};
+  model:['x','y','z','rx','ry','rz','scale','opacity','light','smile','brow','mouth']};
 const NAMES={camera:'Kamera',fx:'Efek',text:'Teks',image:'Foto',video:'Video',group:'Grup',sunburst:'Latar kipas',ribbon:'Pita cahaya',dust:'Debu bintang',model:'Model 3D'};
 const ICON={camera:'🎥',fx:'✦',text:'T',image:'🖼',video:'🎞',group:'▣',sunburst:'✺',ribbon:'〰',dust:'✧',model:'🧊'};
 const IS3D=k=>k==='text'||k==='image'||k==='video'||k==='group'||k==='model';
@@ -196,7 +196,7 @@ let s3mP=null;
 function useModel(){
   return s3mP||(s3mP=new Promise((res,rej)=>{
     if(APK.s3model)return res(APK.s3model);
-    const s=document.createElement('script');s.src='js/s3model.js?v=3';
+    const s=document.createElement('script');s.src='js/s3model.js?v=4';
     s.onload=()=>APK.s3model?res(APK.s3model):(s3mP=null,rej(new Error('modul model tidak termuat')));
     s.onerror=()=>{s3mP=null;rej(new Error('tidak bisa memuat modul model'))};
     document.head.appendChild(s);
@@ -324,7 +324,7 @@ function drawModel(it,tt,C,k,W,H,o){
   }
   const Wd=world(it,tt),pc0=toCam(C,Wd.p);
   if(pc0[2]<-2000)return;
-  const r=M.draw(it,Wd,C,{W:W,H:H,light:val(it,'light',tt),t:tt});
+  const r=M.draw(it,Wd,C,{W:W,H:H,light:val(it,'light',tt),t:tt,face:{smile:val(it,'smile',tt),brow:val(it,'brow',tt),mouth:val(it,'mouth',tt)}});
   if(!r)return;
   if(r.quad)HIT[it.id]=r.quad;
   const g=SC.getContext('2d');g.save();g.setTransform(1,0,0,1,0,0);g.globalAlpha=clamp(o,0,1);g.drawImage(r.canvas,0,0,W,H);g.restore();
@@ -511,7 +511,7 @@ function chips(){
   const c=$('s3-chips').querySelector('.on');if(c&&c.scrollIntoView)c.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 function row(it,p){
-  const d=pd(it.kind,p),v=val(it,p,t),has=!!keyAt(it,p,t),an=it.keys[p]&&it.keys[p].length;
+  const d=pd(it.kind,p),v=val(it,p,t)||0,has=!!keyAt(it,p,t),an=it.keys[p]&&it.keys[p].length;
   const r=Math.round(v*100)/100;
   return`<div class="s3-f"><div class="s3-lab"><span>${d[0]}</span><span class="s3-kf"><button type="button" data-go="-1" data-p="${p}" title="Keyframe sebelumnya">◀</button><button type="button" class="${has?'on':an?'half':''}" data-kf="${p}" title="Tambah / hapus keyframe di waktu sekarang">◆</button><button type="button" data-go="1" data-p="${p}" title="Keyframe berikutnya">▶</button></span></div>
   <div class="s3-in"><input type="range" data-p="${p}" min="${d[1]}" max="${d[2]}" step="${d[3]}" value="${r}"><input type="number" data-p="${p}" min="${d[1]}" max="${d[2]}" step="${d[3]}" value="${r}"></div></div>`;
@@ -555,6 +555,7 @@ function props(){
   }
   let plist=KINDS[it.kind];
   if(it.kind==='camera')plist=plist.filter(p=>it.target?p!=='fd':!CAMT.includes(p));
+  if(it.kind==='model'&&!(it.fmt==='prim'&&it.prim==='char'))plist=plist.filter(p=>!/^(smile|brow|mouth)$/.test(p));   /* wajah hanya untuk Tokoh */
   if(ISPANO(it))plist=plist.filter(p=>/^(rx|ry|rz|opacity)$/.test(p));   /* latar 360° tidak punya posisi / ukuran */
   h+=plist.map(p=>row(it,p)).join('');
   $('s3-props').innerHTML=h;ticks();

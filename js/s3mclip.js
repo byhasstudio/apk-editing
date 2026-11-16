@@ -9,6 +9,8 @@
       dengan menduplikat dan memotong layer di timeline.
    4) CAHAYA FILM per model: preset (tiga titik ala film, hangat sore, dingin malam, dramatis), lampu pinggir dari belakang, tone mapping
       filmik, dan bayangan lembut di lantai tepat di bawah model.
+   5) EKSPRESI WAJAH tokoh: slider keyframe Senyum, Alis, Mulut terbuka; tombol ekspresi cepat (netral, senang, kaget, sedih, marah) dan "Bicara"
+      yang menggerakkan mulut buka-tutup selama durasi pilihan. Mata berkedip otomatis. Semuanya keyframe biasa, bisa diubah dan di-undo.
    Data tersimpan di layer: it.mc = {clip, speed, mode, off} dan, untuk bentuk dasar, it.fmt='prim', it.prim, it.color. Semua perubahan ikut undo (↶)
    dan simpan otomatis lewat pemicu input pada nama project, sama seperti add-on lain. */
 (function(){
@@ -28,6 +30,34 @@ function touch(){const nm=$('s3-name');if(nm)nm.dispatchEvent(new Event('input',
 const PRIM={char:'Tokoh (karakter)',cube:'Kubus',sphere:'Bola',cylinder:'Silinder',cone:'Kerucut',torus:'Donat',pyramid:'Piramida',capsule:'Kapsul'};
 const MODE={loop:'Ulang terus',once:'Sekali lalu diam di akhir',ping:'Bolak-balik'};
 let tries=0,timer=0;
+const r3=v=>Math.round(v*1000)/1000;
+/* ekspresi: [nama, senyum, alis, mulut] */
+const EXP={neutral:['Netral',0,0,0],happy:['Senang',1,.3,.25],shock:['Kaget',0,1,.9],sad:['Sedih',-.9,.8,0],angry:['Marah',-.6,-1,.1]};
+function K(it,p,t,v,e){
+  const a=it.keys[p]||(it.keys[p]=[]),k=a.find(k=>Math.abs(k.t-t)<.02);
+  if(k){k.v=r3(v);k.e=e||k.e}else{a.push({t:r3(t),v:r3(v),e:e||'inout'});a.sort((x,y)=>x.t-y.t)}
+}
+function fixProps(it){['smile','brow','mouth'].forEach(p=>{if(it.props[p]==null)it.props[p]=0})}
+/* pasang ekspresi di waktu sekarang: nilai lama ditahan sampai 0,3 dtk sebelumnya supaya berubah halus, tidak mengubah bagian sebelumnya */
+function setExp(it,vals){
+  const t=curT(),t0=Math.max(0,t-.3);fixProps(it);
+  for(const p of['smile','brow','mouth']){
+    const a=it.keys[p]||[];
+    if(t>.05&&!a.some(k=>k.t>=t0-.02&&k.t<t-.02))K(it,p,t0,A().val(it,p,t0)||0,'inout');
+    K(it,p,t,vals[p],'inout');
+  }
+}
+/* bicara: mulut buka-tutup tiap 0,13 dtk dengan bukaan berbeda-beda, lalu menutup */
+function talk(it){
+  const t=curT(),d=Math.min(30,Math.max(.5,parseFloat(($('s3m-talk')||{}).value)||2)),step=.13,n=Math.floor(d/step);
+  fixProps(it);
+  const v0=A().val(it,'mouth',t)||0,PAT=[.15,.75,.35,.9,.2,.6,.4,.85,.25,.7];
+  it.keys.mouth=(it.keys.mouth||[]).filter(k=>k.t<t-.02||k.t>t+d+.4);
+  K(it,'mouth',t,v0,'linear');
+  for(let i=1;i<=n;i++)K(it,'mouth',t+i*step,PAT[(i*7+3)%PAT.length]*(.7+.3*Math.sin(i*1.7)),'linear');
+  K(it,'mouth',t+n*step+.12,0,'inout');
+  if(!it.keys.mouth.some(k=>k.t>t+n*step+.2))K(it,'mouth',t+n*step+.35,0,'inout');
+}
 
 /* ===== tombol "+ Bentuk 3D" di bilah alat ===== */
 async function addPrim(kind){
@@ -58,13 +88,18 @@ function lookUi(it){
     +'<label class="s3-ck"><input type="checkbox" data-mc="lksh"'+(lk.sh?' checked':'')+'> Bayangan lembut di lantai</label>'
     +'<p class="s3-hint">Lantai berada tepat di bawah model dan ikut berputar bersamanya. Pilih "Biasa" dan matikan bayangan untuk kembali ke tampilan awal.</p>';
 }
+function exprUi(){
+  return '<b>🙂 Ekspresi</b><div class="s3m-row">'+Object.keys(EXP).map(k=>'<button class="btn" type="button" data-mcx="'+k+'">'+EXP[k][0]+'</button>').join('')+'<button class="btn" type="button" data-mcx="talk">💬 Bicara</button></div>'
+    +'<label class="s3-fl">Lama bicara (dtk)<input type="number" id="s3m-talk" min="0.5" max="30" step="0.5" value="2"></label>'
+    +'<p class="s3-hint">Tombol memasang keyframe ekspresi di waktu sekarang (berubah halus dalam 0,3 dtk). "Bicara" menggerakkan mulut selama durasi itu lalu menutup. Senyum, Alis, dan Mulut terbuka juga ada sebagai slider keyframe di bawah. Mata berkedip otomatis.</p>';
+}
 function build(it){
   const M=APK.s3model,st=M?M.state(it):{};
   let h='<b>🕺 Animasi Model</b>';
   if(it.fmt==='prim'&&it.prim==='char'){
     h+='<div class="s3-two"><label class="s3-fl">Baju<input type="color" data-mc="color" value="'+esc(it.color||'#ff7a59')+'"></label>'
       +'<label class="s3-fl">Kulit<input type="color" data-mc="skin" value="'+esc(it.skin||'#f4c7a1')+'"></label></div>'
-      +'<label class="s3-fl">Rambut<input type="color" data-mc="hair" value="'+esc(it.hair||'#4a2f20')+'"></label>';
+      +'<label class="s3-fl">Rambut<input type="color" data-mc="hair" value="'+esc(it.hair||'#4a2f20')+'"></label>'+exprUi();
   }else if(it.fmt==='prim'){
     h+='<div class="s3-two"><label class="s3-fl">Bentuk<select data-mc="prim">'+Object.keys(PRIM).map(k=>'<option value="'+k+'"'+(it.prim===k?' selected':'')+'>'+PRIM[k]+'</option>').join('')+'</select></label>'
       +'<label class="s3-fl">Warna<input type="color" data-mc="color" value="'+esc(it.color||'#4da3ff')+'"></label></div>'
@@ -130,6 +165,16 @@ function onChange(e){
 }
 function boot(){
   if(!$('s3d'))return;
+  try{const st=document.createElement('style');st.textContent='.s3m-row{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}.s3m-row .btn{flex:0 0 auto;white-space:nowrap;padding:6px 10px;font-size:13px;line-height:1.2}';document.head.appendChild(st)}catch(_){}
+  document.addEventListener('click',e=>{
+    const b=e.target.closest&&e.target.closest('[data-mcx]');if(!b||!$('s3d').contains(b))return;
+    const it=byId(selId());if(!isModel(it)||it.prim!=='char')return;
+    const k=b.dataset.mcx;
+    if(k==='talk'){talk(it);toast('Gerak bicara dipasang di '+curT().toFixed(2)+' dtk. Tekan ↶ untuk membatalkan.')}
+    else if(EXP[k]){setExp(it,{smile:EXP[k][1],brow:EXP[k][2],mouth:EXP[k][3]});toast('Ekspresi '+EXP[k][0]+' dipasang di '+curT().toFixed(2)+' dtk.')}
+    else return;
+    touch();
+  });
   mountTool();
   const P=$('s3-props');
   if(P){

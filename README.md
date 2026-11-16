@@ -46,6 +46,8 @@ Pengedit dan tracking 3D, **bukan** pembuat model 3D. Ruang 3D dengan kamera (po
 - **Tracking titik**: pilih layer video, tekan "Lacak titik", ketuk objek, mulai lacak, lalu tempel ke teks/foto: layer mengikuti objek lewat keyframe otomatis.
 - **Contoh referensi**: Lirik 3D Warp (kata terbang menembus kamera), Foto Terowongan 3D, Kartu Foto Orbit, Tracking teks, Kosong.
 - **Kamera**: manual (keyframe) atau menangkap satu objek (jarak, sudut keliling, bingkai sepertiga, kecepatan ikut halus/kaku, fokus/blur latar), gaya cepat (zoom pelan, orbit), banyak kamera dengan potongan (cut) per waktu.
+- **Animasi model 3D** (`js/s3mclip.js`): model `.glb` / `.gltf` / `.fbx` yang punya animasi bawaan (berjalan, lambai, menari) kini bisa diputar. Pilih layer model, lalu di kartu "🕺 Animasi Model" pilih klip, kecepatan (0 = bekukan pose), mulai dari detik ke-n di dalam klip, dan pengulangan (ulang terus / sekali / bolak-balik). Klip mulai dari "Muncul di detik" layer dan ikut waktu scene, jadi scrub, preview, dan export sama. Posisi, putaran, dan ukuran tetap bisa di-keyframe (karakter berjalan sambil bergerak). Model tanpa klip tetap bisa digerakkan dengan keyframe.
+- **Bentuk 3D dasar**: menu "+ Bentuk 3D" di bilah alat menambah kubus, bola, silinder, kerucut, donat, piramida, atau kapsul (tanpa berkas), dengan pilihan warna. Dianimasikan lewat keyframe, Putar 3D, dan semua animasi layer yang sudah ada. Tersimpan sebagai layer model dengan `fmt: "prim"`.
 - File: `js/scene3d.js`, `css/scene3d.css`. Project 3D disimpan di IndexedDB sendiri (`apk-3d`).
 
 ### v12 (sistem vektor, bagian 1 dari 3)

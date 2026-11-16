@@ -196,7 +196,7 @@ let s3mP=null;
 function useModel(){
   return s3mP||(s3mP=new Promise((res,rej)=>{
     if(APK.s3model)return res(APK.s3model);
-    const s=document.createElement('script');s.src='js/s3model.js?v=1';
+    const s=document.createElement('script');s.src='js/s3model.js?v=2';
     s.onload=()=>APK.s3model?res(APK.s3model):(s3mP=null,rej(new Error('modul model tidak termuat')));
     s.onerror=()=>{s3mP=null;rej(new Error('tidak bisa memuat modul model'))};
     document.head.appendChild(s);
@@ -206,7 +206,7 @@ const mrec=id=>DB.get('media',id);
 async function ensureMedia(){
   const ids=new Set(S.items.filter(i=>i.kind!=='model').map(i=>i.mediaId).filter(Boolean));if(S.music)ids.add(S.music);
   for(const id of ids){if(media.has(id)||/^ph\d+$/.test(id))continue;const rec=await DB.get('media',id);if(rec)await loadMedia(rec)}
-  const ms=S.items.filter(i=>i.kind==='model'&&i.mediaId);
+  const ms=S.items.filter(i=>i.kind==='model'&&(i.mediaId||i.fmt==='prim'));
   if(ms.length){
     try{
       const M=await useModel();
@@ -324,7 +324,7 @@ function drawModel(it,tt,C,k,W,H,o){
   }
   const Wd=world(it,tt),pc0=toCam(C,Wd.p);
   if(pc0[2]<-2000)return;
-  const r=M.draw(it,Wd,C,{W:W,H:H,light:val(it,'light',tt)});
+  const r=M.draw(it,Wd,C,{W:W,H:H,light:val(it,'light',tt),t:tt});
   if(!r)return;
   if(r.quad)HIT[it.id]=r.quad;
   const g=SC.getContext('2d');g.save();g.setTransform(1,0,0,1,0,0);g.globalAlpha=clamp(o,0,1);g.drawImage(r.canvas,0,0,W,H);g.restore();
@@ -1270,5 +1270,5 @@ function init(){
   bindUI();renderHome3d();
 }
 init();
-return{TPL,world,val,get scene(){return S},render,openScene,_setT:v=>{setT(v)},select,applyQuick:quick};
+return{TPL,world,val,get scene(){return S},render,openScene,_setT:v=>{setT(v)},select,applyQuick:quick,mk:mkItem,add:add,useModel:useModel};
 })();

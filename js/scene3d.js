@@ -196,7 +196,7 @@ let s3mP=null;
 function useModel(){
   return s3mP||(s3mP=new Promise((res,rej)=>{
     if(APK.s3model)return res(APK.s3model);
-    const s=document.createElement('script');s.src='js/s3model.js?v=2';
+    const s=document.createElement('script');s.src='js/s3model.js?v=3';
     s.onload=()=>APK.s3model?res(APK.s3model):(s3mP=null,rej(new Error('modul model tidak termuat')));
     s.onerror=()=>{s3mP=null;rej(new Error('tidak bisa memuat modul model'))};
     document.head.appendChild(s);

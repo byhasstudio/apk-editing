@@ -26,5 +26,5 @@ APK.wave=(function(){
 /* Dibuat kosong SEBELUM js/s3cam.js dimuat: s3cam.js lalu menaruh fungsi pandangan Ruang 3D di __S3CAM_TEST.api, dipakai js/s3tex.js. */
 window.__S3CAM_TEST=window.__S3CAM_TEST||{};
 
-/* Memuat tambahan Edit 3D (kamera pro, layer pro, animasi lanjutan, tekstur Ruang 3D) setelah semua script lain selesai dimuat. */
-addEventListener('DOMContentLoaded',()=>{['js/s3camfx.js?v=2','js/s3camfx2.js?v=1','js/s3layerpro.js?v=1','js/s3anim.js?v=1','js/s3tex.js?v=3','js/s3mclip.js?v=3'].reduce((p,src)=>p.then(()=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.body.appendChild(s)})),Promise.resolve())});
+/* Memuat tambahan Edit 3D (kamera pro, layer pro, animasi lanjutan, tekstur Ruang 3D, sinematik pro) setelah semua script lain selesai dimuat. */
+addEventListener('DOMContentLoaded',()=>{['js/s3camfx.js?v=2','js/s3camfx2.js?v=1','js/s3layerpro.js?v=1','js/s3anim.js?v=1','js/s3tex.js?v=3','js/s3mclip.js?v=3','js/s3cine.js?v=1'].reduce((p,src)=>p.then(()=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.body.appendChild(s)})),Promise.resolve())});

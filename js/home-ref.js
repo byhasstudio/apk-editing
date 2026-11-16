@@ -1,6 +1,8 @@
 /* Beranda: 1 kartu utama + 3 jalan pintas ke fitur yang sudah ada. Memakai tombol lama lewat .click(). */
 (function(){
 'use strict';
+/* perbaikan tampilan HP: dimuat dari sini supaya index.html tidak perlu diubah */
+try{const l=document.createElement('link');l.rel='stylesheet';l.href='css/mobile-fix.css?v=1';document.head.appendChild(l)}catch(_){}
 /* perbaikan: garis merah / label timeline 3D tidak boleh menembus preview yang menempel di atas saat panel di-scroll */
 try{
   const fx=document.createElement('style');

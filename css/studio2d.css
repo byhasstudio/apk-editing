@@ -1,0 +1,48 @@
+/* Studio Pro 2D (js/studio2d.js) */
+#preview-wrap{position:relative}
+#tl-studio.on{border-color:var(--accent);color:var(--accent)}
+.st-panel{position:fixed;top:56px;right:8px;bottom:8px;width:min(372px,calc(100vw - 16px));z-index:60;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.55);overflow:hidden}
+.st-head{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.st-head b{font-size:14px}.st-head .meta{flex:1;text-align:right}
+.st-head .btn{padding:3px 10px}
+.st-tabs{display:flex;gap:4px;padding:8px 8px 0;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line)}
+.st-tabs::-webkit-scrollbar{display:none}
+.st-tabs button{flex:none;background:none;color:var(--dim);border:0;border-bottom:2px solid transparent;padding:7px 10px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+.st-tabs button:hover{color:var(--text)}
+.st-tabs button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.st-body{flex:1;min-height:0;overflow:auto;padding:10px 12px 18px}
+.st-sec{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.st-sec h4{margin:0 0 8px;font-size:13px}
+.st-sec label{display:block;margin-top:8px;font-size:12px;color:var(--dim)}
+.st-sec input[type=number],.st-sec input[type=text],.st-sec select{display:block;width:100%;margin-top:4px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit}
+.st-sec .btn{margin-top:8px;padding:7px 12px;font-size:13px}
+.st-sec .btn.primary{width:100%}
+.st-sec label.st-ck{display:flex;align-items:center;gap:8px;color:var(--text);font-size:13px;cursor:pointer}
+.st-sec label.st-ck input{width:auto;margin:0}
+.st-note{margin:8px 0 0;color:var(--dim);font-size:12px;line-height:1.4}
+.st-grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.st-grid3.two{grid-template-columns:repeat(2,1fr)}
+.st-grid3 .btn{margin:0;padding:8px 4px;font-size:12px}
+.st-two{display:flex;gap:8px}.st-two .btn{flex:1;margin-top:8px}
+.st-list{margin-top:8px;max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.st-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line);font-size:12px}
+.st-row:last-child{border-bottom:0}
+.st-row>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-row small{display:block;color:var(--dim)}
+.st-row .btn{margin:0 0 0 4px;padding:2px 8px;font-size:12px}
+.st-ts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.st-tsb{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;background:#2a2e3a;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--text);font:inherit}
+.st-tsb:hover{border-color:var(--accent)}
+.st-tsb span{font-size:22px;line-height:1.2;max-width:100%;overflow:hidden;white-space:nowrap}
+.st-tsb small{font-size:10px;color:var(--dim)}
+/* penanda di penggaris timeline */
+.st-mk{position:absolute;top:0;bottom:0;width:0;border-left:1px solid #ffb84d;pointer-events:none;z-index:2;font-style:normal}
+.st-mk::before{content:"";position:absolute;left:-4px;top:0;width:7px;height:7px;background:#ffb84d;transform:rotate(45deg) scale(.9)}
+.st-mk.b{border-left-color:#4dd6c8;opacity:.8}
+.st-mk.b::before{background:#4dd6c8;width:5px;height:5px;left:-3px}
+#st-guides{position:absolute}
+@media(max-width:900px){
+  .st-panel{top:calc(env(safe-area-inset-top,0px) + 50px);bottom:auto;left:8px;right:8px;width:auto;height:46vh}
+}
+@media(prefers-reduced-motion:no-preference){.st-panel:not([hidden]){animation:stin .16s ease-out}}
+@keyframes stin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}

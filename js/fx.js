@@ -71,8 +71,36 @@ APK.fx=(function(){
     ctx.restore();
   }
   /* efek piksel: glitch (potongan horizontal bergeser, acak stabil per 1/12 detik), pemisah RGB, dan vignette. f = clip.flt, tm = waktu (detik) */
-  function pixelFx(ctx,w,h,f,tm){
+  /* strip geser: n strip vertikal (maks 10) setinggi gambar, masing-masing bergeser horizontal (isinya membungkus ke sisi lain, tanpa celah).
+     Berjalan di awal clip selama T detik: 4 denyut, tiap denyut membesar lalu mengecil ke nol, dengan puncak di tengah. Setelah T gambar utuh.
+     Posisi, lebar, dan arah geser strip diacak stabil per denyut (seed = nomor denyut), jadi preview dan export identik. */
+  let sliceSrc=null;
+  function sliceFx(ctx,w,h,f,tm,c){
+    const sl=+f.slice||0,T=Math.max(0.1,+f.sliceT||1.5),u=(tm-(c&&+c.start||0))/T;
+    if(sl<=0||u<0||u>=1)return;
+    const ph=u*4,k=Math.floor(ph),fr=ph-k,amp=Math.sin(Math.PI*fr)*(0.35+0.65*Math.sin(Math.PI*u));
+    if(amp<=0.01)return;
+    let seed=((k+1)*2654435761)>>>0;
+    const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
+    const n=Math.max(1,Math.min(10,Math.round(+f.sliceN||5))),strips=[];
+    let x=w*(0.08+rnd()*0.2),tot=0;
+    for(let i=0;i<n;i++){const sw=w*(0.06+rnd()*0.12),gap=w*rnd()*0.05;strips.push([x+gap,sw]);x+=gap+sw;tot+=gap+sw}
+    const room=w*0.9-w*0.08,sc=tot>room?room/tot:1,base=strips[0][0];   /* semua strip dimuat di dalam gambar */
+    if(!sliceSrc)sliceSrc=document.createElement('canvas');
+    if(sliceSrc.width!==w||sliceSrc.height!==h){sliceSrc.width=w;sliceSrc.height=h}
+    const sg=sliceSrc.getContext('2d');sg.clearRect(0,0,w,h);sg.drawImage(ctx.canvas,0,0);
+    const mx=sl/100*0.12*w;
+    for(let i=0;i<n;i++){
+      const sx=Math.round(base+(strips[i][0]-base)*sc),sw=Math.max(2,Math.round(strips[i][1]*sc)),dx=Math.round((rnd()*2-1)*amp*mx);
+      if(!dx)continue;
+      ctx.save();ctx.beginPath();ctx.rect(sx,0,sw,h);ctx.clip();ctx.clearRect(sx,0,sw,h);
+      ctx.drawImage(sliceSrc,dx,0);ctx.drawImage(sliceSrc,dx-w,0);ctx.drawImage(sliceSrc,dx+w,0);
+      ctx.restore();
+    }
+  }
+  function pixelFx(ctx,w,h,f,tm,c){
     const gl=+f.glitch||0,rg=(+f.rgb||0)+gl*0.12,vg=+f.vig||0;
+    if(+f.slice>0)sliceFx(ctx,w,h,f,tm,c);
     if(gl>0){
       let seed=(Math.floor(tm*12)*2654435761)>>>0;
       const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
@@ -104,10 +132,10 @@ APK.fx=(function(){
   /* kembalikan canvas hasil olahan (chroma + mask + efek piksel) atau null bila clip tidak memakai efek.
      lim (opsional) = sisi terpanjang yang dibutuhkan (px kanvas); olahan tidak dibuat lebih besar dari itu */
   function process(el,w,h,c,lim){
-    const ck=c.chroma&&c.chroma.on,mk=c.mask&&c.mask.on,f=c.flt,px=!!f&&(f.vig>0||f.rgb>0||f.glitch>0);
+    const ck=c.chroma&&c.chroma.on,mk=c.mask&&c.mask.on,f=c.flt,px=!!f&&(f.vig>0||f.rgb>0||f.glitch>0||f.slice>0);
     if(!ck&&!mk&&!px)return null;
     const cap=Math.max(320,Math.min(MAXD,lim>0?lim:MAXD)),sc=Math.min(1,cap/Math.max(w,h)),cw=Math.max(1,Math.round(w*sc)),ch=Math.max(1,Math.round(h*sc));
-    const cpu=!!ck||(!!f&&(f.rgb>0||f.glitch>0)),ctx=layer(cw,ch,cpu);
+    const cpu=!!ck||(!!f&&(f.rgb>0||f.glitch>0||f.slice>0)),ctx=layer(cw,ch,cpu);
     try{
       ctx.drawImage(el,0,0,cw,ch);
       if(ck)key(ctx,cw,ch,Object.assign({},DEF.chroma,c.chroma));
@@ -115,7 +143,7 @@ APK.fx=(function(){
         const mm=Object.assign({},DEF.mask,c.mask);
         if(mm.fix&&typeof mm.fix==='object')maskFix(ctx,cw,ch,mm,c,w,h);else mask(ctx,cw,ch,mm);
       }
-      if(px)pixelFx(ctx,cw,ch,f,APK.preview?APK.preview.time:0);
+      if(px)pixelFx(ctx,cw,ch,f,APK.preview?APK.preview.time:0,c);
     }catch(_){return null}
     return cpu?cvs.c:cvs.g;
   }

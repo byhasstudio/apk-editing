@@ -1,6 +1,6 @@
 /* Filter, efek, dan transisi per clip (tanpa keyframe; nilainya tetap selama clip tampil).
    Data di clip:
-     clip.flt  = { blur, bright, contrast, sat, hue, gray, sepia, invert, vig, rgb, glitch }   (hanya nilai yang berbeda dari bawaan yang disimpan)
+     clip.flt  = { blur, bright, contrast, sat, hue, gray, sepia, invert, vig, rgb, glitch, slice, sliceN, sliceT }   (hanya nilai yang berbeda dari bawaan yang disimpan)
      clip.tin  = { type, d }   transisi masuk di awal clip     clip.tout = { type, d }   transisi keluar di akhir clip
    Filter CSS (blur, kecerahan, kontras, saturasi, rona, hitam putih, sepia, negatif) berlaku untuk semua jenis layer lewat ctx.filter.
    Vignette, pemisah RGB, dan glitch memakai piksel dan hanya untuk video dan gambar (dikerjakan di APK.fx.process).
@@ -13,7 +13,9 @@ APK.effects=(function(){
     ['blur','Blur (px)',0,60,0,false],['bright','Kecerahan (%)',0,250,100,false],['contrast','Kontras (%)',0,250,100,false],
     ['sat','Saturasi (%)',0,300,100,false],['hue','Rona warna (°)',0,360,0,false],['gray','Hitam putih (%)',0,100,0,false],
     ['sepia','Sepia (%)',0,100,0,false],['invert','Negatif (%)',0,100,0,false],
-    ['vig','Vignette (%)',0,100,0,true],['rgb','Pemisah RGB (px)',0,40,0,true],['glitch','Glitch (%)',0,100,0,true]
+    ['vig','Vignette (%)',0,100,0,true],['rgb','Pemisah RGB (px)',0,40,0,true],['glitch','Glitch (%)',0,100,0,true],
+    /* Strip geser: strip vertikal setinggi gambar bergeser ke kiri/kanan, berdenyut 4 kali di awal clip lalu diam (dikerjakan di APK.fx.pixelFx) */
+    ['slice','Strip geser: kekuatan (%)',0,100,0,true],['sliceN','Strip geser: jumlah strip (maks 10)',1,10,5,true],['sliceT','Strip geser: lama (detik)',0.3,5,1.5,true,0.1]
   ];
   const DEFF={};FLT.forEach(f=>DEFF[f[0]]=f[4]);
   const PRESETS={
@@ -24,6 +26,7 @@ APK.effects=(function(){
     drama:['Dramatis',{contrast:150,sat:70,bright:90,vig:30}],
     dream:['Mimpi (lembut)',{blur:2,bright:112,sat:115,vig:15}],
     glitch:['Glitch',{rgb:6,glitch:35}],
+    slice:['Strip geser',{slice:45,sliceN:5,sliceT:1.5}],
     neg:['Negatif',{invert:100}]
   };
   const TRANS=[
@@ -100,7 +103,7 @@ APK.effects=(function(){
   const tOpts='<option value="">— tidak ada —</option>'+TRANS.map(t=>`<option value="${t[0]}">${t[1]}</option>`).join('');
   function html(type){
     const media=type==='video'||type==='image';
-    const rows=FLT.filter(f=>media||!f[5]).map(f=>`<label>${f[1]}<input type="range" data-flt="${f[0]}" min="${f[2]}" max="${f[3]}" step="1"></label>`).join('');
+    const rows=FLT.filter(f=>media||!f[5]).map(f=>`<label>${f[1]}<input type="range" data-flt="${f[0]}" min="${f[2]}" max="${f[3]}" step="${f[6]||1}"></label>`).join('');
     const pre='<option value="">Pilih preset filter…</option>'+Object.keys(PRESETS).map(k=>`<option value="${k}">${PRESETS[k][0]}</option>`).join('')+'<option value="none">Hapus semua filter</option>';
     return `<h3 class="kf-title">Filter &amp; efek</h3>
       <label>Preset filter<select data-flt="preset">${pre}</select></label>${rows}

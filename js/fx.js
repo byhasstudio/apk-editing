@@ -73,13 +73,13 @@ APK.fx=(function(){
   /* efek piksel: glitch (potongan horizontal bergeser, acak stabil per 1/12 detik), pemisah RGB, dan vignette. f = clip.flt, tm = waktu (detik) */
   /* strip geser: seluruh lebar layar dibagi jadi tepat n strip vertikal (1 sampai 10) setinggi gambar, lebar sedikit berbeda-beda.
      Tiap strip bergeser horizontal (isinya membungkus ke sisi lain, tanpa celah), arahnya selang-seling, dan tidak ada strip yang diam.
-     Berjalan di awal clip selama T detik: 1 irisan, membesar lalu mengecil ke nol, puncak di tengah. Setelah T gambar utuh.
+     Berjalan di awal clip selama T detik: 1 irisan: naik cepat, tahan penuh di tengah, turun cepat ke nol. Setelah T gambar utuh.
      Lebar dan besar geser diacak tetap (seed tetap), jadi preview dan export identik. */
   let sliceSrc=null;
   function sliceFx(ctx,w,h,f,tm,c){
     const sl=+f.slice||0,T=Math.max(0.1,+f.sliceT||1.5),u=(tm-(c&&+c.start||0))/T;
     if(sl<=0||u<0||u>=1)return;
-    const amp=Math.sin(Math.PI*u);
+    const e=Math.min(1,4*Math.min(u,1-u)),amp=e*e*(3-2*e);   /* naik cepat, tahan penuh di tengah, turun cepat */
     if(amp<=0.01)return;
     let seed=2654435761;
     const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
@@ -93,7 +93,7 @@ APK.fx=(function(){
     let acc=0,dir=rnd()<0.5?-1:1;
     for(let i=0;i<n;i++){
       const x0=Math.round(acc/tot*w);acc+=wt[i];
-      const x1=i===n-1?w:Math.round(acc/tot*w),dx=Math.round(dir*(0.45+0.55*rnd())*amp*mx);
+      const x1=i===n-1?w:Math.round(acc/tot*w),dx=Math.round(dir*(0.75+0.25*rnd())*amp*mx);
       dir=-dir;
       if(!dx||x1<=x0)continue;
       ctx.save();ctx.beginPath();ctx.rect(x0,0,x1-x0,h);ctx.clip();ctx.clearRect(x0,0,x1-x0,h);

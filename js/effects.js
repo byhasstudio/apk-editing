@@ -115,10 +115,20 @@ APK.effects=(function(){
   const tOpts='<option value="">— tidak ada —</option>'+TRANS.map(t=>`<option value="${t[0]}">${t[1]}</option>`).join('');
   function html(type){
     const media=type==='video'||type==='image';
-    const rows=FLT.filter(f=>media||!f[5]).map(f=>`<label>${f[1]}<input type="range" data-flt="${f[0]}" min="${f[2]}" max="${f[3]}" step="${f[6]||1}"></label>`).join('');
+    const own=k=>k.indexOf('slice')===0||k.indexOf('flash')===0,rg=f=>`<label>${f[1]}<input type="range" data-flt="${f[0]}" min="${f[2]}" max="${f[3]}" step="${f[6]||1}"></label>`;
+    const rows=FLT.filter(f=>!own(f[0])&&(media||!f[5])).map(rg).join('');
+    const F=k=>FLT.find(f=>f[0]===k);
+    /* bagian sendiri supaya mudah ditemukan; jumlah irisan berupa pilihan angka 1-10 (bukan slider) */
+    const sliceSec=media?`<h3 class="kf-title">Strip geser (irisan layar)</h3>
+      ${rg(F('slice'))}
+      <label>Jumlah irisan (1 sampai 10)<select data-flt="sliceN">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}">${n} irisan</option>`).join('')}</select></label>
+      ${rg(F('sliceT'))}
+      <p class="kf-hint">Atur kekuatan di atas 0 supaya irisan aktif. Efek jalan 1 kali di awal clip.</p>`:'';
+    const flashSec=`<h3 class="kf-title">Flash (gelap ke terang di awal clip)</h3>${rg(F('flash'))}${rg(F('flashT'))}`;
     const pre='<option value="">Pilih preset filter…</option>'+Object.keys(PRESETS).map(k=>`<option value="${k}">${PRESETS[k][0]}</option>`).join('')+'<option value="none">Hapus semua filter</option>';
     return `<h3 class="kf-title">Filter &amp; efek</h3>
       <label>Preset filter<select data-flt="preset">${pre}</select></label>${rows}
+      ${sliceSec}${flashSec}
       ${media?'':'<p class="kf-hint">Vignette, pemisah RGB, dan glitch hanya untuk video dan gambar.</p>'}
       <h3 class="kf-title">Transisi (di awal dan akhir clip)</h3>
       <label>Transisi masuk<select data-trn="in">${tOpts}</select></label>

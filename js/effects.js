@@ -14,7 +14,7 @@ APK.effects=(function(){
     ['sat','Saturasi (%)',0,300,100,false],['hue','Rona warna (°)',0,360,0,false],['gray','Hitam putih (%)',0,100,0,false],
     ['sepia','Sepia (%)',0,100,0,false],['invert','Negatif (%)',0,100,0,false],
     ['vig','Vignette (%)',0,100,0,true],['rgb','Pemisah RGB (px)',0,40,0,true],['glitch','Glitch (%)',0,100,0,true],
-    /* Strip geser: strip vertikal setinggi gambar bergeser ke kiri/kanan, berdenyut 4 kali di awal clip lalu diam (dikerjakan di APK.fx.pixelFx) */
+    /* Strip geser: strip vertikal setinggi gambar bergeser ke kiri/kanan, muncul 1 kali di awal clip lalu diam (dikerjakan di APK.fx.pixelFx) */
     ['slice','Strip geser: kekuatan (%)',0,100,0,true],['sliceN','Strip geser: jumlah strip (maks 10)',1,10,5,true],['sliceT','Strip geser: lama (detik)',0.3,5,1.5,true,0.1]
   ];
   const DEFF={};FLT.forEach(f=>DEFF[f[0]]=f[4]);

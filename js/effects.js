@@ -1,6 +1,6 @@
 /* Filter, efek, dan transisi per clip (tanpa keyframe; nilainya tetap selama clip tampil).
    Data di clip:
-     clip.flt  = { blur, bright, contrast, sat, hue, gray, sepia, invert, vig, rgb, glitch, slice, sliceN, sliceT }   (hanya nilai yang berbeda dari bawaan yang disimpan)
+     clip.flt  = { blur, bright, contrast, sat, hue, gray, sepia, invert, vig, rgb, glitch, slice, sliceN, sliceT, flash, flashT }   (hanya nilai yang berbeda dari bawaan yang disimpan)
      clip.tin  = { type, d }   transisi masuk di awal clip     clip.tout = { type, d }   transisi keluar di akhir clip
    Filter CSS (blur, kecerahan, kontras, saturasi, rona, hitam putih, sepia, negatif) berlaku untuk semua jenis layer lewat ctx.filter.
    Vignette, pemisah RGB, dan glitch memakai piksel dan hanya untuk video dan gambar (dikerjakan di APK.fx.process).
@@ -15,7 +15,9 @@ APK.effects=(function(){
     ['sepia','Sepia (%)',0,100,0,false],['invert','Negatif (%)',0,100,0,false],
     ['vig','Vignette (%)',0,100,0,true],['rgb','Pemisah RGB (px)',0,40,0,true],['glitch','Glitch (%)',0,100,0,true],
     /* Strip geser: strip vertikal setinggi gambar bergeser ke kiri/kanan, muncul 1 kali di awal clip lalu diam (dikerjakan di APK.fx.pixelFx) */
-    ['slice','Strip geser: kekuatan (%)',0,100,0,true],['sliceN','Strip geser: jumlah strip (maks 10)',1,10,5,true],['sliceT','Strip geser: lama (detik)',0.3,5,1.5,true,0.1]
+    ['slice','Strip geser: kekuatan (%)',0,100,0,true],['sliceN','Strip geser: jumlah strip (maks 10)',1,10,5,true],['sliceT','Strip geser: lama (detik)',0.3,5,1.5,true,0.1],
+    /* Flash: di awal clip gambar mulai dari hitam, terang naik cepat sampai agak over-exposed, lalu turun ke normal (berlaku untuk semua jenis layer) */
+    ['flash','Flash: kekuatan (%)',0,100,0,false],['flashT','Flash: lama (detik)',0.1,3,0.6,false,0.1]
   ];
   const DEFF={};FLT.forEach(f=>DEFF[f[0]]=f[4]);
   const PRESETS={
@@ -39,11 +41,21 @@ APK.effects=(function(){
   const flt=c=>c&&c.flt?Object.assign({},DEFF,c.flt):null;
 
   /* string ctx.filter untuk clip c. K = skala kanvas terhadap project, extra = blur tambahan dari transisi (px project) */
-  function css(c,K,extra){
+  /* pengali kecerahan flash di waktu t: 0 (hitam) naik cepat ke puncak 1+0.5*kekuatan, lalu turun halus ke 1 (normal) di akhir. 1 = tidak ada efek */
+  function flashMul(f,c,t){
+    const s=(+f.flash||0)/100;if(s<=0||t==null)return 1;
+    const T=Math.max(0.1,+f.flashT||0.6),u=(t-(+c.start||0))/T;
+    if(u<0||u>=1)return 1;
+    const pk=1+0.5*s;
+    if(u<0.65){const a=u/0.65;return pk*(1-(1-a)*(1-a))}
+    const b=(u-0.65)/0.35;return pk+(1-pk)*b*b*(3-2*b);
+  }
+  function css(c,K,extra,t){
     const f=flt(c),p=[],bl=(f?f.blur:0)+(extra||0);
     if(bl>0.05)p.push('blur('+(bl*(K||1)).toFixed(2)+'px)');
     if(f){
-      if(f.bright!==100)p.push('brightness('+f.bright+'%)');
+      const br=f.bright*flashMul(f,c,t);
+      if(Math.abs(br-100)>0.01)p.push('brightness('+br.toFixed(2)+'%)');
       if(f.contrast!==100)p.push('contrast('+f.contrast+'%)');
       if(f.sat!==100)p.push('saturate('+f.sat+'%)');
       if(f.hue)p.push('hue-rotate('+f.hue+'deg)');
@@ -88,7 +100,7 @@ APK.effects=(function(){
      lalu mengembalikan properti yang sudah dimodifikasi transisi. WAJIB dipasangkan dengan end(ctx). */
   function begin(ctx,c,t,pr,W,H,K){
     ctx.save();
-    const tr=trans(c,t,pr,W,H),f=css(c,K,tr.blur);
+    const tr=trans(c,t,pr,W,H),f=css(c,K,tr.blur,t);
     if('filter' in ctx)ctx.filter=f||'none';
     for(const k of tr.clips){
       ctx.beginPath();

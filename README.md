@@ -72,6 +72,7 @@ Pengedit dan tracking 3D, **bukan** pembuat model 3D. Ruang 3D dengan kamera (po
 - **Filter dan efek** (per clip, nilainya tetap): blur, kecerahan, kontras, saturasi, rona warna, hitam putih, sepia, negatif untuk semua jenis layer; **vignette, pemisah RGB, dan glitch** hanya untuk video dan gambar. Ada 8 preset filter (hitam putih, vintage, sinematik, cerah, dramatis, mimpi, glitch, negatif) dan "Hapus semua filter". Filter tidak bisa di-keyframe.
 - **Transisi** di awal dan akhir clip: memudar, geser 4 arah, zoom dari kecil/besar, putar, blur, wipe 4 arah, dan buka lingkaran (iris), dengan lama bisa diatur. Untuk transisi antar dua clip: beri clip pertama transisi keluar dan clip kedua transisi masuk, lalu letakkan berimpit atau bertumpuk di layer berbeda.
 - - **Strip geser** (filter, hanya video dan gambar): strip vertikal setinggi gambar bergeser ke kiri/kanan, muncul 1 kali di awal clip lalu diam. Slider: kekuatan (%), jumlah strip (1 sampai 10), lama efek (0,3 sampai 5 detik). Ada juga di preset filter "Strip geser".
+- **Flash** (filter, semua jenis layer): di awal clip gambar mulai dari hitam, terang naik cepat sampai agak over-exposed, lalu turun ke normal. Slider: kekuatan (%) dan lama (0,1 sampai 3 detik). Terpisah dari Strip geser, jadi bisa dipakai sendiri atau bersama.
 Semua di atas ikut tersimpan di project dan di file preset, dan ikut ter-export. Filter memakai `ctx.filter`, yang didukung Chrome, Edge, dan Firefox; di browser yang belum mendukung (Safari lama) efek filter diabaikan.
 
 ### Kurva otomatis (auto-keyframe, rekam langsung)

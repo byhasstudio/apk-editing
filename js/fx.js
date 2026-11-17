@@ -72,13 +72,13 @@ APK.fx=(function(){
   }
   /* efek piksel: glitch (potongan horizontal bergeser, acak stabil per 1/12 detik), pemisah RGB, dan vignette. f = clip.flt, tm = waktu (detik) */
   /* strip geser: n strip vertikal (maks 10) setinggi gambar, masing-masing bergeser horizontal (isinya membungkus ke sisi lain, tanpa celah).
-     Berjalan di awal clip selama T detik: 4 denyut, tiap denyut membesar lalu mengecil ke nol, dengan puncak di tengah. Setelah T gambar utuh.
+     Berjalan di awal clip selama T detik: 1 irisan: membesar lalu mengecil ke nol, puncak di tengah. Setelah T gambar utuh.
      Posisi, lebar, dan arah geser strip diacak stabil per denyut (seed = nomor denyut), jadi preview dan export identik. */
   let sliceSrc=null;
   function sliceFx(ctx,w,h,f,tm,c){
     const sl=+f.slice||0,T=Math.max(0.1,+f.sliceT||1.5),u=(tm-(c&&+c.start||0))/T;
     if(sl<=0||u<0||u>=1)return;
-    const ph=u*4,k=Math.floor(ph),fr=ph-k,amp=Math.sin(Math.PI*fr)*(0.35+0.65*Math.sin(Math.PI*u));
+    const k=0,amp=Math.sin(Math.PI*u);
     if(amp<=0.01)return;
     let seed=((k+1)*2654435761)>>>0;
     const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};

@@ -216,6 +216,8 @@ APK.preview=(function(){
           if(E)E.end(ctx);
         }finally{
           if(fl){ctx=main;if(drew)FX.layerEnd(main,c,fl,t)}
+          /* Strip geser: iris SELURUH layar (termasuk isi cermin tepi dan area di luar foto) setelah clip dan efek-efeknya selesai tergambar */
+          if(drew&&!c.text&&!c.shape&&c.flt&&c.flt.slice>0&&APK.fx.slice)APK.fx.slice(ctx,c.flt,t,c);
           if(drew)trDrew=true;
         }
       }

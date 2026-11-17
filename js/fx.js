@@ -71,12 +71,13 @@ APK.fx=(function(){
     ctx.restore();
   }
   /* efek piksel: glitch (potongan horizontal bergeser, acak stabil per 1/12 detik), pemisah RGB, dan vignette. f = clip.flt, tm = waktu (detik) */
-  /* strip geser: seluruh lebar layar dibagi jadi tepat n strip vertikal (1 sampai 10) setinggi gambar, lebar sedikit berbeda-beda.
+  /* strip geser (dipanggil preview.js SESUDAH clip tergambar, jadi mengiris seluruh layar termasuk tepi kiri dan kanan walau fotonya lebih kecil dari layar): seluruh lebar layar dibagi jadi tepat n strip vertikal (1 sampai 10) setinggi gambar, lebar sedikit berbeda-beda.
      Tiap strip bergeser horizontal (isinya membungkus ke sisi lain, tanpa celah), arahnya selang-seling, dan tidak ada strip yang diam.
      Berjalan di awal clip selama T detik: 1 irisan: naik cepat, tahan penuh di tengah, turun cepat ke nol. Setelah T gambar utuh.
      Lebar dan besar geser diacak tetap (seed tetap), jadi preview dan export identik. */
   let sliceSrc=null;
-  function sliceFx(ctx,w,h,f,tm,c){
+  function sliceFx(ctx,f,tm,c){
+    const w=ctx.canvas.width,h=ctx.canvas.height;   /* seluruh kanvas (layar), bukan hanya foto */
     const sl=+f.slice||0,T=Math.max(0.1,+f.sliceT||1.5),u=(tm-(c&&+c.start||0))/T;
     if(sl<=0||u<0||u>=1)return;
     const e=Math.min(1,4*Math.min(u,1-u)),amp=e*e*(3-2*e);   /* naik cepat, tahan penuh di tengah, turun cepat */
@@ -96,14 +97,13 @@ APK.fx=(function(){
       const x1=i===n-1?w:Math.round(acc/tot*w),dx=Math.round(dir*(0.75+0.25*rnd())*amp*mx);
       dir=-dir;
       if(!dx||x1<=x0)continue;
-      ctx.save();ctx.beginPath();ctx.rect(x0,0,x1-x0,h);ctx.clip();ctx.clearRect(x0,0,x1-x0,h);
+      ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';if('filter' in ctx)ctx.filter='none';ctx.beginPath();ctx.rect(x0,0,x1-x0,h);ctx.clip();ctx.clearRect(x0,0,x1-x0,h);
       ctx.drawImage(sliceSrc,dx,0);ctx.drawImage(sliceSrc,dx-w,0);ctx.drawImage(sliceSrc,dx+w,0);
       ctx.restore();
     }
   }
   function pixelFx(ctx,w,h,f,tm,c){
     const gl=+f.glitch||0,rg=(+f.rgb||0)+gl*0.12,vg=+f.vig||0;
-    if(+f.slice>0)sliceFx(ctx,w,h,f,tm,c);
     if(gl>0){
       let seed=(Math.floor(tm*12)*2654435761)>>>0;
       const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
@@ -135,10 +135,10 @@ APK.fx=(function(){
   /* kembalikan canvas hasil olahan (chroma + mask + efek piksel) atau null bila clip tidak memakai efek.
      lim (opsional) = sisi terpanjang yang dibutuhkan (px kanvas); olahan tidak dibuat lebih besar dari itu */
   function process(el,w,h,c,lim){
-    const ck=c.chroma&&c.chroma.on,mk=c.mask&&c.mask.on,f=c.flt,px=!!f&&(f.vig>0||f.rgb>0||f.glitch>0||f.slice>0);
+    const ck=c.chroma&&c.chroma.on,mk=c.mask&&c.mask.on,f=c.flt,px=!!f&&(f.vig>0||f.rgb>0||f.glitch>0);
     if(!ck&&!mk&&!px)return null;
     const cap=Math.max(320,Math.min(MAXD,lim>0?lim:MAXD)),sc=Math.min(1,cap/Math.max(w,h)),cw=Math.max(1,Math.round(w*sc)),ch=Math.max(1,Math.round(h*sc));
-    const cpu=!!ck||(!!f&&(f.rgb>0||f.glitch>0||f.slice>0)),ctx=layer(cw,ch,cpu);
+    const cpu=!!ck||(!!f&&(f.rgb>0||f.glitch>0)),ctx=layer(cw,ch,cpu);
     try{
       ctx.drawImage(el,0,0,cw,ch);
       if(ck)key(ctx,cw,ch,Object.assign({},DEF.chroma,c.chroma));
@@ -162,5 +162,5 @@ APK.fx=(function(){
     if(on){ctx.shadowColor=o.shadowColor;ctx.shadowBlur=o.shadowBlur*k;ctx.shadowOffsetX=o.shadowX*k;ctx.shadowOffsetY=o.shadowY*k}
     else{ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetX=0;ctx.shadowOffsetY=0}
   }
-  return{DEF,process,grad,shadow};
+  return{DEF,process,grad,shadow,slice:sliceFx};
 })();

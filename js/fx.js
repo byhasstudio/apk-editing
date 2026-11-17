@@ -71,29 +71,32 @@ APK.fx=(function(){
     ctx.restore();
   }
   /* efek piksel: glitch (potongan horizontal bergeser, acak stabil per 1/12 detik), pemisah RGB, dan vignette. f = clip.flt, tm = waktu (detik) */
-  /* strip geser: n strip vertikal (maks 10) setinggi gambar, masing-masing bergeser horizontal (isinya membungkus ke sisi lain, tanpa celah).
-     Berjalan di awal clip selama T detik: 1 irisan: membesar lalu mengecil ke nol, puncak di tengah. Setelah T gambar utuh.
-     Posisi, lebar, dan arah geser strip diacak stabil per denyut (seed = nomor denyut), jadi preview dan export identik. */
+  /* strip geser: seluruh lebar layar dibagi jadi tepat n strip vertikal (1 sampai 10) setinggi gambar, lebar sedikit berbeda-beda.
+     Tiap strip bergeser horizontal (isinya membungkus ke sisi lain, tanpa celah), arahnya selang-seling, dan tidak ada strip yang diam.
+     Berjalan di awal clip selama T detik: 1 irisan, membesar lalu mengecil ke nol, puncak di tengah. Setelah T gambar utuh.
+     Lebar dan besar geser diacak tetap (seed tetap), jadi preview dan export identik. */
   let sliceSrc=null;
   function sliceFx(ctx,w,h,f,tm,c){
     const sl=+f.slice||0,T=Math.max(0.1,+f.sliceT||1.5),u=(tm-(c&&+c.start||0))/T;
     if(sl<=0||u<0||u>=1)return;
-    const k=0,amp=Math.sin(Math.PI*u);
+    const amp=Math.sin(Math.PI*u);
     if(amp<=0.01)return;
-    let seed=((k+1)*2654435761)>>>0;
+    let seed=2654435761;
     const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
-    const n=Math.max(1,Math.min(10,Math.round(+f.sliceN||5))),strips=[];
-    let x=w*(0.08+rnd()*0.2),tot=0;
-    for(let i=0;i<n;i++){const sw=w*(0.06+rnd()*0.12),gap=w*rnd()*0.05;strips.push([x+gap,sw]);x+=gap+sw;tot+=gap+sw}
-    const room=w*0.9-w*0.08,sc=tot>room?room/tot:1,base=strips[0][0];   /* semua strip dimuat di dalam gambar */
+    const n=Math.max(1,Math.min(10,Math.round(+f.sliceN||5))),wt=[];
+    let tot=0;
+    for(let i=0;i<n;i++){const v=0.6+rnd()*0.8;wt.push(v);tot+=v}
     if(!sliceSrc)sliceSrc=document.createElement('canvas');
     if(sliceSrc.width!==w||sliceSrc.height!==h){sliceSrc.width=w;sliceSrc.height=h}
     const sg=sliceSrc.getContext('2d');sg.clearRect(0,0,w,h);sg.drawImage(ctx.canvas,0,0);
     const mx=sl/100*0.12*w;
+    let acc=0,dir=rnd()<0.5?-1:1;
     for(let i=0;i<n;i++){
-      const sx=Math.round(base+(strips[i][0]-base)*sc),sw=Math.max(2,Math.round(strips[i][1]*sc)),dx=Math.round((rnd()*2-1)*amp*mx);
-      if(!dx)continue;
-      ctx.save();ctx.beginPath();ctx.rect(sx,0,sw,h);ctx.clip();ctx.clearRect(sx,0,sw,h);
+      const x0=Math.round(acc/tot*w);acc+=wt[i];
+      const x1=i===n-1?w:Math.round(acc/tot*w),dx=Math.round(dir*(0.45+0.55*rnd())*amp*mx);
+      dir=-dir;
+      if(!dx||x1<=x0)continue;
+      ctx.save();ctx.beginPath();ctx.rect(x0,0,x1-x0,h);ctx.clip();ctx.clearRect(x0,0,x1-x0,h);
       ctx.drawImage(sliceSrc,dx,0);ctx.drawImage(sliceSrc,dx-w,0);ctx.drawImage(sliceSrc,dx+w,0);
       ctx.restore();
     }

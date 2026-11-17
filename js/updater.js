@@ -2,7 +2,9 @@
    Cara kerja: mengambil index.html terbaru tanpa cache, lalu membandingkan tanda-tangannya (hash) dengan yang tersimpan.
    Index.html memuat semua file js dan css dengan nomor ?v=, jadi setiap kali satu file diubah, NAIKKAN nomor ?v= file itu di index.html
    supaya pembaruan terdeteksi.
-   Cek hanya dua kali kejadian: saat aplikasi dibuka, dan setiap EVERY milidetik (1 jam) selama aplikasi terbuka.
+   Cek: saat aplikasi dibuka (0,5 detik), setiap EVERY milidetik (3 menit) selama aplikasi terbuka, dan setiap kali aplikasi kembali ke depan
+   (APK/tab yang tadinya di latar, layar menyala lagi, internet tersambung lagi). Yang terakhir ini penting di APK, karena aplikasi biasanya hanya
+   pindah ke latar dan tidak dibuka dari awal. Saat kembali ke depan dan ada pembaruan, muat ulang menunggu 15 detik tanpa sentuhan dulu.
    - Saat dibuka: kalau ada pembaruan, langsung dimuat ulang (belum ada yang sedang diedit).
    - Tiap jam: kalau ada pembaruan di tengah mengedit, muncul pesan di bawah layar. Dimuat ulang otomatis setelah tidak ada sentuhan atau
      ketikan selama IDLE milidetik (autosave sudah jalan tiap 4 detik), atau langsung kalau sedang di beranda.
@@ -10,7 +12,7 @@
 (function(){
 'use strict';
 if(window.__swUpdater)return;window.__swUpdater=1;
-const EVERY=60*60*1000,IDLE=15000,COOL=60000,KEY='splineway:index',KEY_AT='splineway:updated-at';
+const EVERY=3*60*1000,IDLE=15000,COOL=60000,KEY='splineway:index',KEY_AT='splineway:updated-at';
 let lastAct=Date.now(),pending=null,bar=null;
 ['pointerdown','keydown','wheel','touchstart'].forEach(function(e){addEventListener(e,function(){lastAct=Date.now()},{passive:true,capture:true})});
 function get(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -38,13 +40,19 @@ function showBar(){
   bar.appendChild(s);bar.appendChild(b);document.body.appendChild(bar);
 }
 function hideBar(){if(bar){bar.remove();bar=null}}
-function reload(sig){if(sig)set(KEY,sig);set(KEY_AT,String(Date.now()));location.reload()}
+async function reload(sig){
+  if(sig)set(KEY,sig);set(KEY_AT,String(Date.now()));
+  try{await fetch('index.html',{cache:'reload'})}catch(e){}   /* segarkan salinan index.html di cache perangkat supaya muat ulang pasti mengambil yang baru */
+  location.reload();
+}
 function tryApply(){
   if(!pending||busy())return;
   if(!home()&&Date.now()-lastAct<IDLE)return;
   reload(pending);
 }
+let lastChk=0;
 async function check(atOpen){
+  lastChk=Date.now();
   let sig;try{sig=await signature()}catch(e){return}
   const known=get(KEY);
   if(!known){set(KEY,sig);return}
@@ -56,7 +64,12 @@ async function check(atOpen){
 }
 setInterval(tryApply,5000);
 setInterval(function(){check(false)},EVERY);
-setTimeout(function(){check(true)},1500);
+setTimeout(function(){check(true)},500);
+function back(){lastAct=Date.now();check(false)}
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')back()});
+addEventListener('pageshow',function(e){if(e.persisted)back()});
+addEventListener('online',back);
+addEventListener('focus',function(){if(Date.now()-lastChk>20000)back()});
 window.APK=window.APK||{};
 APK.updater={check:function(){return check(false)}};
 })();

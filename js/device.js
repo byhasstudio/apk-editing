@@ -44,4 +44,4 @@ APK.device={
 };
 })();
 /* Pembaruan otomatis: js/updater.js dimuat dari sini supaya index.html tidak perlu diubah. Naikkan ?v= kalau updater.js diubah. */
-(function(){var s=document.createElement('script');s.src='js/updater.js?v=2';s.async=true;document.head.appendChild(s)})();
+(function(){var s=document.createElement('script');s.src='js/updater.js?v=3';s.async=true;document.head.appendChild(s)})();

@@ -84,7 +84,7 @@ APK.fx=(function(){
     if(amp<=0.01)return;
     let seed=2654435761;
     const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
-    const n=Math.max(1,Math.min(10,Math.round(+f.sliceN||5))),wt=[];
+    const n=Math.max(2,Math.min(10,Math.round(+f.sliceN||5))),wt=[];   /* jumlah irisan: minimal 2, maksimal 10 */
     let tot=0;
     for(let i=0;i<n;i++){wt.push(1);tot+=1}   /* semua irisan sama lebar: 5 irisan = 5 bagian sama rata dari kiri sampai kanan */
     if(!sliceSrc)sliceSrc=document.createElement('canvas');

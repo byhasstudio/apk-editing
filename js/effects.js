@@ -15,7 +15,7 @@ APK.effects=(function(){
     ['sepia','Sepia (%)',0,100,0,false],['invert','Negatif (%)',0,100,0,false],
     ['vig','Vignette (%)',0,100,0,true],['rgb','Pemisah RGB (px)',0,40,0,true],['glitch','Glitch (%)',0,100,0,true],
     /* Strip geser: strip vertikal setinggi gambar bergeser naik/turun (vertikal), muncul 1 kali di awal clip lalu diam (dikerjakan di APK.fx.slice, dipanggil preview.js) */
-    ['slice','Strip geser: kekuatan (%)',0,100,0,true],['sliceN','Strip geser: jumlah strip (maks 10)',1,10,5,true],['sliceT','Strip geser: lama (detik)',0.3,5,1.5,true,0.1],
+    ['slice','Strip geser: kekuatan (%)',0,100,0,true],['sliceN','Strip geser: jumlah strip (2 sampai 10)',2,10,5,true],['sliceT','Strip geser: lama (detik)',0.3,5,1.5,true,0.1],
     /* Flash: di awal clip gambar mulai dari hitam, terang naik cepat sampai agak over-exposed, lalu turun ke normal (berlaku untuk semua jenis layer) */
     ['flash','Flash: kekuatan (%)',0,100,0,false],['flashT','Flash: lama (detik)',0.1,3,0.6,false,0.1]
   ];
@@ -121,7 +121,7 @@ APK.effects=(function(){
     /* bagian sendiri supaya mudah ditemukan; jumlah irisan berupa pilihan angka 1-10 (bukan slider) */
     const sliceSec=media?`<h3 class="kf-title">Strip geser (irisan layar)</h3>
       ${rg(F('slice'))}
-      <label>Jumlah irisan (1 sampai 10)<select data-flt="sliceN">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}">${n} irisan</option>`).join('')}</select></label>
+      <label>Jumlah irisan (2 sampai 10)<select data-flt="sliceN">${[2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}">${n} irisan</option>`).join('')}</select></label>
       ${rg(F('sliceT'))}
       <p class="kf-hint">Atur kekuatan di atas 0 supaya irisan aktif. Efek jalan 1 kali di awal clip.</p>`:'';
     const flashSec=`<h3 class="kf-title">Flash (gelap ke terang di awal clip)</h3>${rg(F('flash'))}${rg(F('flashT'))}`;

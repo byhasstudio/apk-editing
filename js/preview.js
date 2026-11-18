@@ -343,7 +343,7 @@ APK.preview=(function(){
     canvas=$('pv-canvas');ctx=canvas.getContext('2d');
     $('pv-play').onclick=toggle;$('pv-stop').onclick=stop;
     $('pv-vol').oninput=e=>{vol=+e.target.value;draw()};
-    $('pv-full').onclick=()=>{const w=$('preview-wrap');document.fullscreenElement?document.exitFullscreen():w.requestFullscreen&&w.requestFullscreen()};
+    $('pv-full').onclick=()=>{if(APK.fsctl){APK.fsctl.toggle();return}const w=$('preview-wrap');document.fullscreenElement?document.exitFullscreen():w.requestFullscreen&&w.requestFullscreen()};
     $('pv-aspect').onchange=e=>{APK.project.setAspect(e.target.value);resize();draw()};
   }
   function load(){t=0;playing=false;Q=1;lv=0;needResize=false;$('pv-aspect').value=P().aspect;$('pv-play').textContent='▶';resize();draw()}

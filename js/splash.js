@@ -5,7 +5,7 @@
 (function(){
 'use strict';
 if(window.__swSplash)return;window.__swSplash=1;
-const MIN=1400,MAX=8000,t0=Date.now();
+const BUILD='build 18-11-26 d',MIN=1400,MAX=8000,t0=Date.now();
 const logo=(window.APK&&APK.brand&&APK.brand.logo)||'';
 const st=document.createElement('style');
 st.textContent='#sw-splash{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0b1030;color:#fff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;transition:opacity .45s ease}'
@@ -18,7 +18,7 @@ st.textContent='#sw-splash{position:fixed;inset:0;z-index:2147483000;display:fle
 +'@keyframes sw-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}'
 +'@keyframes sw-rot{to{transform:rotate(360deg)}}';
 const el=document.createElement('div');el.id='sw-splash';el.setAttribute('role','status');
-el.innerHTML=(logo?'<img alt="" src="'+logo+'">':'')+'<b>SplineWay</b><small>BY BYHASSSTUDIO</small><div class="sw-spin"></div>';
+el.innerHTML=(logo?'<img alt="" src="'+logo+'">':'')+'<b>SplineWay</b><small>BY BYHASSSTUDIO</small><div class="sw-spin"></div><small style="opacity:.4;font-size:10px;letter-spacing:1px">'+BUILD+'</small>';
 const root=document.documentElement;root.appendChild(st);root.appendChild(el);
 let done=false;
 function finish(){

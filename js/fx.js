@@ -71,7 +71,7 @@ APK.fx=(function(){
     ctx.restore();
   }
   /* efek piksel: glitch (potongan horizontal bergeser, acak stabil per 1/12 detik), pemisah RGB, dan vignette. f = clip.flt, tm = waktu (detik) */
-  /* strip geser (dipanggil preview.js SESUDAH clip tergambar, jadi mengiris seluruh layar termasuk tepi kiri dan kanan walau fotonya lebih kecil dari layar): seluruh lebar layar dibagi jadi tepat n strip vertikal (1 sampai 10) setinggi gambar, lebar sedikit berbeda-beda.
+  /* strip geser (dipanggil preview.js SESUDAH clip tergambar, jadi mengiris seluruh layar termasuk tepi kiri dan kanan walau fotonya lebih kecil dari layar): seluruh lebar layar dibagi jadi tepat n strip vertikal (1 sampai 10) setinggi gambar, sama lebar.
      Tiap strip bergeser NAIK atau TURUN (vertikal, isinya membungkus ke sisi atas/bawah, tanpa celah), arahnya selang-seling, dan tidak ada strip yang diam.
      Berjalan di awal clip selama T detik: 1 irisan: naik cepat, tahan penuh di tengah, turun cepat ke nol. Setelah T gambar utuh.
      Lebar dan besar geser diacak tetap (seed tetap), jadi preview dan export identik. */
@@ -86,7 +86,7 @@ APK.fx=(function(){
     const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
     const n=Math.max(1,Math.min(10,Math.round(+f.sliceN||5))),wt=[];
     let tot=0;
-    for(let i=0;i<n;i++){const v=0.6+rnd()*0.8;wt.push(v);tot+=v}
+    for(let i=0;i<n;i++){wt.push(1);tot+=1}   /* semua irisan sama lebar: 5 irisan = 5 bagian sama rata dari kiri sampai kanan */
     if(!sliceSrc)sliceSrc=document.createElement('canvas');
     if(sliceSrc.width!==w||sliceSrc.height!==h){sliceSrc.width=w;sliceSrc.height=h}
     const sg=sliceSrc.getContext('2d');sg.clearRect(0,0,w,h);sg.drawImage(ctx.canvas,0,0);
@@ -94,7 +94,7 @@ APK.fx=(function(){
     let acc=0,dir=rnd()<0.5?-1:1;
     for(let i=0;i<n;i++){
       const x0=Math.round(acc/tot*w);acc+=wt[i];
-      const x1=i===n-1?w:Math.round(acc/tot*w),dy=Math.round(dir*(0.75+0.25*rnd())*amp*mx);
+      const x1=i===n-1?w:Math.round(acc/tot*w),dy=Math.round(dir*Math.max(0.75+0.25*rnd(),0.01)*amp*Math.max(mx,8));   /* mx minimal 8 px supaya irisan tepi pun pasti terlihat bergerak */
       dir=-dir;
       if(!dy||x1<=x0)continue;
       ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';if('filter' in ctx)ctx.filter='none';ctx.beginPath();ctx.rect(x0,0,x1-x0,h);ctx.clip();ctx.clearRect(x0,0,x1-x0,h);

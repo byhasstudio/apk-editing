@@ -13,11 +13,13 @@
      (efek Isi Cermin, js/fxclip.js) sehingga sudut dan tepi tidak pernah hitam. Clip yang sengaja kecil (di bawah skala 0,5), transparan,
      bertransisi, bermask, atau ber-chroma tidak disentuh. Clip yang sudah punya efek Isi Cermin sendiri memakai efeknya sendiri.
    v25: clip yang miring (skew) ikut dicek dengan perhitungan yang tepat (bukan dilewati), dan flip/regang negatif tidak lagi merusak pengecekan,
-     jadi sudut hitam saat foto diputar, digeser, di-whip, atau dimiringkan juga terisi. */
+     jadi sudut hitam saat foto diputar, digeser, di-whip, atau dimiringkan juga terisi.
+   v26: tombol 🔁 Ulangi (loop) di samping tombol stop: kalau menyala, preview kembali ke awal otomatis setelah selesai dan terus berputar.
+     Pilihan disimpan di perangkat. Tidak berlaku saat export (export tetap berhenti di akhir timeline). */
 window.APK=window.APK||{};
 APK.preview=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
-  let canvas,ctx,t=0,playing=false,base=0,t0=0,raf=0,vol=1,K=1,hook=null,onEnd=null,exporting=false,off=false,offFps=30;
+  let canvas,ctx,t=0,playing=false,base=0,t0=0,raf=0,vol=1,K=1,hook=null,onEnd=null,exporting=false,off=false,offFps=30,looping=false;
   const els=new Map(),bmap=new Map(),imgs=new Map();
   const LOOK=1.5;                                                   /* detik: clip yang mulai dalam waktu ini disiapkan lebih awal */
   const LV=[[60,1],[30,1],[30,0.75],[24,0.6],[24,0.45]];            /* tingkat kualitas preview: [fps maksimum, skala resolusi] */
@@ -255,7 +257,13 @@ APK.preview=(function(){
     const n=performance.now();
     t=base+(n-t0)/1000;
     const d=duration();
-    if(t>=d){t=d;pause();if(onEnd)onEnd();return}
+    if(t>=d){
+      if(looping&&!exporting&&d>0){
+        /* ulangi: semua video/audio dihentikan lalu dimulai lagi dari awal lewat jalur "mulai" biasa supaya sinkron */
+        els.forEach(e=>{if(e.type!=='image'){e.el.pause();e.pre=false;e.seekAt=0}});
+        t=0;base=0;t0=n;nextDraw=0;
+      }else{t=d;pause();if(onEnd)onEnd();return}
+    }
     if(exporting||n>=nextDraw-2){
       const iv=1000/capFps();
       const di=nextDraw?n-(nextDraw-iv):iv;
@@ -339,15 +347,41 @@ APK.preview=(function(){
     await Promise.all(jobs);
   }
   function exportFrame(tt){t=tt;frame()}
+  /* tombol Ulangi (loop) putar: dibuat di samping tombol stop; pilihan disimpan di perangkat */
+  function setLoop(v){
+    looping=!!v;
+    try{localStorage.setItem('apk-pv-loop',looping?'1':'0')}catch(_){}
+    const b=$('pv-loop');
+    if(b){
+      b.classList.toggle('on',looping);
+      b.setAttribute('aria-pressed',looping?'true':'false');
+      b.style.opacity=looping?'1':'.55';
+      b.style.outline=looping?'2px solid #2fd37a':'';
+      b.style.outlineOffset=looping?'-2px':'';
+    }
+  }
+  function initLoopBtn(){
+    const st=$('pv-stop');if(!st||$('pv-loop'))return;
+    const b=document.createElement('button');
+    b.id='pv-loop';b.type='button';b.className=st.className;b.textContent='🔁';
+    b.title='Ulangi (loop) putar: kembali ke awal setelah selesai';
+    b.setAttribute('aria-label','Ulangi putar');
+    b.onclick=()=>setLoop(!looping);
+    st.insertAdjacentElement('afterend',b);
+    let saved=false;try{saved=localStorage.getItem('apk-pv-loop')==='1'}catch(_){}
+    setLoop(saved);
+  }
   function init(){
     canvas=$('pv-canvas');ctx=canvas.getContext('2d');
     $('pv-play').onclick=toggle;$('pv-stop').onclick=stop;
+    initLoopBtn();
     $('pv-vol').oninput=e=>{vol=+e.target.value;draw()};
     $('pv-full').onclick=()=>{if(APK.fsctl){APK.fsctl.toggle();return}const w=$('preview-wrap');document.fullscreenElement?document.exitFullscreen():w.requestFullscreen&&w.requestFullscreen()};
     $('pv-aspect').onchange=e=>{APK.project.setAspect(e.target.value);resize();draw()};
   }
   function load(){t=0;playing=false;Q=1;lv=0;needResize=false;$('pv-aspect').value=P().aspect;$('pv-play').textContent='▶';resize();draw()}
   function unload(){playing=false;cancelAnimationFrame(raf);for(const id of [...els.keys()])release(id);imgs.clear()}
-  return{init,load,unload,beginExport,beginOffline,endExport,prepare,exportFrame,refresh:()=>draw(),seek,play,pause,toggle,stop,fmt,bounds:id=>bmap.get(id),
+  return{init,load,unload,beginExport,beginOffline,endExport,prepare,exportFrame,refresh:()=>draw(),seek,play,pause,toggle,stop,fmt,bounds:id=>bmap.get(id),setLoop,
+    get looping(){return looping},
     get exporting(){return exporting},get time(){return t},get playing(){return playing},get duration(){return duration()}};
 })();

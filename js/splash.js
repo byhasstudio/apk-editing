@@ -5,7 +5,7 @@
 (function(){
 'use strict';
 if(window.__swSplash)return;window.__swSplash=1;
-const BUILD='build 18-11-26 e',MIN=1400,MAX=8000,t0=Date.now();
+const BUILD='build 18-11-26 f',MIN=1400,MAX=8000,t0=Date.now();
 const logo=(window.APK&&APK.brand&&APK.brand.logo)||'';
 const st=document.createElement('style');
 st.textContent='#sw-splash{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0b1030;color:#fff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;transition:opacity .45s ease}'

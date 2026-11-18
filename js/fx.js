@@ -72,7 +72,7 @@ APK.fx=(function(){
   }
   /* efek piksel: glitch (potongan horizontal bergeser, acak stabil per 1/12 detik), pemisah RGB, dan vignette. f = clip.flt, tm = waktu (detik) */
   /* strip geser (dipanggil preview.js SESUDAH clip tergambar, jadi mengiris seluruh layar termasuk tepi kiri dan kanan walau fotonya lebih kecil dari layar): seluruh lebar layar dibagi jadi tepat n strip vertikal (1 sampai 10) setinggi gambar, lebar sedikit berbeda-beda.
-     Tiap strip bergeser horizontal (isinya membungkus ke sisi lain, tanpa celah), arahnya selang-seling, dan tidak ada strip yang diam.
+     Tiap strip bergeser NAIK atau TURUN (vertikal, isinya membungkus ke sisi atas/bawah, tanpa celah), arahnya selang-seling, dan tidak ada strip yang diam.
      Berjalan di awal clip selama T detik: 1 irisan: naik cepat, tahan penuh di tengah, turun cepat ke nol. Setelah T gambar utuh.
      Lebar dan besar geser diacak tetap (seed tetap), jadi preview dan export identik. */
   let sliceSrc=null;
@@ -90,15 +90,15 @@ APK.fx=(function(){
     if(!sliceSrc)sliceSrc=document.createElement('canvas');
     if(sliceSrc.width!==w||sliceSrc.height!==h){sliceSrc.width=w;sliceSrc.height=h}
     const sg=sliceSrc.getContext('2d');sg.clearRect(0,0,w,h);sg.drawImage(ctx.canvas,0,0);
-    const mx=sl/100*0.12*w;
+    const mx=sl/100*0.12*h;   /* geser vertikal (naik turun), dalam persen tinggi layar */
     let acc=0,dir=rnd()<0.5?-1:1;
     for(let i=0;i<n;i++){
       const x0=Math.round(acc/tot*w);acc+=wt[i];
-      const x1=i===n-1?w:Math.round(acc/tot*w),dx=Math.round(dir*(0.75+0.25*rnd())*amp*mx);
+      const x1=i===n-1?w:Math.round(acc/tot*w),dy=Math.round(dir*(0.75+0.25*rnd())*amp*mx);
       dir=-dir;
-      if(!dx||x1<=x0)continue;
+      if(!dy||x1<=x0)continue;
       ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';if('filter' in ctx)ctx.filter='none';ctx.beginPath();ctx.rect(x0,0,x1-x0,h);ctx.clip();ctx.clearRect(x0,0,x1-x0,h);
-      ctx.drawImage(sliceSrc,dx,0);ctx.drawImage(sliceSrc,dx-w,0);ctx.drawImage(sliceSrc,dx+w,0);
+      ctx.drawImage(sliceSrc,0,dy);ctx.drawImage(sliceSrc,0,dy-h);ctx.drawImage(sliceSrc,0,dy+h);   /* isi membungkus ke sisi atas/bawah, tanpa celah */
       ctx.restore();
     }
   }

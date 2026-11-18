@@ -14,7 +14,7 @@ APK.effects=(function(){
     ['sat','Saturasi (%)',0,300,100,false],['hue','Rona warna (°)',0,360,0,false],['gray','Hitam putih (%)',0,100,0,false],
     ['sepia','Sepia (%)',0,100,0,false],['invert','Negatif (%)',0,100,0,false],
     ['vig','Vignette (%)',0,100,0,true],['rgb','Pemisah RGB (px)',0,40,0,true],['glitch','Glitch (%)',0,100,0,true],
-    /* Strip geser: strip vertikal setinggi gambar bergeser ke kiri/kanan, muncul 1 kali di awal clip lalu diam (dikerjakan di APK.fx.pixelFx) */
+    /* Strip geser: strip vertikal setinggi gambar bergeser naik/turun (vertikal), muncul 1 kali di awal clip lalu diam (dikerjakan di APK.fx.slice, dipanggil preview.js) */
     ['slice','Strip geser: kekuatan (%)',0,100,0,true],['sliceN','Strip geser: jumlah strip (maks 10)',1,10,5,true],['sliceT','Strip geser: lama (detik)',0.3,5,1.5,true,0.1],
     /* Flash: di awal clip gambar mulai dari hitam, terang naik cepat sampai agak over-exposed, lalu turun ke normal (berlaku untuk semua jenis layer) */
     ['flash','Flash: kekuatan (%)',0,100,0,false],['flashT','Flash: lama (detik)',0.1,3,0.6,false,0.1]

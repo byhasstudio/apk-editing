@@ -232,3 +232,161 @@ window.APK=window.APK||{};
   ];
   for(const d of NEW)if(!F.DEF[d.id]){F.LIST.push(d);F.DEF[d.id]=d}
 })();
+
+/* ===== Bagian 2: empat efek lagi dari video referensi yang sama =====
+   – Streak Horizontal (hstreak): gambar ditarik jadi garis cahaya horizontal (motion blur ekstrem), terang dan kontras, lalu kembali. Cocok sebelum pindah clip.
+   – Potong Geser (gslice): gambar terpotong jadi pita horizontal yang bergeser dan melebar acak, muncul sebentar-sebentar (beda dari Glitch RGB: tanpa pecah warna).
+   – Meredup Bulat (vigfade): gambar mengabur, memudar jadi hitam putih, menyusut jadi bulatan cahaya abu-abu di tengah, lalu hitam (akhir video referensi).
+   – Getar Ritme (pshake): zoom menghentak tiap ketukan (tempo bisa diatur) lalu mereda, dengan geser dan getar halus. Taruh awal clip tepat di ketukan pertama. */
+(function(){
+  const F=APK.fxclip;if(!F||!F.LIST||!F.DEF)return;
+  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+  const ss=x=>{x=clamp(x,0,1);return x*x*(3-2*x)};
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const bell=u=>Math.pow(Math.sin(Math.PI*clamp(u,0,1)),1.2);
+  const rng=s=>{let a=(s>>>0)||1;return()=>{a=(Math.imul(a,1664525)+1013904223)>>>0;return a/4294967296}};
+  const fast=()=>!!(APK.preview&&APK.preview.playing&&!APK.preview.exporting);
+  const aux={};
+  function ac(name,w,h){
+    let g=aux[name];
+    if(!g)g=aux[name]=document.createElement('canvas').getContext('2d');
+    const cv=g.canvas;
+    if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h}
+    g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';
+    if('filter' in g)g.filter='none';
+    g.clearRect(0,0,w,h);
+    return g;
+  }
+  const reset=(g,w,h,opaque)=>{
+    g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';
+    if('filter' in g)g.filter='none';
+    g.clearRect(0,0,w,h);
+    if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
+  };
+  function bloom(g,src,w,h,alpha){
+    if(alpha<0.01)return;
+    const a=Math.max(4,Math.round(w/10)),b=Math.max(4,Math.round(h/10));
+    const A=ac('b1',a,b);A.imageSmoothingQuality='high';A.drawImage(src,0,0,a,b);
+    const c=Math.max(8,Math.round(w/3)),d=Math.max(8,Math.round(h/3));
+    const B=ac('b2',c,d);B.imageSmoothingQuality='high';B.drawImage(A.canvas,0,0,c,d);
+    g.save();g.globalCompositeOperation='lighter';g.globalAlpha=clamp(alpha,0,1);g.imageSmoothingQuality='high';
+    g.drawImage(B.canvas,0,0,w,h);g.restore();
+  }
+  function desat(g,w,h,k){
+    if(k<0.01)return;
+    const T=ac('d',w,h);
+    T.drawImage(g.canvas,0,0);
+    T.globalCompositeOperation='saturation';T.globalAlpha=clamp(k,0,1);T.fillStyle='#808080';T.fillRect(0,0,w,h);
+    T.globalCompositeOperation='destination-in';T.globalAlpha=1;T.drawImage(g.canvas,0,0);
+    g.clearRect(0,0,w,h);g.drawImage(T.canvas,0,0);
+  }
+
+  /* ===== Streak Horizontal ===== */
+  function hstreak(g,w,h,p,tm,opaque,rel,dur){
+    const u=dur>0?clamp(rel/dur,0,1):0.5,e=bell(u)*p.amt/100;
+    if(e<0.01)return;
+    const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
+    const span=p.len/100*e*0.8,N=fast()?10:20;
+    reset(g,w,h,opaque);
+    for(let i=0;i<N;i++){
+      const f=N>1?i/(N-1)-0.5:0;
+      g.save();
+      g.globalAlpha=1/(i+1);
+      g.translate(w/2+f*span*w,h/2);g.scale(1+span,1);g.translate(-w/2,-h/2);   /* diperlebar sedikit supaya tepi tidak bolong */
+      g.drawImage(S.canvas,0,0);
+      g.restore();
+    }
+    if('filter' in g){
+      const T=ac('t',w,h);T.drawImage(g.canvas,0,0);
+      reset(g,w,h,opaque);
+      g.filter='contrast('+(1+e*p.brt/40).toFixed(2)+') brightness('+(1-e*p.drk/100).toFixed(2)+')';
+      g.drawImage(T.canvas,0,0);g.filter='none';
+    }
+    bloom(g,g.canvas,w,h,e*p.brt/100*0.5);
+  }
+
+  /* ===== Potong Geser ===== */
+  function gslice(g,w,h,p,tm,opaque,rel,dur){
+    const k=Math.max(0.2,p.spd/50),rd=rng(Math.floor(tm*k*14)*104729+57);
+    if(rd()>p.bst/100)return;                               /* hanya muncul sebentar-sebentar */
+    const u=dur>0?clamp(rel/dur,0,1):0.5,env=dur>0?Math.max(0.35,bell(u)):1,amt=p.amt/100*env;
+    if(amt<0.01)return;
+    const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
+    for(let i=0;i<p.cnt;i++){
+      const y=Math.floor(rd()*h),hh=Math.min(h-y,Math.max(2,Math.floor((0.01+rd()*p.hgt/100)*h)));
+      const dx=(rd()-0.5)*2*amt*w*0.35,sx=1+rd()*p.str/100*amt*0.8,dy=(rd()-0.5)*2*p.vsh/100*amt*h*0.04;
+      if(hh<=0)continue;
+      g.drawImage(S.canvas,0,y,w,hh,dx-(sx-1)*w/2,y+dy,w*sx,hh);
+    }
+  }
+
+  /* ===== Meredup Bulat ===== */
+  function vigfade(g,w,h,p,tm,opaque,rel,dur){
+    let u=dur>0?clamp(rel/dur,0,1):0.5;
+    if(p.dir>=50)u=1-u;
+    const er=ss(u),e=er*p.amt/100;
+    if(er<0.01)return;
+    const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
+    reset(g,w,h,opaque);
+    const kb=1+e*p.blr/100*18,tw=Math.max(8,Math.round(w/kb)),th=Math.max(8,Math.round(h/kb));
+    const T=ac('t',tw,th);T.imageSmoothingQuality='high';T.drawImage(S.canvas,0,0,tw,th);
+    g.imageSmoothingQuality='high';g.drawImage(T.canvas,0,0,tw,th,0,0,w,h);
+    desat(g,w,h,e*p.gry/100*1.3);
+    const cl=p.cls/100,R0=Math.hypot(w,h)/2*1.05,R=lerp(R0,R0*0.06,er*cl);
+    const grd=g.createRadialGradient(w/2,h/2,R*0.15,w/2,h/2,R);
+    grd.addColorStop(0,'rgba(0,0,0,0)');grd.addColorStop(0.5,'rgba(0,0,0,0.5)');grd.addColorStop(1,'rgba(0,0,0,1)');
+    g.globalCompositeOperation='source-atop';
+    if(cl>0){g.fillStyle=grd;g.fillRect(0,0,w,h)}
+    const ba=ss((er-0.75)/0.25)*cl;                         /* menjelang akhir clip: hitam penuh */
+    if(ba>0.003){g.fillStyle='rgba(0,0,0,'+ba.toFixed(3)+')';g.fillRect(0,0,w,h)}
+    g.globalCompositeOperation='source-over';
+  }
+
+  /* ===== Getar Ritme ===== */
+  function pshake(g,w,h,p,tm,opaque,rel){
+    const bp=60/p.bpm,ph=(rel%bp)/bp,beat=Math.floor(rel/bp);
+    const env=Math.exp(-ph*(3+p.dec*0.12)),rd=rng(beat*7919+11),A=p.amt/100,J=p.jit/100;
+    const jx=(rd()-0.5)*2,jy=(rd()-0.5)*2,jr=(rd()-0.5)*2;
+    const tx=(jx*env*A*0.025+Math.sin(tm*47)*J*0.004)*w,ty=(jy*env*A*0.025+Math.cos(tm*53)*J*0.004)*h;
+    const r=jr*p.rot*Math.PI/180*env+Math.sin(tm*31)*J*0.002;
+    const cover=1+2*Math.max((Math.abs(tx)+Math.abs(r)*h/2+1)/w,(Math.abs(ty)+Math.abs(r)*w/2+1)/h);
+    const z=Math.max(1+A*0.12*env,cover);
+    const S=ac('s',w,h);S.drawImage(g.canvas,0,0);
+    reset(g,w,h,opaque);
+    g.translate(w/2+tx,h/2+ty);g.rotate(r);g.scale(z,z);g.translate(-w/2,-h/2);
+    g.drawImage(S.canvas,0,0);
+  }
+
+  const NEW2=[
+    {id:'hstreak',name:'Streak Horizontal',desc:'Gambar ditarik jadi garis cahaya horizontal, terang dan kontras, lalu kembali',len:0.5,
+      params:[
+        ['amt','Kekuatan',0,100,90],
+        ['len','Panjang garis',0,100,70],
+        ['brt','Terang dan kontras garis',0,100,60],
+        ['drk','Gelapkan dasar',0,100,25]],apply:hstreak},
+    {id:'gslice',name:'Potong Geser',desc:'Gambar terpotong jadi pita horizontal yang bergeser dan melebar acak, muncul sebentar-sebentar',len:1,
+      params:[
+        ['amt','Kekuatan geser',0,100,60],
+        ['cnt','Jumlah potongan',1,24,8],
+        ['hgt','Tinggi potongan maks (% layar)',1,30,10],
+        ['str','Pelebaran potongan',0,100,40],
+        ['vsh','Geser vertikal',0,100,25],
+        ['spd','Kecepatan ganti pola',10,100,50],
+        ['bst','Seberapa sering muncul (100 = terus)',0,100,70]],apply:gslice},
+    {id:'vigfade',name:'Meredup Bulat',desc:'Gambar mengabur, memudar hitam putih, menyusut jadi bulatan cahaya, lalu hitam',len:2,
+      params:[
+        ['dir','Arah (0 = meredup ke hitam, 100 = muncul dari bulatan)',0,100,0],
+        ['amt','Kekuatan kabur dan hitam putih',0,100,85],
+        ['blr','Kabur',0,100,70],
+        ['gry','Hitam putih',0,100,80],
+        ['cls','Penyusutan bulatan dan gelap (0 = tanpa)',0,100,100]],apply:vigfade},
+    {id:'pshake',name:'Getar Ritme',desc:'Zoom menghentak tiap ketukan lalu mereda, dengan geser dan getar halus',len:3,
+      params:[
+        ['amt','Kekuatan hentak',0,100,60],
+        ['bpm','Tempo (ketukan per menit)',60,240,120],
+        ['dec','Kecepatan mereda (makin besar = makin cepat)',0,100,50],
+        ['jit','Getar halus',0,100,40],
+        ['rot','Putar sedikit (derajat)',0,10,1]],apply:pshake}
+  ];
+  for(const d of NEW2)if(!F.DEF[d.id]){F.LIST.push(d);F.DEF[d.id]=d}
+})();

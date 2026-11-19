@@ -5,6 +5,7 @@
    dan Fase gelombang (putaran). Kurva itu dipakai apa adanya, jadi gerak bawaan sama dengan video, dan semuanya bisa diatur:
    Kekuatan (skala simpangan), Goyang putar (skala putaran), Jumlah gelombang, Kecepatan, Arah (sudut), dan Balik arah.
    Durasi diatur lewat panjang clip efek di timeline: kurva ikut memanjang atau memendek.
+   Efek 4 memakai model lain (peregangan + pantulan ke bawah), lihat catatan di bawah.
    Dimuat setelah fxwavecc.js dan sebelum fxlib.js. */
 window.APK=window.APK||{};
 (function(){
@@ -36,9 +37,11 @@ window.APK=window.APK||{};
     return P.canvas;
   }
 
-  /* kurva hasil ukur dari video referensi, 28 titik sama rata sepanjang efek (u = 0 sampai 1)
-     rot = putaran dalam derajat (positif = berlawanan arah jarum jam), amp = simpangan sebagai pecahan lebar layar,
-     ph  = fase gelombang dalam putaran, dihitung dari ph0 */
+  /* kurva hasil ukur dari video referensi, titik sama rata sepanjang efek (u = 0 sampai 1)
+     Efek 1 sampai 3: rot = putaran dalam derajat (positif = berlawanan arah jarum jam), amp = simpangan sebagai pecahan lebar layar,
+     ph = fase gelombang dalam putaran, dihitung dari ph0.
+     Efek 4: bukan gelombang strip, tapi peregangan lalu pantulan ke bawah: rot (derajat), tx dan ty (geser, pecahan lebar dan tinggi layar, ty positif = ke bawah),
+     zx dan zy (selisih skala lebar dan tinggi dari 1, zx negatif dan zy positif = menyempit dan memanjang ke bawah) */
   const C={
     wavebaru1:{len:2.06,ph0:0.278,
       rot:[0,0.24,0.51,0.99,1.63,2.39,3.39,4.28,4.79,4.8,3.91,1.88,-1.17,-4.45,-7.48,-9.26,-10.13,-10.09,-9.44,-8.27,-6.99,-5.61,-4.08,-2.87,-1.85,-1.13,-0.62,0],
@@ -52,10 +55,12 @@ window.APK=window.APK||{};
       rot:[0,-0.41,-0.95,-1.63,-2.4,-3.24,-4.08,-4.23,-3.53,-1.76,1.31,4.95,7.56,9.59,10.76,11.19,10.88,9.58,8.08,6.46,4.77,3.16,1.99,1.13,0.47,0.11,-0.03,0],
       amp:[0,0.009,0.013,0.013,0.011,0.008,0.025,0.051,0.081,0.114,0.142,0.155,0.134,0.107,0.084,0.066,0.051,0.038,0.033,0.031,0.03,0.029,0.027,0.023,0.018,0.013,0.009,0],
       ph:[0,0,0,-0.065,-0.171,-0.278,-0.401,-0.433,-0.451,-0.462,-0.47,-0.476,-0.488,-0.509,-0.538,-0.573,-0.615,-0.682,-0.747,-0.807,-0.86,-0.897,-0.918,-0.932,-0.945,-0.95,-0.95,-0.95]},
-    wavebaru4:{len:1.2,ph0:-0.477,
-      rot:[0,-0.14,-0.1,-0.02,0.31,0.86,1.66,2.55,3.37,4.13,3.8,3.39,2.92,2.45,1.94,1.4,0.93,0.47,0,-0.55,-1.05,-1.52,-1.99,-1.82,-1.07,-0.57,-0.21,0],
-      amp:[0,0.001,0.002,0.003,0.008,0.016,0.028,0.041,0.054,0.067,0.07,0.069,0.065,0.061,0.057,0.053,0.05,0.046,0.042,0.038,0.034,0.03,0.027,0.02,0.011,0.005,0.003,0],
-      ph:[0,0,0,0,0,0,-0.003,-0.025,-0.045,-0.063,-0.088,-0.118,-0.151,-0.184,-0.22,-0.258,-0.291,-0.324,-0.357,-0.396,-0.43,-0.463,-0.496,-0.513,-0.513,-0.513,-0.513,-0.513]}
+    wavebaru4:{len:1.4,
+      rot:[0,0.0111,-0.0394,-0.1057,-0.1859,-0.3716,-0.4919,-0.2147,0.3276,0.5241,0.3238,0.2518,0.1043,-0.0002,-0.0636,-0.1057,-0.114,-0.1255,-0.0829,-0.0564,-0.0133,0],
+      tx:[0,0.0008,0.0006,0.0011,0.0008,-0.0005,-0.0031,-0.0054,-0.0066,-0.0005,0.0005,0.0028,0.0034,0.0041,0.0041,0.0034,0.0023,0.0008,-0.0001,-0.0007,-0.0004,0],
+      ty:[0,0.0004,-0.001,-0.0033,-0.0044,-0.0023,0.0063,0.0223,0.0418,0.0496,0.046,0.039,0.0301,0.0209,0.0124,0.0057,0.0015,-0.0002,-0.0001,0.0007,0.0015,0],
+      zx:[0,0.0017,0.0014,-0.0056,-0.0252,-0.0566,-0.0929,-0.1165,-0.1081,-0.0708,-0.0361,-0.0042,0.0168,0.0279,0.029,0.0233,0.0136,0.0044,-0.0022,-0.0046,-0.004,0],
+      zy:[0,-0.0031,-0.0027,0.0042,0.0252,0.0579,0.0984,0.1259,0.114,0.0658,0.0273,-0.0041,-0.0238,-0.032,-0.0312,-0.0251,-0.016,-0.0067,-0.0001,0.0014,0.0012,0]}
   };
 
   /* interpolasi Catmull-Rom pada titik sama rata, u = 0 sampai 1 */
@@ -109,24 +114,68 @@ window.APK=window.APK||{};
     };
   }
 
+  /* efek 4: transformasi dari tengah layar (skala lebar/tinggi terpisah, putar, geser), tepi ditarik dari piksel tepi */
+  function make4(id){
+    const E=C[id];
+    return function(g,w,h,p,tm,opaque,rel,dur){
+      const D=dur>0?dur:E.len;
+      const u=Math.min(1,Math.max(0,rel/D*p.spd/100));
+      const inv=p.inv?-1:1,k=p.amt/100;
+      const zx=1+cr(E.zx,u)*k*p.str/100,zy=1+cr(E.zy,u)*k*p.str/100;
+      const rt=cr(E.rot,u)*k*p.rot/100*inv*Math.PI/180;
+      const tx=cr(E.tx,u)*k*p.drop/100*inv*w,ty=cr(E.ty,u)*k*p.drop/100*h;
+      if(Math.abs(zx-1)<0.0005&&Math.abs(zy-1)<0.0005&&Math.abs(rt)<0.0002&&Math.abs(tx)<0.3&&Math.abs(ty)<0.3)return;
+      /* M = Rot(rt) * diag(zx,zy), lalu seluruhnya diputar ke arah yang dipilih (sudut Arah) */
+      const c=Math.cos(rt),s=Math.sin(rt);
+      let m00=zx*c,m01=zy*s,m10=-zx*s,m11=zy*c,Tx=tx,Ty=ty;
+      const th=(p.ang||0)*Math.PI/180;
+      if(th!==0){
+        const ct=Math.cos(th),st=Math.sin(th);
+        const a00=ct*m00+st*m10,a01=ct*m01+st*m11,a10=-st*m00+ct*m10,a11=-st*m01+ct*m11;
+        m00=a00*ct+a01*st;m01=-a00*st+a01*ct;m10=a10*ct+a11*st;m11=-a10*st+a11*ct;
+        const nx=ct*Tx+st*Ty,ny=-st*Tx+ct*Ty;Tx=nx;Ty=ny;
+      }
+      const cx=w/2,cy=h/2;
+      const e=cx+Tx-(m00*cx+m01*cy),f=cy+Ty-(m10*cx+m11*cy);
+      const mg=Math.min(Math.ceil(Math.max(w,h)*0.5),Math.ceil(0.5*Math.hypot(w,h)*(Math.abs(zx-1)+Math.abs(zy-1)+Math.abs(rt)+0.02)+Math.hypot(Tx,Ty)*1.2+4));
+      const S=ac('wb_s',w,h);S.drawImage(g.canvas,0,0);
+      const Pm=pad(S.canvas,w,h,mg);
+      g.clearRect(0,0,w,h);
+      if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
+      g.save();
+      g.setTransform(m00,m10,m01,m11,e,f);
+      g.drawImage(Pm,-mg,-mg);
+      g.restore();
+    };
+  }
+
   const PR=(cnt,ang)=>[
     ['amt','Kekuatan gelombang (%, 100 = persis video)',0,300,100],
     ['rot','Goyang putar (%, 100 = persis video, 0 = tanpa putar)',0,300,100],
     ['cnt','Jumlah gelombang (1 = setengah, 2 = satu gelombang, makin besar makin rapat)',1,12,cnt],
     ['spd','Kecepatan (%, 100 = persis video, makin besar makin cepat selesai)',20,300,100],
-    ['ang','Arah gelombang (0 = ke samping, 45 = miring, 90 = naik turun / ke bawah, minus = dibalik)',-90,90,ang],
-    ['inv','Balik arah (0 = normal, 1 = dibalik: kiri kanan, atau atas bawah)',0,1,0]
+    ['ang','Arah gelombang (0 = ke samping, 45 = miring naik, 90 = naik turun, minus = dibalik)',-90,90,ang],
+    ['inv','Balik arah kiri kanan (0 = normal, 1 = dibalik)',0,1,0]
+  ];
+  const PR4=[
+    ['amt','Kekuatan efek (%, 100 = persis video)',0,300,100],
+    ['str','Peregangan lebar dan tinggi (%, 100 = persis video, 0 = tanpa peregangan)',0,300,100],
+    ['drop','Geser turun (%, 100 = persis video, 0 = tanpa geser)',0,300,100],
+    ['rot','Goyang putar (%, 100 = persis video, 0 = tanpa putar)',0,300,100],
+    ['spd','Kecepatan (%, 100 = persis video, makin besar makin cepat selesai)',20,300,100],
+    ['ang','Arah (0 = turun ke bawah seperti video, 90 = ke kanan, -90 = ke kiri)',-90,90,0],
+    ['inv','Balik kiri kanan (0 = normal, 1 = dibalik)',0,1,0]
   ];
   const ENT=[
     {id:'wavebaru1',name:'Gelombang Baru 1',desc:'Miring ke kanan lalu berayun balik, gelombang ke samping (efek 1 video)',len:C.wavebaru1.len,params:PR(1,0)},
     {id:'wavebaru2',name:'Gelombang Baru 2',desc:'Dua denyut: satu kuat, satu tipis, ke samping (efek 2 video)',len:C.wavebaru2.len,params:PR(1,0)},
     {id:'wavebaru3',name:'Gelombang Baru 3',desc:'Miring ke kiri lalu hentak ke kanan, ke samping (efek 3 video)',len:C.wavebaru3.len,params:PR(1,0)},
-    {id:'wavebaru4',name:'Gelombang Baru 4',desc:'Gelombang lurus ke bawah, di tengah layar (efek 4 video)',len:C.wavebaru4.len,params:PR(2,90)}
+    {id:'wavebaru4',name:'Gelombang Baru 4',desc:'Meregang lalu memantul ke bawah di tengah layar (efek 4 video)',len:C.wavebaru4.len,params:PR4,mk:make4}
   ];
   let at=F.LIST.findIndex(e=>e.id==='wavecc');
   if(at<0)at=F.LIST.findIndex(e=>e.id==='wave2');
   ENT.forEach((en,k)=>{
-    en.apply=make(en.id);
+    en.apply=(en.mk||make)(en.id);
     F.DEF[en.id]=en;
     if(at>=0)F.LIST.splice(at+1+k,0,en);else F.LIST.push(en);
   });

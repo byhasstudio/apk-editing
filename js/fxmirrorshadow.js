@@ -6,7 +6,7 @@
    – Mode 4 (bawaan): BAYANGAN TEPI. Cermin tepi yang masih kelihatan jelas bentuknya, tipis buramnya di dekat media dan makin buram
      serta makin gelap ke arah pinggir frame. Tepi media sendiri dipudarkan (feather) ke dalam bayangan, jadi tidak ada garis tepi keras:
      gambar tajam, lalu berangsur jadi bayangan cermin yang kabur dan gelap.
-   Efek ini bekerja PER CLIP MEDIA (perLayer), sama seperti Isi Cermin: tiap video/gambar di bawah clip efek diolah di lapisannya sendiri
+   Kalau clip tertentu dipilih lewat "Pilih clip tertentu", efek bekerja PER CLIP MEDIA seperti Isi Cermin lama: tiap video/gambar yang dipilih diolah di lapisannya sendiri
    dengan kotak medianya dari preview (APK.preview.bounds, sudah termasuk posisi, skala, dan rotasi). Jadi media bisa digeser, di-scale,
    dan diputar seperti clip biasa, dan bayangannya ikut menyesuaikan sehingga frame tidak pernah kosong. Media yang sudah menutupi seluruh frame tidak diubah.
    Bayangan statis (tidak ada gerak sendiri); pusat salinan hanya mengikuti media sedikit (30%) supaya terasa menyatu tanpa membuka celah.
@@ -14,6 +14,12 @@
    dan khusus mode 4: Lebar pudar tepi, Blur dekat tepi.
    Bisa dipakai bersamaan dengan efek clip lain (dipasang di clip efek sendiri; urutan layer menentukan mana yang diolah lebih dulu).
    Di kartu pratinjau (tanpa clip sungguhan) dipakai kotak 62% di tengah gambar contoh supaya efeknya kelihatan.
+   MODE KANVAS UTAMA (v2): kalau clip efek ini TIDAK memilih clip tertentu ("Semua layer di bawah"), efek berjalan di kanvas utama dan mengisi frame
+   kosong dari GABUNGAN semua layer yang tampil saat itu di track di bawah clip efek (video, gambar, teks, bentuk, dan hasil efek lain yang urutannya
+   lebih bawah). Urutan mengikuti urutan layer di timeline. Kotak isian = kotak satu-satunya media yang tampil, atau gabungan kotak beberapa media
+   (tanpa putaran). Media berganti di tengah clip efek: isiannya langsung ikut karena dihitung ulang tiap frame.
+   Isi Cermin (js/fxclip.js) juga dialihkan ke jalur ini lewat bagian bawah file ini. preview.js membiarkan kanvas dasar transparan selama ada clip efek
+   berjenis ini yang aktif (entry.alpha), lalu menambahkan latar hitam di akhir frame.
    Dimuat setelah fxsplitmirror.js dan sebelum fxlib.js. */
 window.APK=window.APK||{};
 (function(){
@@ -30,6 +36,49 @@ window.APK=window.APK||{};
       cur=c;
       try{return oldEnd.apply(this,arguments)}finally{cur=null}
     };
+  }
+
+  /* clip efek pemilik fx yang sedang dijalankan di KANVAS UTAMA (bukan lewat layerEnd per layer): dicatat lewat pembungkus run.
+     Kartu pratinjau memberi rel sendiri, jadi tidak dihitung sebagai kanvas utama. */
+  let owner=null;
+  function ownerOf(fx){
+    const pj=P();if(!pj)return null;
+    for(let i=0;i<pj.tracks.length;i++)for(const c of pj.tracks[i].clips)if(c.fx===fx)return{c:c,ti:i};
+    return null;
+  }
+  const oldRun=F.run;
+  if(typeof oldRun==='function'){
+    F.run=function(g,fx,tm,opaque,rel){
+      const prev=owner;
+      owner=(rel==null&&!cur)?ownerOf(fx):null;
+      try{return oldRun.apply(this,arguments)}finally{owner=prev}
+    };
+  }
+  /* kotak isian di koordinat project: media (video/gambar) yang tampil saat ini di track di bawah clip efek. Satu media = kotaknya sendiri (dengan putaran);
+     beberapa media = kotak pembungkus gabungannya tanpa putaran. Kotak diambil dari preview (APK.preview.bounds), yang sudah terisi oleh layer di bawah. */
+  function boxBelow(){
+    const pj=P();
+    if(!owner||!pj||!APK.preview||!APK.preview.bounds)return null;
+    const t=APK.preview.time,boxes=[];
+    for(let k=owner.ti+1;k<pj.tracks.length;k++){
+      const tr=pj.tracks[k];
+      if(tr.hidden||tr.kind==='audio')continue;
+      for(const x of tr.clips){
+        if(x.fx||!x.mediaId||t<x.start||t>=x.start+x.dur-1e-6)continue;
+        const m=pj.media.find(q=>q.id===x.mediaId);
+        if(!m||(m.type!=='image'&&m.type!=='video'))continue;
+        const bb=APK.preview.bounds(x.id);
+        if(bb&&bb.w>0&&bb.h>0)boxes.push(bb);
+      }
+    }
+    if(!boxes.length)return null;
+    if(boxes.length===1){const b1=boxes[0];return{cx:b1.cx,cy:b1.cy,w:b1.w,h:b1.h,rot:+b1.rot||0}}
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+    for(const bb of boxes){
+      const a=(+bb.rot||0)*Math.PI/180,ca=Math.abs(Math.cos(a)),sa=Math.abs(Math.sin(a)),hw=(bb.w*ca+bb.h*sa)/2,hh=(bb.w*sa+bb.h*ca)/2;
+      x0=Math.min(x0,bb.cx-hw);x1=Math.max(x1,bb.cx+hw);y0=Math.min(y0,bb.cy-hh);y1=Math.max(y1,bb.cy+hh);
+    }
+    return{cx:(x0+x1)/2,cy:(y0+y1)/2,w:x1-x0,h:y1-y0,rot:0};
   }
 
   /* kanvas bantu */
@@ -67,6 +116,12 @@ window.APK=window.APK||{};
       if(!q)return;
       const K=w/pj.width;
       b={cx:q.cx*K,cy:q.cy*K,w:q.w*K,h:q.h*K,rot:+q.rot||0};
+    }else if(owner){
+      /* kanvas utama: kotak dari media yang tampil di bawah clip efek; tidak ada media = tidak ada yang diisi */
+      const mb=boxBelow();
+      if(!mb||!pj||!pj.width)return;
+      const K=w/pj.width;
+      b={cx:mb.cx*K,cy:mb.cy*K,w:mb.w*K,h:mb.h*K,rot:+mb.rot||0};
     }else{demo=true;b={cx:w/2,cy:h/2,w:w*0.62,h:h*0.62,rot:0}}
     const tw=Math.round(b.w),th=Math.round(b.h);
     if(!(tw>=4&&th>=4))return;
@@ -230,19 +285,26 @@ window.APK=window.APK||{};
     /* media asli di atas. Mode 4: tepinya dipudarkan ke dalam bayangan lewat topeng Mi */
     let MED=S;
     if(Mi){
+      /* cincin pudar: alfa (1 - Mi) hanya DI DALAM kotak media, 0 di luarnya. Dengan begitu hanya tepi media yang memudar;
+         isi lain di luar kotak (teks, bentuk) tetap utuh. */
+      const R=ac('ms_r',lw,lh);
+      R.setTransform(q*cs,q*sn,-q*sn,q*cs,b.cx*q,b.cy*q);
+      R.fillStyle='#000';R.fillRect(-b.w/2,-b.h/2,b.w,b.h);
+      R.setTransform(1,0,0,1,0,0);
+      R.globalCompositeOperation='destination-out';
+      R.drawImage(Mi.canvas,0,0);
+      R.globalCompositeOperation='source-over';
       MED=ac('ms_m',w,h);
       MED.drawImage(S.canvas,0,0);
-      MED.globalCompositeOperation='destination-in';
-      MED.drawImage(Mi.canvas,0,0,lw,lh,0,0,w,h);
+      MED.globalCompositeOperation='destination-out';
+      MED.drawImage(R.canvas,0,0,lw,lh,0,0,w,h);
       MED.globalCompositeOperation='source-over';
     }
     if(demo){
       /* kartu pratinjau: hanya kotak tengah yang dianggap media */
       g.save();
       g.translate(b.cx,b.cy);g.rotate(rad);g.beginPath();
-      /* mode 4: kotak klip dibuat selebar pudar tepi supaya pudarnya tidak terpotong */
-      const pad=Mi?fd/q*2:0;
-      g.rect(-b.w/2-pad,-b.h/2-pad,b.w+2*pad,b.h+2*pad);g.clip();
+      g.rect(-b.w/2,-b.h/2,b.w,b.h);g.clip();
       g.setTransform(1,0,0,1,0,0);g.drawImage(MED.canvas,0,0);
       g.restore();
     }else g.drawImage(MED.canvas,0,0);
@@ -254,7 +316,7 @@ window.APK=window.APK||{};
     name:'Cermin Bayangan',
     desc:'Mengisi frame kosong dengan bayangan dari media itu sendiri: salinan diperbesar, cermin tepi, gabungan, atau bayangan tepi yang memudar',
     len:5,
-    perLayer:true,
+    alpha:true,   /* preview.js: biarkan kanvas dasar transparan sampai efek ini jalan, supaya area kosong bisa dikenali */
     params:[
       ['mode','Mode (1 = salinan diperbesar + blur, 2 = cermin tepi + blur, 3 = gabungan, 4 = bayangan tepi memudar)',1,4,4],
       ['blur','Blur bayangan (0 = tajam; mode 4: blur di bagian paling luar)',0,100,35],
@@ -270,6 +332,19 @@ window.APK=window.APK||{};
     ],
     apply:mirrorShadow
   };
+  /* Isi Cermin (fxclip.js) ikut berjalan di kanvas utama: tanpa clip yang dipilih, frame kosong diisi gabungan semua layer di bawahnya.
+     Jalur per layer (clip bertarget, atau isi otomatis layer dasar di preview.js) tetap memakai kode aslinya. */
+  const DM=F.DEF.mirror;
+  if(DM&&typeof DM.apply==='function'){
+    const origApply=DM.apply;
+    DM.perLayer=false;DM.alpha=true;
+    DM.desc='Menutup frame kosong dengan cermin dari gabungan semua layer yang tampil di bawah clip efek ini';
+    DM.apply=function(g,w,h,p){
+      if(cur||!owner)return origApply.apply(this,arguments);
+      const br=1-clamp(nz(p.dim,0),0,100)/100;
+      mirrorShadow(g,w,h,{mode:2,blur:nz(p.blur,0)*0.625,zm:100,bri:clamp((br-0.3)/1.4*100,0,100),sat:50,op:100,tint:0,hue:0,edge:0,fd:0,nb:0});
+    };
+  }
   F.DEF[entry.id]=entry;
   const at=F.LIST.findIndex(e=>e.id==='mirror');
   if(at>=0)F.LIST.splice(at+1,0,entry);else F.LIST.push(entry);

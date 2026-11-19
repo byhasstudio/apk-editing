@@ -3,10 +3,14 @@ name: Build EXE
 # Membuat EXE SplineWay (installer dan portable) dan menerbitkannya di Releases (tag latest-exe).
 # Jalankan manual: tab Actions > Build EXE > Run workflow. Otomatis jalan juga kalau file ini atau assets/logo.png diubah.
 #
-# Cara kerja pembaruan: EXE adalah cangkang Electron yang memuat situs https://byhasstudio.github.io/apk-editing/.
+# Cara kerja pembaruan: EXE adalah cangkang Electron yang memuat situs https://byhasstudio.github.io/splineway/.
 # Setiap push ke situs otomatis sampai ke EXE: dicek saat dibuka dan tiap 1 jam (lihat js/updater.js).
 # EXE baru hanya perlu dibuat kalau nama, ikon, atau cangkangnya berubah. Tanpa internet, jendela offline tampil
 # dan menyambung ulang sendiri.
+#
+# PENTING: alamat situs (APP_URL) harus sama dengan alamat GitHub Pages repo ini. Repo ini sudah diganti nama dari apk-editing menjadi splineway,
+# jadi alamat lama .../apk-editing/ sudah tidak ada. EXE lama yang masih memuat alamat itu menampilkan layar "Tidak ada koneksi internet"
+# walau internet menyala. Pasang EXE baru hasil build ini.
 #
 # Logo: kalau ada assets/logo.png (disarankan 1024x1024), itu yang dipakai. Kalau tidak ada, logo 128 px dari js/brand.js dipakai.
 
@@ -25,7 +29,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  APP_URL: https://byhasstudio.github.io/apk-editing/
+  APP_URL: https://byhasstudio.github.io/splineway/
 
 jobs:
   exe:
@@ -126,7 +130,8 @@ jobs:
           <button id="b">Coba lagi</button>
           <script>
           var U='__APP_URL__';
-          function go(){fetch(U,{mode:'no-cors',cache:'no-store'}).then(function(){location.href=U}).catch(function(){})}
+          /* hanya pindah kalau situs benar-benar terbuka (status 200); fetch no-cors dulu dianggap berhasil walau alamatnya 404, jadi layar ini tidak pernah hilang */
+          function go(){fetch(U,{cache:'no-store'}).then(function(r){if(r.ok)location.href=U}).catch(function(){})}
           document.getElementById('b').onclick=go;setInterval(go,5000);
           </script></body></html>
           EOF

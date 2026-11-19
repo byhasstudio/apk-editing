@@ -5,6 +5,9 @@
    dan Fase gelombang (putaran). Kurva itu dipakai apa adanya, jadi gerak bawaan sama dengan video, dan semuanya bisa diatur:
    Kekuatan (skala simpangan), Goyang putar (skala putaran), Jumlah gelombang, Kecepatan, Arah (sudut), dan Balik arah.
    Durasi diatur lewat panjang clip efek di timeline: kurva ikut memanjang atau memendek.
+   Gelombang Baru 4 punya opsi tambahan "Arah ke bawah tengah" (dwn = 1): gelombang berbentuk lingkaran konsentris yang pusatnya di tengah tepi bawah layar,
+   riaknya merambat MENUJU titik bawah tengah itu (simpangan searah jari-jari). Tiap cincin digeser dengan cara diskalakan dari titik bawah tengah, tepi yang terbuka
+   tetap ditarik dari piksel tepi. Kalau dwn = 0 (bawaan), perilakunya sama persis seperti sebelumnya (ikut "Arah gelombang" sudut).
    Dimuat setelah fxwavecc.js dan sebelum fxlib.js. */
 window.APK=window.APK||{};
 (function(){
@@ -87,6 +90,28 @@ window.APK=window.APK||{};
       const m=Math.ceil(A)+2,Pc=pad(Z.canvas,w,h,m);
       g.clearRect(0,0,w,h);
       if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
+      if(p.dwn>=1){
+        /* arah ke bawah tengah: cincin konsentris berpusat di tengah tepi bawah layar, riak merambat menuju pusat itu.
+           Tiap cincin digeser searah jari-jari dengan menskalakan gambar dari titik pusat (skala = 1 + simpangan / jari-jari).
+           Dekat pusat simpangan dilandaikan ke 0 supaya skalanya tidak meledak. */
+        const cx0=w/2,cy0=h,Rm=Math.hypot(w/2,h),st=Math.max(2,Math.round(Rm/(fast?110:170))),ramp=Rm*0.12;
+        for(let r=0;r<Rm;r+=st){
+          const rm=r+st/2,fr=rm/Rm;
+          let dx=inv*A*Math.sin(2*Math.PI*(cyc*fr-ph));
+          dx*=Math.min(1,rm/ramp);
+          const s=1+dx/Math.max(rm,1);
+          g.save();
+          g.beginPath();
+          g.arc(cx0,cy0,r+st+1,0,Math.PI*2);                 /* +1 supaya antar cincin saling menimpa, tidak ada garis tipis */
+          g.moveTo(cx0+r,cy0);
+          g.arc(cx0,cy0,r,0,Math.PI*2,true);
+          g.clip();
+          g.translate(cx0,cy0);g.scale(s,s);
+          g.drawImage(Pc,-cx0-m,-cy0-m);
+          g.restore();
+        }
+        return;
+      }
       if(deg===0){
         const st=Math.max(1,Math.round(h/(fast?180:320)));
         for(let y=0;y<h;y+=st){
@@ -109,19 +134,23 @@ window.APK=window.APK||{};
     };
   }
 
-  const PR=(cnt,ang)=>[
-    ['amt','Kekuatan gelombang (%, 100 = persis video)',0,300,100],
-    ['rot','Goyang putar (%, 100 = persis video, 0 = tanpa putar)',0,300,100],
-    ['cnt','Jumlah gelombang (1 = setengah, 2 = satu gelombang, makin besar makin rapat)',1,12,cnt],
-    ['spd','Kecepatan (%, 100 = persis video, makin besar makin cepat selesai)',20,300,100],
-    ['ang','Arah gelombang (0 = ke samping, 45 = miring naik, 90 = naik turun, minus = dibalik)',-90,90,ang],
-    ['inv','Balik arah kiri kanan (0 = normal, 1 = dibalik)',0,1,0]
-  ];
+  const PR=(cnt,ang,dwn)=>{
+    const a=[
+      ['amt','Kekuatan gelombang (%, 100 = persis video)',0,300,100],
+      ['rot','Goyang putar (%, 100 = persis video, 0 = tanpa putar)',0,300,100],
+      ['cnt','Jumlah gelombang (1 = setengah, 2 = satu gelombang, makin besar makin rapat)',1,12,cnt],
+      ['spd','Kecepatan (%, 100 = persis video, makin besar makin cepat selesai)',20,300,100],
+      ['ang','Arah gelombang (0 = ke samping, 45 = miring naik, 90 = naik turun, minus = dibalik)',-90,90,ang],
+      ['inv','Balik arah kiri kanan (0 = normal, 1 = dibalik)',0,1,0]
+    ];
+    if(dwn)a.push(['dwn','Arah ke bawah tengah (0 = ikut sudut di atas, 1 = riak lingkaran merambat menuju bawah tengah layar)',0,1,0]);
+    return a;
+  };
   const ENT=[
     {id:'wavebaru1',name:'Gelombang Baru 1',desc:'Miring ke kanan lalu berayun balik, gelombang ke samping (efek 1 video)',len:C.wavebaru1.len,params:PR(1,0)},
     {id:'wavebaru2',name:'Gelombang Baru 2',desc:'Dua denyut: satu kuat, satu tipis, ke samping (efek 2 video)',len:C.wavebaru2.len,params:PR(1,0)},
     {id:'wavebaru3',name:'Gelombang Baru 3',desc:'Miring ke kiri lalu hentak ke kanan, ke samping (efek 3 video)',len:C.wavebaru3.len,params:PR(1,0)},
-    {id:'wavebaru4',name:'Gelombang Baru 4',desc:'Gelombang miring 45 derajat, lebih tipis (efek 4 video)',len:C.wavebaru4.len,params:PR(2,45)}
+    {id:'wavebaru4',name:'Gelombang Baru 4',desc:'Gelombang miring 45 derajat, lebih tipis; bisa diarahkan ke bawah tengah (efek 4 video)',len:C.wavebaru4.len,params:PR(2,45,true)}
   ];
   let at=F.LIST.findIndex(e=>e.id==='wavecc');
   if(at<0)at=F.LIST.findIndex(e=>e.id==='wave2');

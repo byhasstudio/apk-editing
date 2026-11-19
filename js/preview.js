@@ -18,7 +18,13 @@
      Pilihan disimpan di perangkat. Tidak berlaku saat export (export tetap berhenti di akhir timeline).
    v28: efek isi-cermin (Isi Cermin dan Cermin Bayangan, penanda alpha di js/fxclip.js dan js/fxmirrorshadow.js) tanpa clip yang dipilih berjalan di kanvas utama:
      selama ada clip efek berjenis itu yang aktif, kanvas dasar dibiarkan TRANSPARAN (bukan hitam) sampai efeknya jalan, supaya area kosong di sekitar GABUNGAN
-     semua layer di bawahnya terisi. Latar hitam ditambahkan di akhir frame. Isi cermin otomatis layer dasar dimatikan saat itu supaya tidak menutupi efeknya. */
+     semua layer di bawahnya terisi. Latar hitam ditambahkan di akhir frame. Isi cermin otomatis layer dasar dimatikan saat itu supaya tidak menutupi efeknya.
+   v29: JARING PENGAMAN FRAME HITAM untuk kombinasi efek isi-cermin dengan efek lain (Gelombang, Gelombang Baru, Getar, JJ, Glitch, Split Mirror, dan lain-lain).
+     Efek isi-cermin menghitung area kosong dari KOTAK media aslinya, padahal efek lain menggeser, memutar, atau menyempitkan gambar sehingga muncul celah yang
+     bentuknya tidak persegi (sudut miring, strip bergeser, tepi gelombang). Celah itu dulu lolos dan jadi hitam. Sekarang di akhir frame, SEBELUM latar hitam
+     ditambahkan, semua area transparan yang masih tersisa diisi bayangan kabur dari isi frame itu sendiri (lihat safeFill di bawah), dihitung dari alfa piksel
+     yang sebenarnya, jadi bentuk celah apa pun dan urutan efek apa pun (di atas atau di bawah clip isi-cermin) tetap tidak ada frame hitam.
+     Kanvas dasar transparan dan jaring ini juga berlaku kalau clip isi-cermin hanya memilih clip tertentu (bertarget). */
 window.APK=window.APK||{};
 APK.preview=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
@@ -106,24 +112,140 @@ APK.preview=(function(){
     }
     return false;
   }
+
+  /* ===== JARING PENGAMAN FRAME HITAM (v29) =====
+     Dipanggil di akhir frame() kalau ada clip efek isi-cermin yang aktif (kanvas dasar sedang transparan), tepat SEBELUM latar hitam ditambahkan.
+     Semua piksel yang masih transparan (celah akibat efek yang menggeser, memutar, menggetarkan, atau menyempitkan gambar, atau area di luar media)
+     diisi warna tetangganya yang dikaburkan, jadi tidak ada lagi yang jatuh ke hitam, apa pun bentuk celahnya dan apa pun urutan efeknya.
+     Cara kerja (push-pull, hanya memakai kanvas kecil, jadi ringan):
+       1) frame diperkecil bertahap separuh demi separuh sampai 1 piksel (warna dirata-rata dengan bobot alfa, celah makin menyempit)
+       2) lapis paling kasar dijenuhkan (alfa jadi penuh tanpa mengubah warna), lalu dibesarkan bertahap; di tiap tingkat lapis yang lebih halus
+          ditumpuk di atas lapis kasar, jadi bagian transparan terisi dari lapis kasar dan bagian berisi tetap dari lapis halus
+       3) hasilnya (seperempat ukuran) dikaburkan sedikit, diatur kecerahan, saturasi, tint, dan opasitasnya seperti pengaturan clip efek isi-cermin teratas
+          yang aktif, lalu digambar DI BAWAH frame (destination-over). Frame asli tidak berubah sama sekali di bagian yang sudah terisi. */
+  const sfc=[];
+  function sfCanvas(i,w,h){
+    let g=sfc[i];
+    if(!g)g=sfc[i]=document.createElement('canvas').getContext('2d');
+    const cv=g.canvas;
+    if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h}
+    g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';
+    if('filter' in g)g.filter='none';
+    g.shadowBlur=0;g.shadowColor='rgba(0,0,0,0)';
+    g.imageSmoothingEnabled=true;
+    if('imageSmoothingQuality' in g)g.imageSmoothingQuality='high';
+    g.clearRect(0,0,w,h);
+    return g;
+  }
+  function safeFill(g,tm){
+    const p=P(),FX=APK.fxclip;
+    if(!p||!FX||!FX.DEF||!FX.params)return;
+    /* pengaturan diambil dari clip efek isi-cermin teratas yang aktif (track paling atas = indeks terkecil) */
+    let fx=null;
+    for(let i=0;i<p.tracks.length&&!fx;i++){
+      const tr=p.tracks[i];
+      if(tr.hidden)continue;
+      for(const c of tr.clips){
+        if(!c.fx||tm<c.start||tm>=c.start+c.dur-1e-6)continue;
+        const d=FX.DEF[c.fx.type];
+        if(d&&d.alpha){fx=c.fx;break}
+      }
+    }
+    if(!fx)return;
+    const q=FX.params(fx);
+    let br=0.7,sa=1,op=1,tint=0,hue=210;
+    if(fx.type==='mirrorshadow'){br=0.3+1.4*q.bri/100;sa=q.sat/50;op=clampN(q.op/100,0,1);tint=q.tint||0;hue=q.hue||0}
+    else if(q.dim!=null)br=1-clampN(+q.dim||0,0,100)/100;
+    const cv=g.canvas,w=cv.width,h=cv.height;
+    if(!(w>=4&&h>=4))return;
+    /* ukuran tiap tingkat: separuh dari tingkat sebelumnya sampai sisi terpanjang 2 piksel atau kurang */
+    const sz=[[w,h]];
+    while(sz.length<12&&Math.max(sz[sz.length-1][0],sz[sz.length-1][1])>2){
+      const l=sz[sz.length-1];
+      sz.push([Math.max(1,Math.ceil(l[0]/2)),Math.max(1,Math.ceil(l[1]/2))]);
+    }
+    const n=sz.length-1;
+    if(n<2)return;
+    /* 1) pull: perkecil bertahap */
+    const lv=[cv];
+    for(let i=1;i<=n;i++){
+      const L=sfCanvas(i,sz[i][0],sz[i][1]);
+      L.drawImage(lv[i-1],0,0,sz[i-1][0],sz[i-1][1],0,0,sz[i][0],sz[i][1]);
+      lv[i]=L.canvas;
+    }
+    /* 2) jenuhkan lapis paling kasar: menumpuk dirinya sendiri membuat alfa naik ke penuh sementara warnanya tetap (bolak-balik dua kanvas) */
+    const tw=sz[n][0],th=sz[n][1];
+    let ca=sfCanvas(40,tw,th),cb=sfCanvas(41,tw,th);
+    ca.drawImage(lv[n],0,0);
+    for(let k=0;k<5;k++){
+      cb.clearRect(0,0,tw,th);
+      cb.drawImage(ca.canvas,0,0);
+      cb.drawImage(ca.canvas,0,0);
+      const sw0=ca;ca=cb;cb=sw0;
+    }
+    let acc=ca.canvas;
+    /* push: besarkan bertahap sampai seperempat ukuran frame, tiap tingkat menumpuk lapis yang lebih halus di atas lapis kasar */
+    for(let i=n-1;i>=2;i--){
+      const A=sfCanvas(20+i,sz[i][0],sz[i][1]);
+      A.drawImage(acc,0,0,sz[i+1][0],sz[i+1][1],0,0,sz[i][0],sz[i][1]);
+      A.drawImage(lv[i],0,0);
+      acc=A.canvas;
+    }
+    /* 3) kaburkan sedikit (digambar sedikit lebih besar supaya tepi tidak memudar), atur kecerahan, saturasi, dan tint */
+    const sw=sz[2][0],sh=sz[2][1],E=sfCanvas(42,sw,sh),hasF='filter' in E;
+    const bl=Math.max(1.2,Math.min(sw,sh)*0.04),m=Math.ceil(bl*2);
+    if(hasF){
+      let fs='blur('+bl.toFixed(1)+'px)';
+      if(Math.abs(br-1)>0.01)fs+=' brightness('+br.toFixed(2)+')';
+      if(Math.abs(sa-1)>0.01)fs+=' saturate('+sa.toFixed(2)+')';
+      E.filter=fs;
+    }
+    E.drawImage(acc,0,0,sw,sh,-m,-m,sw+2*m,sh+2*m);
+    if(hasF)E.filter='none';
+    else if(br<0.99){
+      E.globalCompositeOperation='source-atop';
+      E.fillStyle='rgba(0,0,0,'+(1-br).toFixed(2)+')';
+      E.fillRect(0,0,sw,sh);
+      E.globalCompositeOperation='source-over';
+    }
+    if(tint>0){
+      E.globalCompositeOperation='source-atop';
+      E.fillStyle='hsla('+Math.round(hue)+',80%,50%,'+(tint/100*0.7).toFixed(2)+')';
+      E.fillRect(0,0,sw,sh);
+      E.globalCompositeOperation='source-over';
+    }
+    /* digambar di bawah frame: hanya piksel yang masih transparan yang memperlihatkannya */
+    g.save();
+    g.setTransform(1,0,0,1,0,0);
+    g.globalAlpha=op;
+    g.globalCompositeOperation='destination-over';
+    if('filter' in g)g.filter='none';
+    g.imageSmoothingEnabled=true;
+    if('imageSmoothingQuality' in g)g.imageSmoothingQuality='high';
+    g.drawImage(E.canvas,0,0,sw,sh,0,0,w,h);
+    g.restore();
+  }
+
   function frame(){
     const p=P(),W=p.width,H=p.height,FX=APK.fxclip,ft=FX?FX.targets(p,t):null;
     bmap.clear();
     APK.layers.begin();
-    /* ada clip efek isi-cermin (entry.alpha) tanpa clip yang dipilih yang aktif sekarang: kanvas dasar dibiarkan transparan sampai efeknya jalan */
-    let tr0=false;
+    /* ada clip efek isi-cermin (entry.alpha) yang aktif sekarang: kanvas dasar dibiarkan transparan sampai efeknya jalan.
+       trA = ada clip efek isi-cermin aktif (bertarget atau tidak): kanvas dasar transparan, efek lain tidak mengisi hitam, dan jaring pengaman jalan di akhir frame.
+       tr0 = yang aktif itu tanpa clip yang dipilih (berjalan di kanvas utama): isi cermin otomatis layer dasar dimatikan karena efek itu yang mengisi. */
+    let tr0=false,trA=false;
     if(FX&&FX.DEF){
       for(const tr of p.tracks){
         if(tr.hidden)continue;
         for(const c of tr.clips){
-          if(!c.fx||Array.isArray(c.fx.targets)||t<c.start||t>=c.start+c.dur-1e-6)continue;
+          if(!c.fx||t<c.start||t>=c.start+c.dur-1e-6)continue;
           const d=FX.DEF[c.fx.type];
-          if(d&&d.alpha)tr0=true;
+          if(d&&d.alpha){trA=true;if(!Array.isArray(c.fx.targets))tr0=true}
         }
       }
     }
     ctx.setTransform(K,0,0,K,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
-    if(tr0)ctx.clearRect(0,0,W,H);
+    if(trA)ctx.clearRect(0,0,W,H);
     else{ctx.fillStyle='#000';ctx.fillRect(0,0,W,H)}
     /* membuang elemen clip yang sudah dihapus: cukup sesekali saat memutar */
     if(!playing||++gcN%20===0){
@@ -151,7 +273,7 @@ APK.preview=(function(){
           continue;
         }
         /* clip efek (js/fxclip.js): tanpa target = mengolah semua yang sudah tergambar di bawahnya; yang bertarget diterapkan per clip di bawah */
-        if(c.fx){if(FX&&!Array.isArray(c.fx.targets))FX.run(ctx,c.fx,t,!tr0);continue}
+        if(c.fx){if(FX&&!Array.isArray(c.fx.targets))FX.run(ctx,c.fx,t,!trA);continue}
         const E=APK.effects,main=ctx;
         let fl=ft&&ft.get(c.id)||null,drew=false;
         /* layer dasar yang tidak menutupi frame: isi otomatis dengan cermin tepinya supaya tidak ada area hitam.
@@ -242,8 +364,10 @@ APK.preview=(function(){
       }
       if(trDrew)below=true;
     }
-    /* kanvas dasar tadi dibiarkan transparan: sisa area yang tetap kosong (tidak ada media, atau celah di antara media) diberi latar hitam seperti biasa */
-    if(tr0){
+    /* kanvas dasar tadi dibiarkan transparan: sisa celah yang belum terisi efek apa pun (akibat efek lain yang menggeser atau memutar gambar) diisi bayangan kabur
+       dari isi frame sendiri (jaring pengaman v29), baru sisa terakhir yang benar-benar kosong (tidak ada media sama sekali) diberi latar hitam seperti biasa */
+    if(trA){
+      try{safeFill(ctx,t)}catch(_){}
       ctx.save();
       ctx.setTransform(K,0,0,K,0,0);ctx.globalAlpha=1;
       ctx.globalCompositeOperation='destination-over';

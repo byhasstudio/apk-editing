@@ -1,16 +1,10 @@
-/* Efek clip tambahan: 4 Gelombang Baru (Gelombang Baru 1 sampai 4), ditiru dari video referensi (empat efek bergelombang berurutan, bertanda 1 sampai 4),
-   ditambah Gelombang Baru 5 (Riak Bawah Tengah) yang kurvanya dirancang sendiri (bukan hasil ukur video) dan bawaannya sudah menuju bawah tengah.
+/* Efek clip tambahan: 4 Gelombang Baru (Gelombang Baru 1 sampai 4), ditiru dari video referensi (empat efek bergelombang berurutan, bertanda 1 sampai 4).
    Fade hitam masuk dan keluar di video referensi sengaja TIDAK ditiru; hanya gerak gelombangnya.
-   Cara ukur: tiap frame video dibandingkan dengan frame diam sebelum efek, lalu dicocokkan ke model "putar dari tengah + strip digeser mengikuti gelombang sinus".
-   Hasilnya tiga kurva waktu per efek: Goyang putar (derajat), Simpangan (pecahan lebar layar), dan Fase gelombang (putaran).
-   Kurva itu dipakai apa adanya, jadi gerak bawaan sama dengan video, dan semuanya bisa diatur:
+   Cara ukur: tiap frame video dibandingkan dengan frame diam sebelum efek, lalu dicocokkan ke model "putar dari tengah + strip digeser mengikuti gelombang sinus,
+   tepi yang terbuka ditarik dari piksel tepi (tanpa zoom)". Hasilnya tiga kurva waktu per efek: Goyang putar (derajat), Simpangan (pecahan lebar layar),
+   dan Fase gelombang (putaran). Kurva itu dipakai apa adanya, jadi gerak bawaan sama dengan video, dan semuanya bisa diatur:
    Kekuatan (skala simpangan), Goyang putar (skala putaran), Jumlah gelombang, Kecepatan, Arah (sudut), dan Balik arah.
    Durasi diatur lewat panjang clip efek di timeline: kurva ikut memanjang atau memendek.
-   Frame kosong (sudut akibat putar, tepi akibat geser) DIBIARKAN KOSONG: tidak ditarik, tidak dicermin, tidak di-zoom. Di clip biasa bagian itu transparan
-   (kelihatan layer di bawahnya), dan kalau latar kanvas tidak transparan (preview kartu efek, export) bagian itu hitam.
-   Gelombang Baru 4 dan 5 punya opsi tambahan "Arah ke bawah tengah" (dwn = 1): gelombang berbentuk lingkaran konsentris yang pusatnya di tengah tepi bawah layar,
-   riaknya merambat MENUJU titik bawah tengah itu (simpangan searah jari-jari). Tiap cincin digeser dengan cara diskalakan dari titik bawah tengah.
-   Kalau dwn = 0, perilakunya ikut "Arah gelombang" sudut. Bawaan: Baru 4 = 0, Baru 5 = 1.
    Dimuat setelah fxwavecc.js dan sebelum fxlib.js. */
 window.APK=window.APK||{};
 (function(){
@@ -27,10 +21,18 @@ window.APK=window.APK||{};
     g.clearRect(0,0,w,h);
     return g;
   }
-  /* gambar ditaruh di tengah kanvas yang lebih besar m piksel di semua sisi; bingkainya DIBIARKAN KOSONG (transparan), tidak diisi apa pun */
+  /* gambar diberi bingkai m piksel di semua sisi; isi bingkai = piksel tepi yang ditarik memanjang */
   function pad(src,w,h,m){
     const P=ac('wb_p',w+2*m,h+2*m);
     P.drawImage(src,m,m);
+    P.drawImage(src,0,0,1,h,0,m,m,h);
+    P.drawImage(src,w-1,0,1,h,w+m,m,m,h);
+    P.drawImage(src,0,0,w,1,m,0,w,m);
+    P.drawImage(src,0,h-1,w,1,m,h+m,w,m);
+    P.drawImage(src,0,0,1,1,0,0,m,m);
+    P.drawImage(src,w-1,0,1,1,w+m,0,m,m);
+    P.drawImage(src,0,h-1,1,1,0,h+m,m,m);
+    P.drawImage(src,w-1,h-1,1,1,w+m,h+m,m,m);
     return P.canvas;
   }
 
@@ -53,13 +55,7 @@ window.APK=window.APK||{};
     wavebaru4:{len:1.2,ph0:-0.477,
       rot:[0,-0.14,-0.1,-0.02,0.31,0.86,1.66,2.55,3.37,4.13,3.8,3.39,2.92,2.45,1.94,1.4,0.93,0.47,0,-0.55,-1.05,-1.52,-1.99,-1.82,-1.07,-0.57,-0.21,0],
       amp:[0,0.001,0.002,0.003,0.008,0.016,0.028,0.041,0.054,0.067,0.07,0.069,0.065,0.061,0.057,0.053,0.05,0.046,0.042,0.038,0.034,0.03,0.027,0.02,0.011,0.005,0.003,0],
-      ph:[0,0,0,0,0,0,-0.003,-0.025,-0.045,-0.063,-0.088,-0.118,-0.151,-0.184,-0.22,-0.258,-0.291,-0.324,-0.357,-0.396,-0.43,-0.463,-0.496,-0.513,-0.513,-0.513,-0.513,-0.513]},
-    /* Riak Bawah Tengah: dirancang sendiri. Simpangan naik halus ke puncak sekitar sepertiga clip, mereda sedikit, ada denyut kedua yang lebih lembut, lalu habis.
-       Fase terus turun (riak merambat menuju pusat bawah tengah), putaran tipis berayun ke satu arah lalu balik. */
-    wavebaru5:{len:1.5,ph0:0,
-      rot:[0,0.3,0.8,1.6,2.6,3.4,3.8,3.6,3,2.2,1.4,0.6,-0.2,-0.9,-1.4,-1.6,-1.5,-1.2,-0.9,-0.6,-0.4,-0.25,-0.15,-0.08,-0.04,-0.02,-0.01,0],
-      amp:[0,0.004,0.012,0.024,0.04,0.058,0.074,0.085,0.09,0.088,0.08,0.07,0.06,0.052,0.048,0.05,0.054,0.052,0.045,0.036,0.027,0.019,0.013,0.008,0.005,0.003,0.001,0],
-      ph:[0,-0.02,-0.06,-0.12,-0.2,-0.3,-0.41,-0.52,-0.63,-0.74,-0.85,-0.95,-1.04,-1.12,-1.19,-1.25,-1.3,-1.34,-1.38,-1.41,-1.44,-1.46,-1.48,-1.49,-1.5,-1.5,-1.5,-1.5]}
+      ph:[0,0,0,0,0,0,-0.003,-0.025,-0.045,-0.063,-0.088,-0.118,-0.151,-0.184,-0.22,-0.258,-0.291,-0.324,-0.357,-0.396,-0.43,-0.463,-0.496,-0.513,-0.513,-0.513,-0.513,-0.513]}
   };
 
   /* interpolasi Catmull-Rom pada titik sama rata, u = 0 sampai 1 */
@@ -82,36 +78,15 @@ window.APK=window.APK||{};
       const deg=p.ang||0,th=deg*Math.PI/180,sn=Math.sin(th),cs=Math.cos(th),ux=cs,uy=-sn;
       const fast=!!(APK.preview&&APK.preview.playing&&!APK.preview.exporting);
       const S=ac('wb_s',w,h);S.drawImage(g.canvas,0,0);
-      /* 1) putar dari tengah; sudut yang terbuka dibiarkan kosong */
+      /* 1) putar dari tengah; sudut yang terbuka diisi piksel tepi yang ditarik (tanpa zoom, seperti video) */
+      const m1=Math.min(Math.ceil(Math.max(w,h)*0.5),Math.ceil(Math.abs(rot)*Math.hypot(w,h)/2)+2);
       const Z=ac('wb_z',w,h);
       Z.translate(w/2,h/2);Z.rotate(-rot);
-      Z.drawImage(S.canvas,-w/2,-h/2);
-      /* 2) strip digeser mengikuti gelombang sinus; tepi yang terbuka dibiarkan kosong */
+      Z.drawImage(pad(S.canvas,w,h,m1),-w/2-m1,-h/2-m1);
+      /* 2) strip digeser mengikuti gelombang sinus; tepi yang terbuka ditarik dari piksel tepi */
       const m=Math.ceil(A)+2,Pc=pad(Z.canvas,w,h,m);
       g.clearRect(0,0,w,h);
       if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
-      if(p.dwn>=1){
-        /* arah ke bawah tengah: cincin konsentris berpusat di tengah tepi bawah layar, riak merambat menuju pusat itu.
-           Tiap cincin digeser searah jari-jari dengan menskalakan gambar dari titik pusat (skala = 1 + simpangan / jari-jari).
-           Dekat pusat simpangan dilandaikan ke 0 supaya skalanya tidak meledak. */
-        const cx0=w/2,cy0=h,Rm=Math.hypot(w/2,h),st=Math.max(2,Math.round(Rm/(fast?110:170))),ramp=Rm*0.12;
-        for(let r=0;r<Rm;r+=st){
-          const rm=r+st/2,fr=rm/Rm;
-          let dx=inv*A*Math.sin(2*Math.PI*(cyc*fr-ph));
-          dx*=Math.min(1,rm/ramp);
-          const s=1+dx/Math.max(rm,1);
-          g.save();
-          g.beginPath();
-          g.arc(cx0,cy0,r+st+1,0,Math.PI*2);                 /* +1 supaya antar cincin saling menimpa, tidak ada garis tipis */
-          g.moveTo(cx0+r,cy0);
-          g.arc(cx0,cy0,r,0,Math.PI*2,true);
-          g.clip();
-          g.translate(cx0,cy0);g.scale(s,s);
-          g.drawImage(Pc,-cx0-m,-cy0-m);
-          g.restore();
-        }
-        return;
-      }
       if(deg===0){
         const st=Math.max(1,Math.round(h/(fast?180:320)));
         for(let y=0;y<h;y+=st){
@@ -134,24 +109,19 @@ window.APK=window.APK||{};
     };
   }
 
-  const PR=(cnt,ang,dwn,dwnDef)=>{
-    const a=[
-      ['amt','Kekuatan gelombang (%, 100 = persis video)',0,300,100],
-      ['rot','Goyang putar (%, 100 = persis video, 0 = tanpa putar)',0,300,100],
-      ['cnt','Jumlah gelombang (1 = setengah, 2 = satu gelombang, makin besar makin rapat)',1,12,cnt],
-      ['spd','Kecepatan (%, 100 = persis video, makin besar makin cepat selesai)',20,300,100],
-      ['ang','Arah gelombang (0 = ke samping, 45 = miring naik, 90 = naik turun, minus = dibalik)',-90,90,ang],
-      ['inv','Balik arah kiri kanan (0 = normal, 1 = dibalik)',0,1,0]
-    ];
-    if(dwn)a.push(['dwn','Arah ke bawah tengah (0 = ikut sudut di atas, 1 = riak lingkaran merambat menuju bawah tengah layar)',0,1,dwnDef?1:0]);
-    return a;
-  };
+  const PR=(cnt,ang)=>[
+    ['amt','Kekuatan gelombang (%, 100 = persis video)',0,300,100],
+    ['rot','Goyang putar (%, 100 = persis video, 0 = tanpa putar)',0,300,100],
+    ['cnt','Jumlah gelombang (1 = setengah, 2 = satu gelombang, makin besar makin rapat)',1,12,cnt],
+    ['spd','Kecepatan (%, 100 = persis video, makin besar makin cepat selesai)',20,300,100],
+    ['ang','Arah gelombang (0 = ke samping, 45 = miring, 90 = naik turun / ke bawah, minus = dibalik)',-90,90,ang],
+    ['inv','Balik arah (0 = normal, 1 = dibalik: kiri kanan, atau atas bawah)',0,1,0]
+  ];
   const ENT=[
     {id:'wavebaru1',name:'Gelombang Baru 1',desc:'Miring ke kanan lalu berayun balik, gelombang ke samping (efek 1 video)',len:C.wavebaru1.len,params:PR(1,0)},
     {id:'wavebaru2',name:'Gelombang Baru 2',desc:'Dua denyut: satu kuat, satu tipis, ke samping (efek 2 video)',len:C.wavebaru2.len,params:PR(1,0)},
     {id:'wavebaru3',name:'Gelombang Baru 3',desc:'Miring ke kiri lalu hentak ke kanan, ke samping (efek 3 video)',len:C.wavebaru3.len,params:PR(1,0)},
-    {id:'wavebaru4',name:'Gelombang Baru 4',desc:'Gelombang miring 45 derajat, lebih tipis; bisa diarahkan ke bawah tengah (efek 4 video)',len:C.wavebaru4.len,params:PR(2,45,true,false)},
-    {id:'wavebaru5',name:'Gelombang Baru 5',desc:'Riak lingkaran merambat menuju bawah tengah layar, dua denyut lembut, putaran tipis',len:C.wavebaru5.len,params:PR(2,45,true,true)}
+    {id:'wavebaru4',name:'Gelombang Baru 4',desc:'Gelombang lurus ke bawah, di tengah layar (efek 4 video)',len:C.wavebaru4.len,params:PR(2,90)}
   ];
   let at=F.LIST.findIndex(e=>e.id==='wavecc');
   if(at<0)at=F.LIST.findIndex(e=>e.id==='wave2');

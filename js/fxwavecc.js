@@ -2,10 +2,10 @@
    Ciri yang diukur dari video referensi (detik 6 sampai 7,5):
    – strip horizontal digeser mengikuti gelombang sinus (miring/meliuk), kuat di tengah lalu mereda
    – seluruh gambar ikut goyang putar tipis (miring searah jarum jam lalu kembali), bukan cuma strip yang bergeser
-   – tepi yang terbuka karena strip bergeser TIDAK diperbesar, tapi ditarik memanjang dari piksel tepi (garis tipis memanjang di sisi objek, mis. panah di kiri)
+   – tepi yang terbuka karena strip bergeser atau gambar berputar DIBIARKAN KOSONG (tanpa zoom penutup dan tanpa tarik tepi); frame kosong nanti diisi efek Isi Cermin kalau dipasang
    Pola kekuatan sama dengan Gelombang biasa: diam sebentar, naik pelan sampai puncak, lalu mereda sampai akhir clip (mengikuti panjang clip).
    Parameter dasar sama seperti Gelombang dan Gelombang Balik (Kekuatan, Jumlah gelombang, Kecepatan, Arah, Awal pelan, Peredam),
-   ditambah dua parameter khas efek ini: Goyang putar dan Tarik tepi.
+   ditambah satu parameter khas efek ini: Goyang putar.
    Dimuat setelah fxsplitmirror.js dan sebelum fxlib.js. */
 window.APK=window.APK||{};
 (function(){
@@ -24,19 +24,11 @@ window.APK=window.APK||{};
     return g;
   }
 
-  /* gambar diberi bingkai m piksel di semua sisi; isi bingkai = piksel tepi yang ditarik memanjang (clamp ke tepi),
-     jadi saat strip bergeser, bagian yang terbuka terisi garis memanjang seperti di video referensi */
+  /* gambar diberi bingkai kosong (transparan) m piksel di semua sisi, supaya strip yang bergeser keluar tepi tidak terpotong;
+     bagian yang terbuka dibiarkan kosong */
   function pad(src,w,h,m){
     const P=ac('wc_p',w+2*m,h+2*m);
     P.drawImage(src,m,m);
-    P.drawImage(src,0,0,1,h,0,m,m,h);
-    P.drawImage(src,w-1,0,1,h,w+m,m,m,h);
-    P.drawImage(src,0,0,w,1,m,0,w,m);
-    P.drawImage(src,0,h-1,w,1,m,h+m,w,m);
-    P.drawImage(src,0,0,1,1,0,0,m,m);
-    P.drawImage(src,w-1,0,1,1,w+m,0,m,m);
-    P.drawImage(src,0,h-1,1,1,0,h+m,m,m);
-    P.drawImage(src,w-1,h-1,1,1,w+m,h+m,m,m);
     return P.canvas;
   }
 
@@ -53,18 +45,14 @@ window.APK=window.APK||{};
     const rotMax=p.rot*Math.PI/180*env;
     if(A<0.3&&rotMax<0.0005)return;
     const fast=!!(APK.preview&&APK.preview.playing&&!APK.preview.exporting);
-    const sm=p.smr/100,spd=p.spd/50;
+    const spd=p.spd/50;
     const ph=rel*1.3*spd;
     const r=rotMax*Math.sin(2*Math.PI*rel*0.7*spd);          /* goyang putar: berayun pelan, searah lalu kembali */
     const deg=p.ang||0,th=deg*Math.PI/180,sn=Math.sin(th),cs=Math.cos(th);
     const ux=cs,uy=-sn;
-    /* zoom penutup tepi: untuk putaran selalu, untuk geseran gelombang hanya sebesar bagian yang tidak ditutup tarikan tepi */
-    const cr=Math.abs(Math.cos(r))+Math.abs(Math.sin(r))*Math.max(w/h,h/w);
-    const zw=1+2*A*(1-sm)*Math.max(Math.abs(ux)/w,Math.abs(uy)/h);
-    const z=cr*zw;
     const S=ac('wc_s',w,h);S.drawImage(g.canvas,0,0);
     const Z=ac('wc_z',w,h);
-    Z.translate(w/2,h/2);Z.rotate(r);Z.scale(z,z);Z.translate(-w/2,-h/2);Z.drawImage(S.canvas,0,0);
+    Z.translate(w/2,h/2);Z.rotate(r);Z.translate(-w/2,-h/2);Z.drawImage(S.canvas,0,0);   /* tanpa zoom: sudut yang terbuka dibiarkan kosong */
     const m=Math.ceil(A)+2,Pc=pad(Z.canvas,w,h,m);
     g.clearRect(0,0,w,h);
     if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
@@ -94,7 +82,7 @@ window.APK=window.APK||{};
   const entry={
     id:'wavecc',
     name:'Gelombang CapCut',
-    desc:'Gelombang meliuk + goyang putar tipis, tepi ditarik memanjang — seperti video referensi',
+    desc:'Gelombang meliuk + goyang putar tipis, tepi yang terbuka dibiarkan kosong',
     len:1.6,
     params:[
       ['amt','Kekuatan',0,100,55],
@@ -103,8 +91,7 @@ window.APK=window.APK||{};
       ['ang','Arah gelombang (0 = ke samping, 60 = miring naik, 90 = naik turun, minus = dibalik)',-90,90,0],
       ['atk','Awal pelan (0 = langsung kuat, makin besar makin lama diam dan naik pelan)',0,100,40],
       ['dec','Peredam (mereda sampai akhir clip, 0 = tetap kuat)',0,100,60],
-      ['rot','Goyang putar (derajat, 0 = tanpa putar)',0,10,4],
-      ['smr','Tarik tepi (0 = tepi ditutup zoom, 100 = tepi ditarik memanjang seperti video)',0,100,70]
+      ['rot','Goyang putar (derajat, 0 = tanpa putar)',0,10,4]
     ],
     apply:wavecc
   };

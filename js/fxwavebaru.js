@@ -1,11 +1,13 @@
 /* Efek clip tambahan: 4 Gelombang Baru (Gelombang Baru 1 sampai 4), ditiru dari video referensi (empat efek bergelombang berurutan, bertanda 1 sampai 4).
    Fade hitam masuk dan keluar di video referensi sengaja TIDAK ditiru; hanya gerak gelombangnya.
-   Cara ukur: tiap frame video dibandingkan dengan frame diam sebelum efek, lalu dicocokkan ke model "putar dari tengah + strip digeser mengikuti gelombang sinus,
-   tepi yang terbuka ditarik dari piksel tepi (tanpa zoom)". Hasilnya tiga kurva waktu per efek: Goyang putar (derajat), Simpangan (pecahan lebar layar),
+   Cara ukur: tiap frame video dibandingkan dengan frame diam sebelum efek, lalu dicocokkan ke model "putar dari tengah + strip digeser mengikuti gelombang sinus".
+   Tepi yang terbuka dibiarkan KOSONG (tanpa zoom penutup dan tanpa tarik tepi); frame kosong nanti diisi efek Isi Cermin kalau dipasang.
+   Hasilnya tiga kurva waktu per efek: Goyang putar (derajat), Simpangan (pecahan lebar layar),
    dan Fase gelombang (putaran). Kurva itu dipakai apa adanya, jadi gerak bawaan sama dengan video, dan semuanya bisa diatur:
    Kekuatan (skala simpangan), Goyang putar (skala putaran), Jumlah gelombang, Kecepatan, Arah (sudut), dan Balik arah.
    Durasi diatur lewat panjang clip efek di timeline: kurva ikut memanjang atau memendek.
    Efek 4 memakai model lain (peregangan + pantulan ke bawah), lihat catatan di bawah.
+   Di bagian paling bawah file ini, efek bawaan fxclip.js (Gelombang, Gelombang Balik, Getar, Glitch RGB, JJ Tipis, JJ Tipis Pintar) dipasang ulang tanpa penutup tepi.
    Dimuat setelah fxwavecc.js dan sebelum fxlib.js. */
 window.APK=window.APK||{};
 (function(){
@@ -22,18 +24,11 @@ window.APK=window.APK||{};
     g.clearRect(0,0,w,h);
     return g;
   }
-  /* gambar diberi bingkai m piksel di semua sisi; isi bingkai = piksel tepi yang ditarik memanjang */
+  /* gambar diberi bingkai kosong (transparan) m piksel di semua sisi; saat gambar bergeser atau berputar, bagian yang terbuka DIBIARKAN KOSONG
+     (tidak ditarik dari piksel tepi dan tidak ditutup zoom). Frame kosong nanti diisi efek Isi Cermin kalau dipasang. */
   function pad(src,w,h,m){
     const P=ac('wb_p',w+2*m,h+2*m);
     P.drawImage(src,m,m);
-    P.drawImage(src,0,0,1,h,0,m,m,h);
-    P.drawImage(src,w-1,0,1,h,w+m,m,m,h);
-    P.drawImage(src,0,0,w,1,m,0,w,m);
-    P.drawImage(src,0,h-1,w,1,m,h+m,w,m);
-    P.drawImage(src,0,0,1,1,0,0,m,m);
-    P.drawImage(src,w-1,0,1,1,w+m,0,m,m);
-    P.drawImage(src,0,h-1,1,1,0,h+m,m,m);
-    P.drawImage(src,w-1,h-1,1,1,w+m,h+m,m,m);
     return P.canvas;
   }
 
@@ -83,12 +78,12 @@ window.APK=window.APK||{};
       const deg=p.ang||0,th=deg*Math.PI/180,sn=Math.sin(th),cs=Math.cos(th),ux=cs,uy=-sn;
       const fast=!!(APK.preview&&APK.preview.playing&&!APK.preview.exporting);
       const S=ac('wb_s',w,h);S.drawImage(g.canvas,0,0);
-      /* 1) putar dari tengah; sudut yang terbuka diisi piksel tepi yang ditarik (tanpa zoom, seperti video) */
+      /* 1) putar dari tengah; sudut yang terbuka dibiarkan kosong (tanpa zoom) */
       const m1=Math.min(Math.ceil(Math.max(w,h)*0.5),Math.ceil(Math.abs(rot)*Math.hypot(w,h)/2)+2);
       const Z=ac('wb_z',w,h);
       Z.translate(w/2,h/2);Z.rotate(-rot);
       Z.drawImage(pad(S.canvas,w,h,m1),-w/2-m1,-h/2-m1);
-      /* 2) strip digeser mengikuti gelombang sinus; tepi yang terbuka ditarik dari piksel tepi */
+      /* 2) strip digeser mengikuti gelombang sinus; tepi yang terbuka dibiarkan kosong */
       const m=Math.ceil(A)+2,Pc=pad(Z.canvas,w,h,m);
       g.clearRect(0,0,w,h);
       if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
@@ -114,7 +109,7 @@ window.APK=window.APK||{};
     };
   }
 
-  /* efek 4: transformasi dari tengah layar (skala lebar/tinggi terpisah, putar, geser), tepi ditarik dari piksel tepi */
+  /* efek 4: transformasi dari tengah layar (skala lebar/tinggi terpisah, putar, geser), tepi yang terbuka dibiarkan kosong */
   function make4(id){
     const E=C[id];
     return function(g,w,h,p,tm,opaque,rel,dur){
@@ -178,5 +173,141 @@ window.APK=window.APK||{};
     en.apply=(en.mk||make)(en.id);
     F.DEF[en.id]=en;
     if(at>=0)F.LIST.splice(at+1+k,0,en);else F.LIST.push(en);
+  });
+
+  /* ===== efek bawaan fxclip.js, versi tanpa penutup tepi =====
+     Aturan semua efek: kalau ada frame kosong akibat efek (strip bergeser, gambar berputar, getar, hentak), biarkan KOSONG.
+     Jadi di sini efek Gelombang, Gelombang Balik, Getar, Glitch RGB, JJ Tipis, dan JJ Tipis Pintar dipasang ulang tanpa zoom penutup tepi dan tanpa
+     membungkus potongan ke sisi seberang. Zoom sentak milik JJ Tipis (parameter Zoom sentak) tetap ada karena itu bagian dari gayanya, bukan penutup tepi.
+     Frame kosong diisi dengan efek Isi Cermin yang dipasang sesudahnya. */
+  const rng=s=>{let a=(s>>>0)||1;return()=>{a=(Math.imul(a,1664525)+1013904223)>>>0;return a/4294967296}};
+  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+  function curveAt(pts,u){
+    const n=pts.length;
+    if(!n)return 0;
+    if(u<=pts[0][0])return pts[0][1];
+    if(u>=pts[n-1][0])return pts[n-1][1];
+    let i=0;while(i<n-2&&u>pts[i+1][0])i++;
+    const sl=k=>(pts[k+1][1]-pts[k][1])/Math.max(1e-9,pts[k+1][0]-pts[k][0]);
+    const tg=k=>{
+      if(k===0)return sl(0);
+      if(k===n-1)return sl(n-2);
+      const a=sl(k-1),b=sl(k);
+      return a*b<=0?0:2*a*b/(a+b);
+    };
+    const x0=pts[i][0],x1=pts[i+1][0],y0=pts[i][1],y1=pts[i+1][1],hh=x1-x0;
+    if(hh<=1e-9)return y1;
+    const t=(u-x0)/hh,t2=t*t,t3=t2*t;
+    return clamp((2*t3-3*t2+1)*y0+(t3-2*t2+t)*hh*tg(i)+(-2*t3+3*t2)*y1+(t3-t2)*hh*tg(i+1),0,1);
+  }
+  const CURVE_DEF=[[0,0],[0.05,1],[0.3,0],[0.5,0],[0.55,0.8],[0.8,0],[1,0]];
+
+  function waveK(dir){
+    return function(g,w,h,p,tm,opaque,rel,dur){
+      let env=1;
+      if(dur>0){
+        const u=Math.min(1,rel/dur),a=p.atk/100,s0=a*0.15,rise=a*0.45,pk=s0+rise;
+        if(u<s0)env=0;
+        else if(u<pk){const x=(u-s0)/rise;env=x*x*(3-2*x)}
+        if(p.dec>0&&u>pk)env*=Math.exp(-((u-pk)/Math.max(1e-6,1-pk))*p.dec/100*5);
+      }
+      const A=p.amt/100*0.08*w*env;
+      if(A<0.3)return;
+      const S=ac('wb_ks',w,h);S.drawImage(g.canvas,0,0);
+      const src=S.canvas;
+      const ph=dir*rel*1.3*(p.spd/50),deg=p.ang||0;
+      const th=deg*Math.PI/180,sn=Math.sin(th),cs=Math.cos(th);
+      const ux=cs,uy=-sn;
+      g.clearRect(0,0,w,h);
+      if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
+      if(deg===0){
+        const st=Math.max(1,Math.round(h/320));
+        for(let y=0;y<h;y+=st){
+          const hh=Math.min(st,h-y),dx=dir*A*Math.sin(2*Math.PI*(p.cnt*(y+hh/2)/h-ph));
+          g.drawImage(src,0,y,w,hh,dx,y,w,hh);
+        }
+        return;
+      }
+      const Ev=w*Math.abs(sn)+h*Math.abs(cs),R=Math.hypot(w,h);
+      const st=Math.max(3,Math.round(Ev/180));
+      for(let v=-Ev/2;v<Ev/2;v+=st){
+        const fr=(v+st/2+Ev/2)/Ev,dx=dir*A*Math.sin(2*Math.PI*(p.cnt*fr-ph));
+        g.save();
+        g.translate(w/2,h/2);g.rotate(-th);
+        g.beginPath();g.rect(-R,v,2*R,st+1);g.clip();
+        g.setTransform(1,0,0,1,0,0);
+        g.drawImage(src,dx*ux,dx*uy);
+        g.restore();
+      }
+    };
+  }
+  function shakeK(g,w,h,p,tm,opaque){
+    const a=p.amt/100;if(a<=0)return;
+    const k=Math.max(0.2,p.spd/50),u=tm*k*24;
+    const S=ac('wb_ks',w,h);S.drawImage(g.canvas,0,0);
+    const pos=v=>({
+      x:(Math.sin(v)+0.6*Math.sin(v*2.31+1.2))*a*0.018*w,
+      y:(Math.cos(v*1.37)+0.6*Math.sin(v*1.93+0.4))*a*0.018*h,
+      r:Math.sin(v*0.87+2)*a*0.02
+    });
+    const put=(q,al)=>{g.save();g.globalAlpha=al;g.translate(w/2+q.x,h/2+q.y);g.rotate(q.r);g.translate(-w/2,-h/2);g.drawImage(S.canvas,0,0);g.restore()};
+    g.clearRect(0,0,w,h);
+    if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
+    put(pos(u-0.8),1);
+    put(pos(u),0.65);
+  }
+  function glitchK(g,w,h,p,tm){
+    const amt=p.amt/100;if(amt<=0)return;
+    const k=Math.max(0.2,p.spd/50),rnd=rng(Math.floor(tm*k*14)*7919+101);
+    const pulse=0.5+0.5*Math.abs(Math.sin(tm*k*4.3)*Math.cos(tm*k*1.7));
+    const S=ac('wb_gs',w,h),T=ac('wb_gt',w,h);
+    S.drawImage(g.canvas,0,0);
+    T.drawImage(S.canvas,0,0);
+    const n=1+Math.round(amt*pulse*9);
+    for(let i=0;i<n;i++){
+      const y=Math.floor(rnd()*h),hh=Math.min(h-y,Math.max(2,Math.floor((0.01+rnd()*0.07)*h))),dx=Math.round((rnd()-0.5)*2*amt*pulse*w*0.16);
+      if(hh<=0)continue;
+      S.clearRect(0,y,w,hh);
+      S.drawImage(T.canvas,0,y,w,hh,dx,y,w,hh);   /* tanpa membungkus ke sisi seberang: celah dibiarkan kosong */
+    }
+    const sh=Math.max(1,Math.round(w*0.016*amt*(0.4+0.6*pulse)));
+    g.clearRect(0,0,w,h);
+    g.globalCompositeOperation='lighter';
+    for(const ch of [['#f00',-sh],['#0f0',0],['#00f',sh]]){
+      T.globalCompositeOperation='source-over';T.clearRect(0,0,w,h);
+      T.drawImage(S.canvas,0,0);
+      T.globalCompositeOperation='multiply';T.fillStyle=ch[0];T.fillRect(0,0,w,h);
+      T.globalCompositeOperation='destination-in';T.drawImage(S.canvas,0,0);
+      g.drawImage(T.canvas,ch[1],0);
+    }
+  }
+  function jjShot(g,w,h,p,opaque,e){
+    const rd=rng(31),ang=rd()*Math.PI*2,sg=rd()<0.5?-1:1;
+    const A=p.amt/100*0.03*Math.min(w,h)*e,r=sg*p.rot*Math.PI/180*e;
+    const dx=Math.cos(ang)*A,dy=Math.sin(ang)*A;
+    const z=1+p.zm/100*e;
+    const S=ac('wb_ks',w,h);S.drawImage(g.canvas,0,0);
+    g.clearRect(0,0,w,h);
+    if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
+    g.save();
+    g.translate(w/2+dx,h/2+dy);g.rotate(r);g.scale(z,z);g.translate(-w/2,-h/2);
+    g.drawImage(S.canvas,0,0);
+    g.restore();
+  }
+  function jjK(g,w,h,p,tm,opaque,rel){
+    const t=Math.max(0,rel),AT=0.025,k=5+p.dec*0.1;
+    let e;
+    if(t<AT){const x=t/AT;e=x*x*(3-2*x)}else e=Math.exp(-(t-AT)*k);
+    if(t>AT&&e<0.004)return;
+    if(e<=0)return;
+    jjShot(g,w,h,p,opaque,e);
+  }
+  function jjpK(g,w,h,p,tm,opaque,rel,dur){
+    const u=dur>0?clamp(rel/dur,0,1):0,e=curveAt(p.curve||CURVE_DEF,u);
+    if(e<0.003)return;
+    jjShot(g,w,h,p,opaque,e);
+  }
+  [['wave',waveK(1)],['wave2',waveK(-1)],['shake',shakeK],['glitch',glitchK],['jj',jjK],['jjp',jjpK]].forEach(q=>{
+    const d=F.DEF[q[0]];if(d)d.apply=q[1];
   });
 })();

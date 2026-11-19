@@ -15,7 +15,10 @@
    v25: clip yang miring (skew) ikut dicek dengan perhitungan yang tepat (bukan dilewati), dan flip/regang negatif tidak lagi merusak pengecekan,
      jadi sudut hitam saat foto diputar, digeser, di-whip, atau dimiringkan juga terisi.
    v26: tombol 🔁 Ulangi (loop) di samping tombol stop: kalau menyala, preview kembali ke awal otomatis setelah selesai dan terus berputar.
-     Pilihan disimpan di perangkat. Tidak berlaku saat export (export tetap berhenti di akhir timeline). */
+     Pilihan disimpan di perangkat. Tidak berlaku saat export (export tetap berhenti di akhir timeline).
+   v28: efek isi-cermin (Isi Cermin dan Cermin Bayangan, penanda alpha di js/fxclip.js dan js/fxmirrorshadow.js) tanpa clip yang dipilih berjalan di kanvas utama:
+     selama ada clip efek berjenis itu yang aktif, kanvas dasar dibiarkan TRANSPARAN (bukan hitam) sampai efeknya jalan, supaya area kosong di sekitar GABUNGAN
+     semua layer di bawahnya terisi. Latar hitam ditambahkan di akhir frame. Isi cermin otomatis layer dasar dimatikan saat itu supaya tidak menutupi efeknya. */
 window.APK=window.APK||{};
 APK.preview=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
@@ -107,8 +110,21 @@ APK.preview=(function(){
     const p=P(),W=p.width,H=p.height,FX=APK.fxclip,ft=FX?FX.targets(p,t):null;
     bmap.clear();
     APK.layers.begin();
+    /* ada clip efek isi-cermin (entry.alpha) tanpa clip yang dipilih yang aktif sekarang: kanvas dasar dibiarkan transparan sampai efeknya jalan */
+    let tr0=false;
+    if(FX&&FX.DEF){
+      for(const tr of p.tracks){
+        if(tr.hidden)continue;
+        for(const c of tr.clips){
+          if(!c.fx||Array.isArray(c.fx.targets)||t<c.start||t>=c.start+c.dur-1e-6)continue;
+          const d=FX.DEF[c.fx.type];
+          if(d&&d.alpha)tr0=true;
+        }
+      }
+    }
     ctx.setTransform(K,0,0,K,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
-    ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+    if(tr0)ctx.clearRect(0,0,W,H);
+    else{ctx.fillStyle='#000';ctx.fillRect(0,0,W,H)}
     /* membuang elemen clip yang sudah dihapus: cukup sesekali saat memutar */
     if(!playing||++gcN%20===0){
       const live=new Set();
@@ -135,11 +151,12 @@ APK.preview=(function(){
           continue;
         }
         /* clip efek (js/fxclip.js): tanpa target = mengolah semua yang sudah tergambar di bawahnya; yang bertarget diterapkan per clip di bawah */
-        if(c.fx){if(FX&&!Array.isArray(c.fx.targets))FX.run(ctx,c.fx,t,true);continue}
+        if(c.fx){if(FX&&!Array.isArray(c.fx.targets))FX.run(ctx,c.fx,t,!tr0);continue}
         const E=APK.effects,main=ctx;
         let fl=ft&&ft.get(c.id)||null,drew=false;
-        /* layer dasar yang tidak menutupi frame: isi otomatis dengan cermin tepinya supaya tidak ada area hitam */
-        if(!fl&&FX&&!below&&tr.kind!=='audio'&&c.mediaId&&autoFill(c,t,W,H))fl=AUTO;
+        /* layer dasar yang tidak menutupi frame: isi otomatis dengan cermin tepinya supaya tidak ada area hitam.
+           Dilewati kalau ada clip efek isi-cermin aktif (tr0): efek itu yang mengisi, dengan pengaturannya sendiri. */
+        if(!fl&&FX&&!below&&!tr0&&tr.kind!=='audio'&&c.mediaId&&autoFill(c,t,W,H))fl=AUTO;
         /* clip yang dituju efek digambar dulu ke lapisan terpisah, efek diterapkan ke lapisan itu, lalu ditempel ke kanvas utama */
         if(fl)ctx=FX.layerBegin(main,K);
         try{
@@ -224,6 +241,14 @@ APK.preview=(function(){
         }
       }
       if(trDrew)below=true;
+    }
+    /* kanvas dasar tadi dibiarkan transparan: sisa area yang tetap kosong (tidak ada media, atau celah di antara media) diberi latar hitam seperti biasa */
+    if(tr0){
+      ctx.save();
+      ctx.setTransform(K,0,0,K,0,0);ctx.globalAlpha=1;
+      ctx.globalCompositeOperation='destination-over';
+      ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+      ctx.restore();
     }
   }
   /* live = dipanggil dari loop playback: antarmuka (waktu, playhead, gizmo) tidak perlu diperbarui di setiap frame */

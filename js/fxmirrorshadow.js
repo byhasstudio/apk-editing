@@ -3,11 +3,15 @@
    – Mode 1: salinan media diperbesar sampai menutup seluruh frame, lalu diburamkan (gaya blur background CapCut / Instagram)
    – Mode 2: cermin tepi media (dipantulkan bolak-balik seperti ubin cermin), lalu diburamkan
    – Mode 3: gabungan keduanya (salinan diperbesar sebagai dasar, cermin tepi di atasnya supaya sambungan di tepi media tetap mulus)
+   – Mode 4 (bawaan): BAYANGAN TEPI. Cermin tepi yang masih kelihatan jelas bentuknya, tipis buramnya di dekat media dan makin buram
+     serta makin gelap ke arah pinggir frame. Tepi media sendiri dipudarkan (feather) ke dalam bayangan, jadi tidak ada garis tepi keras:
+     gambar tajam, lalu berangsur jadi bayangan cermin yang kabur dan gelap.
    Efek ini bekerja PER CLIP MEDIA (perLayer), sama seperti Isi Cermin: tiap video/gambar di bawah clip efek diolah di lapisannya sendiri
    dengan kotak medianya dari preview (APK.preview.bounds, sudah termasuk posisi, skala, dan rotasi). Jadi media bisa digeser, di-scale,
    dan diputar seperti clip biasa, dan bayangannya ikut menyesuaikan sehingga frame tidak pernah kosong. Media yang sudah menutupi seluruh frame tidak diubah.
    Bayangan statis (tidak ada gerak sendiri); pusat salinan hanya mengikuti media sedikit (30%) supaya terasa menyatu tanpa membuka celah.
-   Pengaturan: Mode, Blur, Zoom bayangan, Kecerahan, Saturasi, Opasitas, Tint (kekuatan dan rona), dan Bayangan tepi media utama.
+   Pengaturan: Mode, Blur, Zoom bayangan, Kecerahan, Saturasi, Opasitas, Tint (kekuatan dan rona), Bayangan tepi media utama,
+   dan khusus mode 4: Lebar pudar tepi, Blur dekat tepi.
    Bisa dipakai bersamaan dengan efek clip lain (dipasang di clip efek sendiri; urutan layer menentukan mana yang diolah lebih dulu).
    Di kartu pratinjau (tanpa clip sungguhan) dipakai kotak 62% di tengah gambar contoh supaya efeknya kelihatan.
    Dimuat setelah fxsplitmirror.js dan sebelum fxlib.js. */
@@ -15,6 +19,7 @@ window.APK=window.APK||{};
 (function(){
   const F=APK.fxclip;if(!F||!F.LIST||!F.DEF)return;
   const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+  const nz=(v,d)=>(v==null||isNaN(v))?d:+v;   /* parameter lama (proyek tersimpan sebelum mode 4) belum punya nilai ini: pakai bawaan */
   const P=()=>APK.project&&APK.project.current;
 
   /* clip media yang sedang diolah: fxclip.js menyimpannya di variabel privat, jadi dicatat lagi di sini lewat pembungkus layerEnd */
@@ -39,6 +44,19 @@ window.APK=window.APK||{};
     g.shadowBlur=0;g.shadowColor='rgba(0,0,0,0)';g.shadowOffsetX=0;g.shadowOffsetY=0;
     g.clearRect(0,0,w,h);
     return g;
+  }
+
+  /* hanya BAYANGAN kotak media yang tergambar (kotak sendiri jauh di luar kanvas, bayangannya digeser balik), jadi hasilnya
+     tanjakan alfa halus: 1 di dalam kotak, 0 di luar, lebar peralihan sekitar 2 x sb. grow > 0 membesarkan kotak, grow < 0 mengecilkan.
+     Semua ukuran (grow, sb, off) dalam piksel kanvas isian (sudah dikali q); kotak b dalam piksel kanvas penuh. */
+  function rectShadow(G,b,cs,sn,q,grow,sb,off){
+    G.save();
+    G.setTransform(q*cs,q*sn,-q*sn,q*cs,b.cx*q-off,b.cy*q);
+    G.shadowColor='#000';G.shadowBlur=sb;G.shadowOffsetX=off;G.shadowOffsetY=0;
+    G.fillStyle='#000';
+    const gq=grow/q;
+    G.fillRect(-b.w/2-gq,-b.h/2-gq,b.w+2*gq,b.h+2*gq);
+    G.restore();
   }
 
   function mirrorShadow(g,w,h,p){
@@ -94,7 +112,7 @@ window.APK=window.APK||{};
       A.drawImage(T.canvas,-tw/2,-th/2,tw,th);
       A.restore();
     }
-    if(mode===2||mode===3){
+    if(mode===2||mode===3||mode===4){
       /* cermin tepi: ubin dicermin bergantian (ubin ganjil dibalik), disusun di ruang media: pusat, sumbu, dan putar mengikuti media */
       A.save();
       A.globalAlpha=mode===3?0.6:1;
@@ -118,6 +136,56 @@ window.APK=window.APK||{};
       B.drawImage(A.canvas,-m,-m,lw+2*m,lh+2*m);
       B.filter='none';
       FL=B;
+    }
+
+    /* mode 4: bayangan tepi. Tiga lapis disusun dengan topeng jarak dari tepi media:
+       (1) cermin dengan blur tipis (dekat media), (2) cermin dengan blur penuh yang makin kelihatan ke arah luar, (3) gelap yang makin pekat ke luar.
+       Tepi media sendiri dipudarkan ke dalam (topeng Mi) supaya peralihan dari gambar tajam ke bayangan tidak punya garis tepi. */
+    let Mi=null,fd=0;
+    if(mode===4){
+      const mn=Math.min(w,h);
+      fd=clamp(nz(p.fd,40),0,100)/100*0.12*mn*q;                 /* separuh lebar peralihan, dalam piksel kanvas isian */
+      const off=(w*4+tw*2)*q;
+      /* lapis dekat: blur tipis */
+      let FN=A;
+      const bn=clamp(nz(p.nb,15),0,100)/100*0.04*mn;
+      if(hasF&&bn*q>=0.5){
+        const N=ac('ms_n',lw,lh),m=Math.ceil(bn*q*2);
+        N.filter='blur('+(bn*q).toFixed(1)+'px)';
+        N.drawImage(A.canvas,-m,-m,lw+2*m,lh+2*m);
+        N.filter='none';
+        FN=N;
+      }
+      /* topeng luar Mo: alfa 0 tepat di tepi media, naik ke 1 sejauh dua kali fd ke luar */
+      const Mo=ac('ms_mo',lw,lh);
+      Mo.fillStyle='#000';Mo.fillRect(0,0,lw,lh);
+      if(fd>=1){
+        Mo.globalCompositeOperation='destination-out';
+        rectShadow(Mo,b,cs,sn,q,fd,fd,off);
+        Mo.globalCompositeOperation='source-over';
+        /* topeng dalam Mi: alfa 1 jauh di dalam media, 0 tepat di tepinya */
+        Mi=ac('ms_mi',lw,lh);
+        rectShadow(Mi,b,cs,sn,q,-fd,fd,off);
+      }
+      const F4=ac('ms_f',lw,lh);
+      F4.drawImage(FN.canvas,0,0);
+      const C=ac('ms_c',lw,lh);
+      C.drawImage(FL.canvas,0,0);
+      C.globalCompositeOperation='destination-in';
+      C.drawImage(Mo.canvas,0,0);
+      C.globalCompositeOperation='source-over';
+      F4.drawImage(C.canvas,0,0);
+      /* gelap bertahap ke arah pinggir: pakai parameter "Bayangan tepi" sebagai kekuatannya */
+      const dk=clamp(nz(p.edge,35)/100,0,1)*0.8;
+      if(dk>0){
+        const D=ac('ms_d',lw,lh);
+        D.fillStyle='#000';D.fillRect(0,0,lw,lh);
+        D.globalCompositeOperation='destination-in';
+        D.drawImage(Mo.canvas,0,0);
+        D.globalCompositeOperation='source-over';
+        F4.globalAlpha=dk;F4.drawImage(D.canvas,0,0);F4.globalAlpha=1;
+      }
+      FL=F4;
     }
     FL.setTransform(1,0,0,1,0,0);
     /* tint warna (hanya di area isian yang terisi) */
@@ -146,8 +214,9 @@ window.APK=window.APK||{};
     g.drawImage(FL.canvas,0,0,lw,lh,0,0,w,h);
     g.restore();
 
-    /* bayangan lembut di tepi media utama (hanya bayangannya yang tergambar: kotak digambar jauh di luar layar lalu bayangannya digeser balik) */
-    if(p.edge>0){
+    /* bayangan lembut di tepi media utama (hanya bayangannya yang tergambar: kotak digambar jauh di luar layar lalu bayangannya digeser balik).
+       Mode 4 tidak memakainya: gelap tepinya sudah ikut di dalam bayangan bertahap di atas. */
+    if(p.edge>0&&mode!==4){
       const sz=p.edge/100*0.06*Math.min(w,h),OFF=w*4+tw*2;
       g.save();
       g.setTransform(cs,sn,-sn,cs,b.cx-OFF,b.cy);
@@ -158,32 +227,46 @@ window.APK=window.APK||{};
       g.restore();
     }
 
+    /* media asli di atas. Mode 4: tepinya dipudarkan ke dalam bayangan lewat topeng Mi */
+    let MED=S;
+    if(Mi){
+      MED=ac('ms_m',w,h);
+      MED.drawImage(S.canvas,0,0);
+      MED.globalCompositeOperation='destination-in';
+      MED.drawImage(Mi.canvas,0,0,lw,lh,0,0,w,h);
+      MED.globalCompositeOperation='source-over';
+    }
     if(demo){
       /* kartu pratinjau: hanya kotak tengah yang dianggap media */
       g.save();
-      g.translate(b.cx,b.cy);g.rotate(rad);g.beginPath();g.rect(-b.w/2,-b.h/2,b.w,b.h);g.clip();
-      g.setTransform(1,0,0,1,0,0);g.drawImage(S.canvas,0,0);
+      g.translate(b.cx,b.cy);g.rotate(rad);g.beginPath();
+      /* mode 4: kotak klip dibuat selebar pudar tepi supaya pudarnya tidak terpotong */
+      const pad=Mi?fd/q*2:0;
+      g.rect(-b.w/2-pad,-b.h/2-pad,b.w+2*pad,b.h+2*pad);g.clip();
+      g.setTransform(1,0,0,1,0,0);g.drawImage(MED.canvas,0,0);
       g.restore();
-    }else g.drawImage(S.canvas,0,0);
+    }else g.drawImage(MED.canvas,0,0);
   }
 
   /* ===== definisi efek ===== */
   const entry={
     id:'mirrorshadow',
     name:'Cermin Bayangan',
-    desc:'Mengisi frame kosong dengan bayangan blur dari media itu sendiri: salinan diperbesar, cermin tepi, atau gabungan',
+    desc:'Mengisi frame kosong dengan bayangan dari media itu sendiri: salinan diperbesar, cermin tepi, gabungan, atau bayangan tepi yang memudar',
     len:5,
     perLayer:true,
     params:[
-      ['mode','Mode (1 = salinan diperbesar + blur, 2 = cermin tepi + blur, 3 = gabungan keduanya)',1,3,1],
-      ['blur','Blur bayangan (0 = tajam)',0,100,60],
+      ['mode','Mode (1 = salinan diperbesar + blur, 2 = cermin tepi + blur, 3 = gabungan, 4 = bayangan tepi memudar)',1,4,4],
+      ['blur','Blur bayangan (0 = tajam; mode 4: blur di bagian paling luar)',0,100,35],
       ['zm','Zoom bayangan (%, 100 = pas menutup frame; hanya mode 1 dan 3)',100,300,110],
       ['bri','Kecerahan bayangan (50 = asli, makin kecil makin gelap)',0,100,40],
       ['sat','Saturasi bayangan (50 = asli, 0 = hitam putih)',0,100,60],
       ['op','Opasitas bayangan (100 = penuh, makin kecil makin transparan)',0,100,100],
       ['tint','Kekuatan warna tint (0 = tanpa tint)',0,100,0],
       ['hue','Rona warna tint (0 sampai 360 derajat)',0,360,210],
-      ['edge','Bayangan tepi media utama (0 = tanpa)',0,100,35]
+      ['edge','Bayangan tepi media utama (0 = tanpa; mode 4: kegelapan yang makin pekat ke pinggir)',0,100,35],
+      ['fd','Lebar pudar tepi media (mode 4; 0 = tepi tajam)',0,100,40],
+      ['nb','Blur dekat tepi media (mode 4; 0 = cermin tajam)',0,100,15]
     ],
     apply:mirrorShadow
   };

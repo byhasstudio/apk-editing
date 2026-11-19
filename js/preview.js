@@ -18,7 +18,11 @@
      Pilihan disimpan di perangkat. Tidak berlaku saat export (export tetap berhenti di akhir timeline).
    v28: efek isi-cermin (Isi Cermin dan Cermin Bayangan, penanda alpha di js/fxclip.js dan js/fxmirrorshadow.js) tanpa clip yang dipilih berjalan di kanvas utama:
      selama ada clip efek berjenis itu yang aktif, kanvas dasar dibiarkan TRANSPARAN (bukan hitam) sampai efeknya jalan, supaya area kosong di sekitar GABUNGAN
-     semua layer di bawahnya terisi. Latar hitam ditambahkan di akhir frame. Isi cermin otomatis layer dasar dimatikan saat itu supaya tidak menutupi efeknya. */
+     semua layer di bawahnya terisi. Latar hitam ditambahkan di akhir frame. Isi cermin otomatis layer dasar dimatikan saat itu supaya tidak menutupi efeknya.
+   v29: ISI SEMUA FRAME KOSONG. Kalau ada efek clip lain (Split Mirror, Irisan Pulsa, Gelombang, dan sebagainya) yang aktif bersamaan di kanvas utama, efek isi-cermin
+     tidak lagi dijalankan sesuai urutan track-nya, tapi PALING AKHIR setelah semua efek clip lain selesai, apa pun urutan track-nya. Sebelum efek clip pertama jalan,
+     kanvas disalin sekali (salinan bersih media TANPA efek) dan diserahkan lewat APK.fxclip.fillSrc. Efek isi memakainya sebagai sumber ubin cermin, jadi setiap area
+     yang kosong (transparan) akibat efek lain, di dalam maupun di luar kotak media, terisi media saat itu. Tanpa efek clip lain yang aktif, urutan dan hasilnya sama seperti v28. */
 window.APK=window.APK||{};
 APK.preview=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
@@ -28,6 +32,7 @@ APK.preview=(function(){
   const LV=[[60,1],[30,1],[30,0.75],[24,0.6],[24,0.45]];            /* tingkat kualitas preview: [fps maksimum, skala resolusi] */
   const AUTO=[{type:'mirror',p:{blur:14}}];                         /* efek isi cermin otomatis (blur isian tipis supaya terasa seperti latar) */
   let lat=0.1,lv=0,Q=1,ema=0,dema=0,slow=0,fast=0,nextDraw=0,lastUi=0,gcN=0,needResize=false;
+  let cleanG=null;                                                  /* v29: kanvas salinan bersih (sebelum efek clip), dipakai efek isi-cermin */
   const clampN=(v,a,b)=>Math.min(b,Math.max(a,v));
   const mediaOf=id=>P().media.find(m=>m.id===id);
   const capFps=()=>{const p=P();return Math.max(10,Math.min(LV[lv][0],(p&&p.fps)||30))};
@@ -106,12 +111,24 @@ APK.preview=(function(){
     }
     return false;
   }
+  /* v29: salin isi kanvas utama sekarang ke kanvas terpisah (salinan bersih media sebelum efek clip pertama jalan) dan kembalikan kanvasnya */
+  function snapClean(){
+    const cv=ctx.canvas;
+    if(!cleanG)cleanG=document.createElement('canvas').getContext('2d');
+    const c2=cleanG.canvas;
+    if(c2.width!==cv.width||c2.height!==cv.height){c2.width=cv.width;c2.height=cv.height}
+    cleanG.setTransform(1,0,0,1,0,0);cleanG.globalAlpha=1;cleanG.globalCompositeOperation='source-over';
+    cleanG.clearRect(0,0,c2.width,c2.height);
+    cleanG.drawImage(cv,0,0);
+    return c2;
+  }
   function frame(){
     const p=P(),W=p.width,H=p.height,FX=APK.fxclip,ft=FX?FX.targets(p,t):null;
     bmap.clear();
     APK.layers.begin();
-    /* ada clip efek isi-cermin (entry.alpha) tanpa clip yang dipilih yang aktif sekarang: kanvas dasar dibiarkan transparan sampai efeknya jalan */
-    let tr0=false;
+    /* ada clip efek isi-cermin (entry.alpha) tanpa clip yang dipilih yang aktif sekarang: kanvas dasar dibiarkan transparan sampai efeknya jalan.
+       nOther = jumlah efek clip lain (bukan efek isi) yang juga aktif di kanvas utama (v29) */
+    let tr0=false,nOther=0;
     if(FX&&FX.DEF){
       for(const tr of p.tracks){
         if(tr.hidden)continue;
@@ -119,9 +136,12 @@ APK.preview=(function(){
           if(!c.fx||Array.isArray(c.fx.targets)||t<c.start||t>=c.start+c.dur-1e-6)continue;
           const d=FX.DEF[c.fx.type];
           if(d&&d.alpha)tr0=true;
+          else if(d&&!d.perLayer)nOther++;
         }
       }
     }
+    /* v29: efek isi-cermin ditunda sampai semua efek clip lain selesai; clean = salinan bersih media sebelum efek clip pertama jalan */
+    const defer=[];let clean=null;
     ctx.setTransform(K,0,0,K,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
     if(tr0)ctx.clearRect(0,0,W,H);
     else{ctx.fillStyle='#000';ctx.fillRect(0,0,W,H)}
@@ -150,8 +170,19 @@ APK.preview=(function(){
           if(playing&&c.mediaId&&c.start>t&&c.start-t<LOOK)pre(c,tr);
           continue;
         }
-        /* clip efek (js/fxclip.js): tanpa target = mengolah semua yang sudah tergambar di bawahnya; yang bertarget diterapkan per clip di bawah */
-        if(c.fx){if(FX&&!Array.isArray(c.fx.targets))FX.run(ctx,c.fx,t,!tr0);continue}
+        /* clip efek (js/fxclip.js): tanpa target = mengolah semua yang sudah tergambar di bawahnya; yang bertarget diterapkan per clip di bawah.
+           v29: efek isi-cermin ditunda ke akhir frame kalau ada efek clip lain yang aktif; efek lain menyalin kanvas bersih lebih dulu (sekali). */
+        if(c.fx){
+          if(FX&&!Array.isArray(c.fx.targets)){
+            const fd=FX.DEF&&FX.DEF[c.fx.type];
+            if(tr0&&nOther>0&&fd&&fd.alpha)defer.push(c);
+            else{
+              if(tr0&&nOther>0&&!clean)clean=snapClean();
+              FX.run(ctx,c.fx,t,!tr0);
+            }
+          }
+          continue;
+        }
         const E=APK.effects,main=ctx;
         let fl=ft&&ft.get(c.id)||null,drew=false;
         /* layer dasar yang tidak menutupi frame: isi otomatis dengan cermin tepinya supaya tidak ada area hitam.
@@ -241,6 +272,13 @@ APK.preview=(function(){
         }
       }
       if(trDrew)below=true;
+    }
+    /* v29: efek isi-cermin yang ditunda dijalankan sekarang, setelah semua efek clip lain selesai. fillSrc = salinan bersih media (tanpa efek),
+       jadi area kosong akibat efek lain ikut terisi media saat itu. */
+    if(defer.length){
+      FX.fillSrc=clean;
+      try{for(const c of defer)FX.run(ctx,c.fx,t,false)}
+      finally{FX.fillSrc=null}
     }
     /* kanvas dasar tadi dibiarkan transparan: sisa area yang tetap kosong (tidak ada media, atau celah di antara media) diberi latar hitam seperti biasa */
     if(tr0){

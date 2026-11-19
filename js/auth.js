@@ -21,6 +21,8 @@
    4) Aplikasi menemukan data itu, menghapusnya, lalu masuk sebagai akun tersebut. Kode hanya berlaku 10 menit sejak dibuat di aplikasi.
    SYARAT DI FIREBASE CONSOLE: Realtime Database > Rules harus memuat blok "loginLinks" (lihat commit message / README).
    Database yang dipakai sama dengan js/qrlink.js (DB di bawah).
+   APP_URL harus sama dengan alamat GitHub Pages repo ini (https://byhasstudio.github.io/splineway/). Dulu memakai alamat lama /apk-editing/
+   (sebelum repo diganti nama), sehingga tautan yang disalin membuka halaman yang tidak ada dan login lewat tautan tidak bisa jalan.
 
    SYARAT DI FIREBASE CONSOLE (umum): Authentication > Sign-in method > Google harus Enabled, dan Authentication > Settings > Authorized domains
    harus memuat domain tempat aplikasi dibuka (mis. byhasstudio.github.io). Cek juga FB_CFG di bawah (authDomain dan projectId).
@@ -31,7 +33,7 @@ if(window.__swAuth)return;window.__swAuth=1;
 const FB_CFG={apiKey:'AIzaSyBahNCBMGHzRBTIT4aE2PMHDdTEQVgQkp4',authDomain:'splineway.firebaseapp.com',projectId:'splineway'};
 const SDK='https://www.gstatic.com/firebasejs/10.14.1/';
 const AUTH_DB='splineway-auth',SKEY='splineway:session',LKEY='splineway:legacy-owner',RKEY='splineway:redirect-keep',CKEY='splineway:linkcode';
-const APP_URL='https://byhasstudio.github.io/apk-editing/';
+const APP_URL='https://byhasstudio.github.io/splineway/';
 const DB='https://splineway-default-rtdb.asia-southeast1.firebasedatabase.app';
 const LINKS=DB+'/loginLinks';
 const ALPHA='ABCDEFGHJKMNPQRSTUVWXYZ23456789',CODE_RE=/^[A-HJKMNP-Z2-9]{10}$/,CODE_TTL=600000;

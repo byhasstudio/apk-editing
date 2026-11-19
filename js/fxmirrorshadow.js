@@ -12,14 +12,20 @@
    Bayangan statis (tidak ada gerak sendiri); pusat salinan hanya mengikuti media sedikit (30%) supaya terasa menyatu tanpa membuka celah.
    Pengaturan: Mode, Blur, Zoom bayangan, Kecerahan, Saturasi, Opasitas, Tint (kekuatan dan rona), Bayangan tepi media utama,
    dan khusus mode 4: Lebar pudar tepi, Blur dekat tepi.
-   Bisa dipakai bersamaan dengan efek clip lain (dipasang di clip efek sendiri; urutan layer menentukan mana yang diolah lebih dulu).
+   Bisa dipakai bersamaan dengan efek clip lain (dipasang di clip efek sendiri).
    Di kartu pratinjau (tanpa clip sungguhan) dipakai kotak 62% di tengah gambar contoh supaya efeknya kelihatan.
    MODE KANVAS UTAMA (v2): kalau clip efek ini TIDAK memilih clip tertentu ("Semua layer di bawah"), efek berjalan di kanvas utama dan mengisi frame
    kosong dari GABUNGAN semua layer yang tampil saat itu di track di bawah clip efek (video, gambar, teks, bentuk, dan hasil efek lain yang urutannya
-   lebih bawah). Urutan mengikuti urutan layer di timeline. Kotak isian = kotak satu-satunya media yang tampil, atau gabungan kotak beberapa media
+   lebih bawah). Kotak isian = kotak satu-satunya media yang tampil, atau gabungan kotak beberapa media
    (tanpa putaran). Media berganti di tengah clip efek: isiannya langsung ikut karena dihitung ulang tiap frame.
    Isi Cermin (js/fxclip.js) juga dialihkan ke jalur ini lewat bagian bawah file ini. preview.js membiarkan kanvas dasar transparan selama ada clip efek
    berjenis ini yang aktif (entry.alpha), lalu menambahkan latar hitam di akhir frame.
+   ISI SEMUA FRAME KOSONG (v3): efek clip lain (Split Mirror, Irisan Pulsa, Gelombang, JJ Tipis, dan seterusnya) bisa membuat bagian frame jadi kosong
+   (transparan) di DALAM kotak media, bukan hanya di luarnya. Karena itu preview.js sekarang menjalankan Isi Cermin dan Cermin Bayangan (kanvas utama) PALING AKHIR,
+   setelah semua efek clip lain selesai, apa pun urutan track-nya, dan menyerahkan salinan media TANPA efek lewat APK.fxclip.fillSrc (kanvas, atau null kalau
+   tidak ada efek clip lain yang aktif). Ubin cermin, salinan diperbesar, dan bayangan tepi diambil dari salinan bersih itu (dengan hasil akhir sebagai cadangan
+   untuk area yang tidak ada di salinan bersih), lalu digambar DI BAWAH hasil akhir, jadi setiap area transparan, di dalam maupun di luar media, terisi media saat itu.
+   Pengaturan "Isi area kosong akibat efek clip lain" (hole) mematikan perilaku ini (0) atau menyalakannya (1, bawaan). Proyek lama tanpa nilai ini memakai 1.
    Dimuat setelah fxsplitmirror.js dan sebelum fxlib.js. */
 window.APK=window.APK||{};
 (function(){
@@ -27,6 +33,9 @@ window.APK=window.APK||{};
   const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
   const nz=(v,d)=>(v==null||isNaN(v))?d:+v;   /* parameter lama (proyek tersimpan sebelum mode 4) belum punya nilai ini: pakai bawaan */
   const P=()=>APK.project&&APK.project.current;
+
+  /* salinan kanvas utama TANPA efek clip (diisi preview.js sebelum menjalankan efek isi, null kalau tidak ada efek clip lain yang aktif) */
+  F.fillSrc=null;
 
   /* clip media yang sedang diolah: fxclip.js menyimpannya di variabel privat, jadi dicatat lagi di sini lewat pembungkus layerEnd */
   let cur=null;
@@ -133,7 +142,9 @@ window.APK=window.APK||{};
       Rmax=Math.max(Rmax,Math.hypot(dx,dy));
       if(Math.abs(lx)>b.w/2+0.5||Math.abs(ly)>b.h/2+0.5)cover=false;
     }
-    if(cover&&!demo)return;   /* media sudah menutupi seluruh frame */
+    /* v3: ada efek clip lain yang aktif (salinan bersih tersedia) = ada kemungkinan bolong di dalam kotak media, jadi tetap diisi walau kotak menutupi frame */
+    const fs=F.fillSrc,hole=!!(owner&&!cur&&fs&&fs.width===w&&fs.height===h&&nz(p.hole,1)>=0.5);
+    if(cover&&!demo&&!hole)return;   /* media sudah menutupi seluruh frame */
 
     const mode=Math.round(p.mode);
     const bl=p.blur/100*0.08*Math.min(w,h);   /* radius blur dalam piksel kanvas */
@@ -142,13 +153,23 @@ window.APK=window.APK||{};
     const q=hasF?(bl>=10?0.25:bl>=4?0.5:1):(bl>2?clamp(3/bl,0.04,1):1);
     const lw=Math.max(1,Math.ceil(w*q)),lh=Math.max(1,Math.ceil(h*q));
 
-    /* salin frame asli (media di lapisan transparan) */
+    /* salin frame asli (media di lapisan transparan, sudah kena efek clip lain di bawahnya) */
     const S=ac('ms_s',w,h);S.drawImage(g.canvas,0,0);
+    /* sumber ubin: salinan bersih media (tanpa efek) kalau ada, dengan hasil akhir S sebagai cadangan di area yang tidak ada di salinan bersih */
+    let SRC=S;
+    if(hole){
+      const KS=ac('ms_k',w,h);
+      KS.drawImage(fs,0,0,w,h);
+      KS.globalCompositeOperation='destination-over';
+      KS.drawImage(S.canvas,0,0);
+      KS.globalCompositeOperation='source-over';
+      SRC=KS;
+    }
     /* ubin = kotak media yang diluruskan (rotasi dibalik), diambil di resolusi isian */
     const tcw=Math.max(1,Math.round(tw*q)),tch=Math.max(1,Math.round(th*q));
     const T=ac('ms_t',tcw,tch);
     T.scale(tcw/tw,tch/th);
-    T.translate(tw/2,th/2);T.rotate(-rad);T.translate(-b.cx,-b.cy);T.drawImage(S.canvas,0,0);
+    T.translate(tw/2,th/2);T.rotate(-rad);T.translate(-b.cx,-b.cy);T.drawImage(SRC.canvas,0,0);
 
     /* isian mentah (belum buram), koordinatnya tetap koordinat kanvas lewat A.scale(q,q) */
     const A=ac('ms_a',lw,lh);
@@ -311,6 +332,7 @@ window.APK=window.APK||{};
   }
 
   /* ===== definisi efek ===== */
+  const HOLE=['hole','Isi juga area kosong akibat efek clip lain (0 = tidak, 1 = ya; berlaku saat "Semua layer di bawah")',0,1,1];
   const entry={
     id:'mirrorshadow',
     name:'Cermin Bayangan',
@@ -328,7 +350,8 @@ window.APK=window.APK||{};
       ['hue','Rona warna tint (0 sampai 360 derajat)',0,360,210],
       ['edge','Bayangan tepi media utama (0 = tanpa; mode 4: kegelapan yang makin pekat ke pinggir)',0,100,35],
       ['fd','Lebar pudar tepi media (mode 4; 0 = tepi tajam)',0,100,40],
-      ['nb','Blur dekat tepi media (mode 4; 0 = cermin tajam)',0,100,15]
+      ['nb','Blur dekat tepi media (mode 4; 0 = cermin tajam)',0,100,15],
+      HOLE
     ],
     apply:mirrorShadow
   };
@@ -338,11 +361,12 @@ window.APK=window.APK||{};
   if(DM&&typeof DM.apply==='function'){
     const origApply=DM.apply;
     DM.perLayer=false;DM.alpha=true;
-    DM.desc='Menutup frame kosong dengan cermin dari gabungan semua layer yang tampil di bawah clip efek ini';
+    DM.desc='Menutup frame kosong dengan cermin dari gabungan semua layer yang tampil di bawah clip efek ini, termasuk area kosong akibat efek clip lain';
+    if(Array.isArray(DM.params)&&!DM.params.some(q=>q[0]==='hole'))DM.params.push(HOLE.slice());
     DM.apply=function(g,w,h,p){
       if(cur||!owner)return origApply.apply(this,arguments);
       const br=1-clamp(nz(p.dim,0),0,100)/100;
-      mirrorShadow(g,w,h,{mode:2,blur:nz(p.blur,0)*0.625,zm:100,bri:clamp((br-0.3)/1.4*100,0,100),sat:50,op:100,tint:0,hue:0,edge:0,fd:0,nb:0});
+      mirrorShadow(g,w,h,{mode:2,blur:nz(p.blur,0)*0.625,zm:100,bri:clamp((br-0.3)/1.4*100,0,100),sat:50,op:100,tint:0,hue:0,edge:0,fd:0,nb:0,hole:nz(p.hole,1)});
     };
   }
   F.DEF[entry.id]=entry;

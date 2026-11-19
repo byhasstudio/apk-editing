@@ -1,13 +1,15 @@
 /* Efek clip tambahan: 4 Gelombang Baru (Gelombang Baru 1 sampai 4), ditiru dari video referensi (empat efek bergelombang berurutan, bertanda 1 sampai 4).
    Fade hitam masuk dan keluar di video referensi sengaja TIDAK ditiru; hanya gerak gelombangnya.
    Cara ukur: tiap frame video dibandingkan dengan frame diam sebelum efek, lalu dicocokkan ke model "putar dari tengah + strip digeser mengikuti gelombang sinus,
-   tepi yang terbuka ditarik dari piksel tepi (tanpa zoom)". Hasilnya tiga kurva waktu per efek: Goyang putar (derajat), Simpangan (pecahan lebar layar),
+   tepi yang terbuka diisi CERMIN gambar itu sendiri (tanpa zoom)". Hasilnya tiga kurva waktu per efek: Goyang putar (derajat), Simpangan (pecahan lebar layar),
    dan Fase gelombang (putaran). Kurva itu dipakai apa adanya, jadi gerak bawaan sama dengan video, dan semuanya bisa diatur:
    Kekuatan (skala simpangan), Goyang putar (skala putaran), Jumlah gelombang, Kecepatan, Arah (sudut), dan Balik arah.
    Durasi diatur lewat panjang clip efek di timeline: kurva ikut memanjang atau memendek.
+   Frame kosong (sudut akibat putar, tepi akibat geser): DULU ditutup dengan menarik memanjang piksel tepi, hasilnya garis-garis lurus; SEKARANG diisi pantulan
+   cermin gambar (bolak-balik seperti ubin cermin), jadi tidak ada garis dan sambungan di tepi mulus.
    Gelombang Baru 4 punya opsi tambahan "Arah ke bawah tengah" (dwn = 1): gelombang berbentuk lingkaran konsentris yang pusatnya di tengah tepi bawah layar,
    riaknya merambat MENUJU titik bawah tengah itu (simpangan searah jari-jari). Tiap cincin digeser dengan cara diskalakan dari titik bawah tengah, tepi yang terbuka
-   tetap ditarik dari piksel tepi. Kalau dwn = 0 (bawaan), perilakunya sama persis seperti sebelumnya (ikut "Arah gelombang" sudut).
+   diisi cermin juga. Kalau dwn = 0 (bawaan), perilakunya ikut "Arah gelombang" sudut.
    Dimuat setelah fxwavecc.js dan sebelum fxlib.js. */
 window.APK=window.APK||{};
 (function(){
@@ -24,18 +26,19 @@ window.APK=window.APK||{};
     g.clearRect(0,0,w,h);
     return g;
   }
-  /* gambar diberi bingkai m piksel di semua sisi; isi bingkai = piksel tepi yang ditarik memanjang */
+  /* gambar diberi bingkai m piksel di semua sisi; isi bingkai = pantulan cermin gambar itu sendiri (ubin dibalik bergantian),
+     jadi tidak ada garis hasil tarikan piksel tepi dan sambungan di tepi selalu mulus */
   function pad(src,w,h,m){
     const P=ac('wb_p',w+2*m,h+2*m);
-    P.drawImage(src,m,m);
-    P.drawImage(src,0,0,1,h,0,m,m,h);
-    P.drawImage(src,w-1,0,1,h,w+m,m,m,h);
-    P.drawImage(src,0,0,w,1,m,0,w,m);
-    P.drawImage(src,0,h-1,w,1,m,h+m,w,m);
-    P.drawImage(src,0,0,1,1,0,0,m,m);
-    P.drawImage(src,w-1,0,1,1,w+m,0,m,m);
-    P.drawImage(src,0,h-1,1,1,0,h+m,m,m);
-    P.drawImage(src,w-1,h-1,1,1,w+m,h+m,m,m);
+    const nx=Math.ceil(m/w),ny=Math.ceil(m/h);
+    for(let j=-ny;j<=ny;j++)for(let i=-nx;i<=nx;i++){
+      const fx=i&1,fy=j&1;
+      P.save();
+      P.translate(m+i*w+(fx?w:0),m+j*h+(fy?h:0));
+      P.scale(fx?-1:1,fy?-1:1);
+      P.drawImage(src,0,0);
+      P.restore();
+    }
     return P.canvas;
   }
 
@@ -81,12 +84,12 @@ window.APK=window.APK||{};
       const deg=p.ang||0,th=deg*Math.PI/180,sn=Math.sin(th),cs=Math.cos(th),ux=cs,uy=-sn;
       const fast=!!(APK.preview&&APK.preview.playing&&!APK.preview.exporting);
       const S=ac('wb_s',w,h);S.drawImage(g.canvas,0,0);
-      /* 1) putar dari tengah; sudut yang terbuka diisi piksel tepi yang ditarik (tanpa zoom, seperti video) */
+      /* 1) putar dari tengah; sudut yang terbuka diisi cermin gambar (tanpa zoom, tanpa garis tarikan) */
       const m1=Math.min(Math.ceil(Math.max(w,h)*0.5),Math.ceil(Math.abs(rot)*Math.hypot(w,h)/2)+2);
       const Z=ac('wb_z',w,h);
       Z.translate(w/2,h/2);Z.rotate(-rot);
       Z.drawImage(pad(S.canvas,w,h,m1),-w/2-m1,-h/2-m1);
-      /* 2) strip digeser mengikuti gelombang sinus; tepi yang terbuka ditarik dari piksel tepi */
+      /* 2) strip digeser mengikuti gelombang sinus; tepi yang terbuka diisi cermin */
       const m=Math.ceil(A)+2,Pc=pad(Z.canvas,w,h,m);
       g.clearRect(0,0,w,h);
       if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}

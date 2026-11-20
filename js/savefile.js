@@ -8,11 +8,16 @@
    menurut platform:
    - Browser biasa (Chrome, Edge, dst): 1) Simpan Sebagai (showSaveFilePicker) 2) Bagikan 3) <a download>
    - APK (Capacitor): 1) Filesystem + Share (ditulis bertahap supaya file besar aman) 2) Bagikan 3) pesan jelas kalau plugin belum terpasang
-   - EXE (Electron): <a download> biasa; Electron menampilkan jendela Simpan Sebagai sendiri
+   - EXE (Electron): 1) jembatan asli (window.swNative, jendela Simpan Sebagai dari Electron, ditulis bertahap) 2) <a download> biasa
    v2: showSaveFilePicker TIDAK dipakai di EXE dan APK. Di pembungkus, fungsi itu ada tetapi tidak punya jendela pemilih file, jadi langsung
    gagal dengan AbortError, dan itu dikira pengguna menekan Batal sehingga muncul tulisan "Dibatalkan" terus dan metode lain tidak pernah dicoba.
    File tetap ada di memori sampai dialog ditutup, jadi kalau satu cara gagal tinggal tekan lagi atau pilih Bagikan. Kalau hasil export kosong
-   (0 byte), pengguna diberi tahu, bukan diam. Juga tersedia APK.saveFile(blob, namaFile) untuk dipakai langsung. */
+   (0 byte), pengguna diberi tahu, bukan diam. Juga tersedia APK.saveFile(blob, namaFile) untuk dipakai langsung.
+   v3: (a) di EXE / APK, window.showSaveFilePicker dimatikan untuk SEMUA kode (bukan hanya file ini), jadi simpan preset, QR, subtitle, dst
+   yang memanggilnya langsung tidak lagi gagal "Dibatalkan"; (b) EXE memakai jembatan asli window.swNative (dibuat di preload.js EXE baru);
+   EXE lama tanpa jembatan itu tetap jalan lewat <a download>; (c) <a download> berisi data: dan klik lewat dispatchEvent ikut dicegat;
+   (d) di APK, kalau file sudah tertulis ke Documents tetapi menu Bagikan gagal, tetap dianggap tersimpan; (e) jenis file (MIME) ditebak dari
+   ekstensi, jadi preset .json / .apkpreset / .preset tidak lagi dianggap video. */
 (function(){
 'use strict';
 if(window.__swSave)return;window.__swSave=1;
@@ -21,23 +26,56 @@ const UA=navigator.userAgent||'';
 const ELECTRON=/Electron/i.test(UA);
 const NATIVE=(function(){try{return !!(window.Capacitor&&(window.Capacitor.isNativePlatform?window.Capacitor.isNativePlatform():true))}catch(_){return !!window.Capacitor}})();
 const WRAPPED=ELECTRON||NATIVE||/; wv\)/.test(UA)||/wv\b/.test(UA);   /* pembungkus APK / EXE: jangan coba klik otomatis dan jangan pakai showSaveFilePicker */
+/* v3: matikan showSaveFilePicker untuk semua kode di pembungkus; fungsinya ada tapi tidak punya jendela, jadi selalu AbortError ("Dibatalkan") */
+if(WRAPPED){
+  try{delete window.showSaveFilePicker}catch(_){}
+  try{if('showSaveFilePicker' in window)Object.defineProperty(window,'showSaveFilePicker',{value:undefined,configurable:true,writable:true})}catch(_){}
+}
 const origClick=HTMLAnchorElement.prototype.click;
+const origDispatch=EventTarget.prototype.dispatchEvent;
 let cur=null,dlg=null;
 
 const mb=n=>(n/1048576).toFixed(n>=10485760?0:1)+' MB';
 const isAbort=e=>!!e&&(e.name==='AbortError'||e.code===20);
+const MIME={json:'application/json',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',zip:'application/zip',mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',
+  mp3:'audio/mpeg',wav:'audio/wav',srt:'text/plain',txt:'text/plain',html:'text/html'};
+const mimeOf=item=>{
+  if(item.blob.type)return item.blob.type;
+  const m=/\.([a-z0-9]+)$/i.exec(item.name||'');
+  return (m&&MIME[m[1].toLowerCase()])||'application/octet-stream';
+};
 
 /* ===== metode simpan ===== */
 async function viaPicker(item,say){
   if(WRAPPED||!window.showSaveFilePicker)return false;
-  const m=/\.([a-z0-9]+)$/i.exec(item.name),ext=m?'.'+m[1].toLowerCase():'.mp4',type=item.blob.type||'video/mp4',acc={};acc[type]=[ext];
-  const h=await window.showSaveFilePicker({suggestedName:item.name,types:[{description:'Video',accept:acc}]});
+  const m=/\.([a-z0-9]+)$/i.exec(item.name),ext=m?'.'+m[1].toLowerCase():'.mp4',type=mimeOf(item),acc={};acc[type]=[ext];
+  const h=await window.showSaveFilePicker({suggestedName:item.name,types:[{description:'File',accept:acc}]});
   const w=await h.createWritable();
   try{await w.write(item.blob)}finally{await w.close()}
   say('Tersimpan: '+(h.name||item.name));return true;
 }
 function b64(blob){
   return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]||'');r.onerror=()=>rej(r.error||new Error('gagal membaca file'));r.readAsDataURL(blob)});
+}
+/* EXE: jembatan asli dari preload.js (window.swNative). Jendela Simpan Sebagai dibuka oleh Electron, file ditulis bertahap. */
+async function viaElectron(item,say){
+  const nb=window.swNative;
+  if(!nb||!nb.begin||!nb.chunk||!nb.end)return false;   /* EXE lama tanpa jembatan: lanjut ke <a download> */
+  const id=await nb.begin(item.name);
+  if(!id){const e=new Error('Dibatalkan');e.name='AbortError';throw e}   /* pengguna menutup jendela Simpan Sebagai */
+  const CH=4*1024*1024;
+  try{
+    for(let o=0;o<item.blob.size;o+=CH){
+      const buf=new Uint8Array(await item.blob.slice(o,o+CH).arrayBuffer());
+      await nb.chunk(id,buf);
+      say('Menulis file… '+Math.min(100,Math.round((o+CH)/item.blob.size*100))+'%');
+    }
+    const p=await nb.end(id);
+    say('Tersimpan: '+(p||item.name));return true;
+  }catch(e){
+    try{await nb.abort(id)}catch(_){}
+    throw e;
+  }
 }
 async function viaCapacitor(item,say){
   const C=window.Capacitor,P=C&&C.Plugins,FS=P&&P.Filesystem;if(!FS)return false;
@@ -57,12 +95,23 @@ async function viaCapacitor(item,say){
   }
   if(lastErr||!uri)throw lastErr||new Error('file tidak bisa ditulis');
   const S=P.Share;
-  if(S&&S.share){try{await S.share({title:item.name,url:uri,dialogTitle:'Simpan atau bagikan video'})}catch(e){if(!isAbort(e)&&!/cancel/i.test(String(e&&e.message)))throw e}}
-  say('Tersimpan di '+(dir==='DOCUMENTS'?'folder Documents':'penyimpanan aplikasi')+': '+item.name);return true;
+  let shared=false;
+  if(S&&S.share){
+    try{await S.share({title:item.name,url:uri,dialogTitle:'Simpan atau bagikan file'});shared=true}
+    catch(e){
+      if(isAbort(e)||/cancel/i.test(String(e&&e.message))){/* menu bagikan ditutup pengguna */}
+      else if(dir!=='DOCUMENTS')throw e;   /* di Documents file sudah aman walau menu bagikan gagal */
+    }
+  }else if(dir!=='DOCUMENTS'){
+    throw new Error('plugin Share belum terpasang di APK ini. Pasang APK terbaru dari Releases (latest-apk)');
+  }
+  if(dir==='DOCUMENTS')say('Tersimpan di folder Documents: '+item.name);
+  else say(shared?'File dikirim ke menu Bagikan. Pilih tujuan simpan di sana.':'Menu Bagikan ditutup, file belum dipindahkan. Tekan Simpan file lagi untuk memilih tujuan.');
+  return true;
 }
 async function viaShare(item,say){
   if(!navigator.share||!navigator.canShare)return false;
-  let f;try{f=new File([item.blob],item.name,{type:item.blob.type||'video/mp4'})}catch(_){return false}
+  let f;try{f=new File([item.blob],item.name,{type:mimeOf(item)})}catch(_){return false}
   if(!navigator.canShare({files:[f]}))return false;
   await navigator.share({files:[f],title:item.name});
   say('Dibagikan / disimpan lewat menu perangkat.');return true;
@@ -76,7 +125,7 @@ function viaAnchor(item,say){
   setTimeout(()=>{try{a.remove();URL.revokeObjectURL(u)}catch(_){}},120000);
   say(ELECTRON?'Pilih lokasi simpan di jendela yang muncul. Kalau tidak muncul, tekan Simpan file lagi.':'Unduhan dimulai. Kalau tidak muncul, coba tombol Bagikan.');return true;
 }
-const CHAIN=ELECTRON?[viaAnchor]:WRAPPED?[viaCapacitor,viaShare,viaAnchor]:[viaPicker,viaCapacitor,viaShare,viaAnchor];
+const CHAIN=ELECTRON?[viaElectron,viaAnchor]:WRAPPED?[viaCapacitor,viaShare,viaAnchor]:[viaPicker,viaCapacitor,viaShare,viaAnchor];
 
 /* ===== dialog ===== */
 function close(force){
@@ -100,7 +149,7 @@ function build(item){
   const q=s=>dlg.querySelector('[data-sw='+s+']'),msg=q('msg');
   const say=t=>{msg.textContent=t};
   let canShare=false;
-  try{if(navigator.share&&navigator.canShare)canShare=navigator.canShare({files:[new File([item.blob],item.name,{type:item.blob.type||'video/mp4'})]})}catch(_){}
+  try{if(navigator.share&&navigator.canShare)canShare=navigator.canShare({files:[new File([item.blob],item.name,{type:mimeOf(item)})]})}catch(_){}
   q('share').hidden=!canShare;
   const run=async chain=>{
     const sv=q('save'),sh=q('share');sv.disabled=sh.disabled=true;
@@ -133,13 +182,17 @@ function offer(blob,name){
 function saveFile(blob,name){offer(blob,name)}
 APK.saveFile=saveFile;
 
-/* ===== cegat <a download>.click() berisi blob: (export.js, scene3d.js, ekspor subtitle, dst) ===== */
+/* ===== cegat <a download> berisi blob: / data: (export.js, presets.js, s3preset.js, qrpreset.js, scene3d.js, ekspor subtitle, dst) ===== */
+const isDl=a=>{try{return a instanceof HTMLAnchorElement&&a.hasAttribute('download')&&/^(blob|data):/i.test(a.href)}catch(_){return false}};
 HTMLAnchorElement.prototype.click=function(){
-  let hit=false;
-  try{hit=this.hasAttribute('download')&&/^blob:/i.test(this.href)}catch(_){}
-  if(!hit)return origClick.apply(this,arguments);
+  if(!isDl(this))return origClick.apply(this,arguments);
   const name=this.getAttribute('download')||'export',self=this;
   /* ambil isinya SEKARANG, sebelum pemanggil mencabut link blob-nya */
   fetch(this.href).then(r=>r.blob()).then(b=>offer(b,name)).catch(()=>{try{origClick.call(self)}catch(_){}});
+};
+/* kode yang memicu unduhan lewat dispatchEvent(new MouseEvent('click')) juga dicegat */
+EventTarget.prototype.dispatchEvent=function(ev){
+  try{if(ev&&ev.type==='click'&&isDl(this)){this.click();return true}}catch(_){}
+  return origDispatch.apply(this,arguments);
 };
 })();

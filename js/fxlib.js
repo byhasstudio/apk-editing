@@ -1,6 +1,7 @@
-/* Daftar efek di bilah kanan (tombol "Efek" di timeline), ala CapCut.
+/* Daftar efek di bilah kanan (tombol "Efek" di timeline), ala CapCut, dibagi dua kategori lewat tab: "Efek Media" dan "Efek Transisi".
+   Efek yang punya cat:'transisi' (js/fxtransisi.js) masuk tab Efek Transisi; semua efek lain masuk tab Efek Media.
    Tiap kartu menampilkan foto atau video contoh yang memakai efek itu dan bergerak langsung (memakai media project kalau ada, kalau tidak gambar contoh bawaan).
-   Ketuk kartu = tambahkan clip efek di posisi playhead (js/fxclip.js). Di layar kecil daftar ini jadi tab "Efek" di bawah.
+   Ketuk kartu = tambahkan clip efek di posisi playhead (js/fxclip.js); clip efek transisi diletakkan tepat di TENGAH playhead supaya menutupi sambungan dua clip. Di layar kecil daftar ini jadi tab "Efek" di bawah.
    Di sini juga dipasang dua tombol pintasan di bar timeline, tepat di samping kanan tombol "Pisah audio": Kuning (kurva otomatis) dan Biru (kurva hentakan JJ Tipis Pintar). */
 window.APK=window.APK||{};
 APK.fxlib=(function(){
@@ -8,6 +9,9 @@ APK.fxlib=(function(){
   const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const mq=window.matchMedia?matchMedia('(max-width:900px)'):{matches:false};
   const CW=240,CH=135,LOOP=1.8;   /* LOOP = detik per putaran pratinjau (efek yang mereda, seperti Gelombang, diulang dari awal; dianggap sebagai clip sepanjang LOOP) */
+  const CATS=[['media','Efek Media'],['transisi','Efek Transisi']];
+  const catOf=e=>e&&e.cat==='transisi'?'transisi':'media';
+  let cat='media';   /* tab yang sedang dipilih */
   const imgs=new Map(),demos=[];
   let cards=[],raf=0,last=0;
   function toast(m){const t=$('toast');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),2800)}
@@ -59,17 +63,47 @@ APK.fxlib=(function(){
     }
     APK.fxclip.run(g,c.fx,tm,true,tm%LOOP,LOOP);
   }
+
+  /* ===== tab kategori: Efek Media | Efek Transisi (dibuat sekali, disisipkan di atas catatan panel efek) ===== */
+  function ensureTabs(){
+    if($('fx-cats'))return;
+    const note=$('fx-note');if(!note||!note.parentNode)return;
+    if(!$('fx-cats-css')){
+      const st=document.createElement('style');st.id='fx-cats-css';
+      st.textContent='.fx-cats{display:flex;gap:6px;margin:0 0 8px}.fx-cats .btn{flex:1;white-space:nowrap}';
+      document.head.appendChild(st);
+    }
+    const d=document.createElement('div');d.id='fx-cats';d.className='fx-cats';
+    d.setAttribute('role','tablist');
+    d.innerHTML=CATS.map(c=>`<button type="button" class="btn" role="tab" data-cat="${c[0]}">${c[1]}</button>`).join('');
+    note.parentNode.insertBefore(d,note);
+    d.addEventListener('click',e=>{
+      const b=e.target.closest('[data-cat]');
+      if(!b||b.dataset.cat===cat)return;
+      cat=b.dataset.cat;build();start();
+    });
+  }
+  function markTabs(){
+    document.querySelectorAll('#fx-cats [data-cat]').forEach(b=>{
+      const on=b.dataset.cat===cat;
+      b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');
+    });
+  }
+
   function build(){
     const grid=$('fx-grid'),src=sources();
-    grid.innerHTML=APK.fxclip.LIST.map(e=>`<button type="button" class="fx-card" data-fx="${e.id}" title="Tambahkan efek ${esc(e.name)} di posisi playhead"><canvas width="${CW}" height="${CH}"></canvas><span class="fx-tag"></span><span class="fx-add">+</span><b>${esc(e.name)}</b><small>${esc(e.desc)}</small></button>`).join('');
+    ensureTabs();markTabs();
+    const list=APK.fxclip.LIST.filter(e=>catOf(e)===cat);
+    grid.innerHTML=list.map(e=>`<button type="button" class="fx-card" data-fx="${e.id}" title="Tambahkan efek ${esc(e.name)} di posisi playhead"><canvas width="${CW}" height="${CH}"></canvas><span class="fx-tag"></span><span class="fx-add">+</span><b>${esc(e.name)}</b><small>${esc(e.desc)}</small></button>`).join('');
     cards=[...grid.querySelectorAll('.fx-card')].map((el,i)=>{
       const s=src.list[i%src.list.length];
       el.querySelector('.fx-tag').textContent=TAG[s.type]||'Contoh';
       return{el,g:el.querySelector('canvas').getContext('2d'),fx:{type:el.dataset.fx},src:s};
     });
-    $('fx-note').textContent=src.own
-      ?'Pratinjau memakai foto dan video dari project kamu. Ketuk efek untuk menambahkannya sebagai clip sendiri di posisi playhead.'
-      :'Pratinjau memakai gambar contoh. Impor foto atau video agar pratinjau memakai media kamu. Ketuk efek untuk menambahkannya sebagai clip sendiri di posisi playhead.';
+    const own=src.own?'Pratinjau memakai foto dan video dari project kamu.':'Pratinjau memakai gambar contoh. Impor foto atau video agar pratinjau memakai media kamu.';
+    $('fx-note').textContent=cat==='transisi'
+      ?own+' Efek transisi menutupi sambungan dua clip: taruh playhead tepat di sambungan, lalu ketuk efek. Clip transisinya diletakkan di tengah playhead.'
+      :own+' Ketuk efek untuk menambahkannya sebagai clip sendiri di posisi playhead.';
     for(const c of cards)paint(c,performance.now()/1000);
   }
   function tick(now){
@@ -97,6 +131,21 @@ APK.fxlib=(function(){
     ed().removeAttribute('data-right');
     if(ed().dataset.tab==='efek'){ed().dataset.tab='timeline';tabOn('timeline')}
     $('tl-fx').classList.remove('on');stop();
+  }
+
+  /* clip efek transisi dipindah ke tengah playhead (setengah sebelum dan setengah sesudah sambungan), kalau ruangnya di track itu kosong */
+  function centre(c){
+    const p=P(),d=c&&c.fx&&APK.fxclip.DEF[c.fx.type];
+    if(!p||!d||d.cat!=='transisi')return;
+    const ns=Math.max(0,c.start-c.dur/2);
+    if(Math.abs(ns-c.start)<1e-6)return;
+    for(const tr of p.tracks){
+      if(!tr.clips.includes(c))continue;
+      if(tr.clips.some(x=>x!==c&&ns<x.start+x.dur-1e-6&&ns+c.dur>x.start+1e-6))return;
+      c.start=ns;
+      APK.timeline.commit();
+      return;
+    }
   }
 
   /* ===== pintasan Kuning dan Biru di bar timeline, di samping kanan tombol "Pisah audio" =====
@@ -132,14 +181,16 @@ APK.fxlib=(function(){
 
   function init(){
     try{shortcuts()}catch(e){console.error('Pintasan kurva gagal dimuat',e)}
+    try{ensureTabs();markTabs()}catch(e){console.error('Tab kategori efek gagal dimuat',e)}
     $('tl-fx').onclick=()=>isOpen()?close():open();
     $('fx-close').onclick=close;
     $('fx-grid').addEventListener('click',e=>{
       const b=e.target.closest('[data-fx]');if(!b||!P())return;
       const c=APK.fxclip.add(b.dataset.fx);if(!c)return;
-      const nm=APK.fxclip.label(c.fx);
-      if(small()){close();toast('Efek '+nm+' ditambahkan di timeline. Ketuk clip efeknya untuk mengatur.')}
-      else toast('Efek '+nm+' ditambahkan di timeline. Klik clip efeknya untuk mengatur dan memilih media yang terkena.');
+      centre(c);
+      const nm=APK.fxclip.label(c.fx),tr=cat==='transisi';
+      if(small()){close();toast(tr?'Transisi '+nm+' ditambahkan di tengah playhead. Pastikan tepat di sambungan dua clip, geser kalau perlu.':'Efek '+nm+' ditambahkan di timeline. Ketuk clip efeknya untuk mengatur.')}
+      else toast(tr?'Transisi '+nm+' ditambahkan di tengah playhead. Pastikan tepat di sambungan dua clip, geser kalau perlu. Klik clipnya untuk mengatur.':'Efek '+nm+' ditambahkan di timeline. Klik clip efeknya untuk mengatur dan memilih media yang terkena.');
     });
     /* tab bawah di layar kecil */
     $('mtabs').addEventListener('click',e=>{

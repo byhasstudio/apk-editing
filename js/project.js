@@ -1,7 +1,7 @@
 /* Sistem project: buat, simpan, buka, hapus, autosave */
 window.APK=window.APK||{};
 APK.project=(function(){
-  const RATIOS={'16:9':[16,9],'9:16':[9,16],'1:1':[1,1],'4:3':[4,3],'21:9':[21,9]};
+  const RATIOS={'16:9':[16,9],'9:16':[9,16],'1:1':[1,1],'4:5':[4,5],'5:4':[5,4],'4:3':[4,3],'3:4':[3,4],'3:2':[3,2],'2:3':[2,3],'2:1':[2,1],'1:2':[1,2],'21:9':[21,9],'9:21':[9,21]};
   let cur=null,dirty=false,timer=null;
   const listeners=[];
   const emit=()=>listeners.forEach(f=>f(cur,dirty));

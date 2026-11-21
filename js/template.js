@@ -20,7 +20,7 @@ APK.template=(function(){
   const clone=o=>JSON.parse(JSON.stringify(o));
   const num=v=>typeof v==='number'&&isFinite(v);
   const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const RATIOS=['16:9','9:16','1:1','4:3','21:9'],IMG='.png,.jpg,.jpeg,.webp',DIR='presets/';
+  const RATIOS=['16:9','9:16','1:1','4:5','5:4','4:3','3:4','3:2','2:3','2:1','1:2','21:9','9:21'],IMG='.png,.jpg,.jpeg,.webp',DIR='presets/';
   const registry=[];
   let cur=null,urls=[],fileIn=null,slotIn=null,pickIdx=-1,manifestP=null,loadingUse=false;
   function toast(m){const t=$('toast');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),3200)}

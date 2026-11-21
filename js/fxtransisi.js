@@ -178,6 +178,141 @@ window.APK=window.APK||{};
     g.restore();
   }
 
+  /* ===== efek transisi bergaya video referensi (panel manga, strip, kipas, inversi gelembung, pusaran) ===== */
+  const rnd=(i,s)=>{const x=Math.sin(i*127.1+s*311.7)*43758.5453;return x-Math.floor(x)};
+  const scl=(w,h)=>Math.min(w,h)/368;
+
+  /* ===== 7. Panel Geser: gambar terpotong jadi panel-panel persegi yang bergeser dengan bayangan, seperti panel manga ===== */
+  function panelgeser(g,w,h,p,tm,opaque,rel,dur){
+    const b=bell(rel,dur);if(b<0.003)return;
+    const sg=p.dir>=1?-1:1,k=scl(w,h),S=ac('pg',w,h);S.drawImage(g.canvas,0,0);
+    const z=1+p.zm/100*b;
+    put(g,S.canvas,w,h,z,0,0,0,true);
+    const n=Math.round(p.cnt),A=p.amt/100*0.5*w*b,gp=Math.max(0,1.5*k*ss(b*4));
+    let tot=0;const wt=[];for(let i=0;i<n;i++){const v=0.55+rnd(i,3);wt.push(v);tot+=v}
+    let y=0;
+    for(let i=0;i<n;i++){
+      const rh=h*wt[i]/tot,y0=y;y+=rh;
+      const ox=(i%2?1:-1)*sg*A*(0.5+0.5*rnd(i,7));
+      const xs=w*(0.25+0.5*rnd(i,11));
+      for(let c=0;c<2;c++){
+        const x0=c?xs:0,x1=c?w:xs;
+        const o2=c?-ox*0.6:ox,oy=(rnd(i,20+c)-0.4)*h*0.08*b;
+        const rx=x0+o2,ry=y0+oy+gp,rw=x1-x0,rhh=rh-2*gp;
+        g.save();
+        g.shadowColor='rgba(0,0,0,'+(p.shw/100*0.6*ss(b*3)).toFixed(3)+')';
+        g.shadowBlur=9*k*b;g.fillStyle='#000';g.fillRect(rx,ry,rw,rhh);
+        g.shadowColor='transparent';g.shadowBlur=0;
+        g.beginPath();g.rect(rx,ry,rw,rhh);g.clip();
+        g.translate(w/2+o2,h/2+oy);g.scale(z,z);g.translate(-w/2,-h/2);
+        g.drawImage(S.canvas,0,0);
+        g.restore();
+      }
+    }
+  }
+
+  /* ===== 8. Strip Putih: gambar terpotong jadi pita horizontal yang bergeser, dipisah celah putih ===== */
+  function strip(g,w,h,p,tm,opaque,rel,dur){
+    const b=bell(rel,dur);if(b<0.003)return;
+    const sg=p.dir>=1?-1:1,k=scl(w,h),S=ac('st',w,h);S.drawImage(g.canvas,0,0);
+    g.clearRect(0,0,w,h);
+    g.fillStyle='rgb('+gray(p.wrn)+')';g.fillRect(0,0,w,h);
+    const n=Math.round(p.cnt),A=p.amt/100*0.45*w*b,gap=p.gap/100*h*0.045*b;
+    let tot=0;const wt=[];for(let i=0;i<n;i++){const v=0.5+rnd(i,5);wt.push(v);tot+=v}
+    let y=0;
+    for(let i=0;i<n;i++){
+      const rh=h*wt[i]/tot,y0=y;y+=rh;
+      const ox=(i%2?1:-1)*sg*A*(0.4+0.6*rnd(i,9)),oy=(rnd(i,13)-0.5)*h*0.03*b;
+      g.save();
+      g.beginPath();g.rect(0,y0+gap/2,w,Math.max(0,rh-gap));g.clip();
+      for(let s=-1;s<=1;s++)g.drawImage(S.canvas,ox+s*w,oy);
+      g.restore();
+      if(i>0){
+        g.fillStyle='rgba(0,0,0,'+(0.7*ss(b*6)).toFixed(3)+')';
+        g.fillRect(0,y0-0.5*k,w,Math.max(1,k));
+      }
+    }
+  }
+
+  /* ===== 9. Kipas Silang: layar terbelah jadi juring-juring yang berputar berlawanan arah, celah hitam di antaranya ===== */
+  function kipas(g,w,h,p,tm,opaque,rel,dur){
+    const b=bell(rel,dur);if(b<0.003)return;
+    const sg=p.dir>=1?-1:1,k=scl(w,h),S=ac('kp',w,h);S.drawImage(g.canvas,0,0);
+    const n=Math.max(4,Math.round(p.cnt/2)*2),cx=w/2,cy=h/2,R=Math.hypot(w,h);
+    const rot=p.rot*Math.PI/180*b,open=p.opn/100*Math.min(w,h)*0.08*b,z=1+p.zm/100*b+0.1*b;
+    g.clearRect(0,0,w,h);g.fillStyle='#000';g.fillRect(0,0,w,h);
+    for(let i=0;i<n;i++){
+      const a0=i*TAU/n-Math.PI/2,a1=(i+1)*TAU/n-Math.PI/2,mid=(a0+a1)/2;
+      g.save();
+      g.translate(cx+Math.cos(mid)*open,cy+Math.sin(mid)*open);
+      g.beginPath();g.moveTo(0,0);g.arc(0,0,R,a0,a1);g.closePath();
+      g.clip();
+      g.rotate((i%2?1:-1)*sg*rot);
+      const s2=z*(i%2?1:1+0.12*b);
+      g.scale(s2,s2);g.translate(-cx,-cy);
+      g.drawImage(S.canvas,0,0);
+      g.restore();
+      g.save();g.translate(cx+Math.cos(mid)*open,cy+Math.sin(mid)*open);
+      g.strokeStyle='rgba(0,0,0,'+(0.85*ss(b*5)).toFixed(3)+')';g.lineWidth=Math.max(1,1.5*k);
+      g.beginPath();g.moveTo(0,0);g.lineTo(Math.cos(a0)*R,Math.sin(a0)*R);g.stroke();
+      g.restore();
+    }
+  }
+
+  /* ===== 10. Inversi Gelembung: gambar jadi garis tepi terang di latar gelap, dengan cincin gelembung melayang ===== */
+  function inversi(g,w,h,p,tm,opaque,rel,dur){
+    const b=bell(rel,dur);if(b<0.003)return;
+    const k=scl(w,h),S=ac('iv',w,h);S.drawImage(g.canvas,0,0);
+    const E=ac('ive',w,h);
+    put(E,S.canvas,w,h,1+p.zm/100*b,0,0,0,true);
+    const T=ac('ivt',w,h);T.drawImage(E.canvas,0,0);
+    const ed=Math.max(1,p.edg*k);
+    E.globalCompositeOperation='difference';E.drawImage(T.canvas,ed,ed);
+    E.globalCompositeOperation='lighter';
+    for(let i=0;i<2;i++)E.drawImage(E.canvas,0,0);
+    E.globalCompositeOperation='multiply';E.fillStyle='rgb(190,235,255)';E.fillRect(0,0,w,h);
+    E.globalCompositeOperation='source-over';
+    const a=clamp(ss(b*1.5)*p.amt/100,0,1);
+    g.save();
+    g.globalAlpha=a*0.85;g.fillStyle='#000';g.fillRect(0,0,w,h);
+    g.globalAlpha=a;g.drawImage(E.canvas,0,0);
+    g.restore();
+    const cn=Math.round(p.cnt*(fastMode()?0.6:1)),cx=w/2,cy=h/2,ex=1+0.35*b;
+    g.save();
+    g.strokeStyle='rgba(235,245,255,'+(0.8*ss(b*2)).toFixed(3)+')';g.lineWidth=Math.max(1,1.3*k);
+    for(let i=0;i<cn;i++){
+      if(rnd(i,6)>ss(b*1.4)+0.05)continue;
+      const x=cx+(rnd(i,1)*w-cx)*ex,y=cy+(rnd(i,2)*h-cy)*ex;
+      const r=(3+rnd(i,3)*11)*k*(0.5+b*0.8),ry=r*(0.6+0.3*rnd(i,4)),rt=rnd(i,5)*Math.PI;
+      g.beginPath();g.ellipse(x,y,r,ry,rt,0,TAU);g.stroke();
+      if(rnd(i,8)>0.6){g.beginPath();g.ellipse(x+r*0.45,y+ry*0.2,r*0.8,ry*0.8,rt,0,TAU);g.stroke()}
+    }
+    g.restore();
+  }
+
+  /* ===== 11. Pusaran: gambar mengecil dan berputar jadi kincir kecil di tengah layar putih, lalu mekar kembali ===== */
+  function pusaran(g,w,h,p,tm,opaque,rel,dur){
+    const b=bell(rel,dur);if(b<0.003)return;
+    const sg=p.dir>=1?-1:1,k=scl(w,h),S=ac('ps',w,h);S.drawImage(g.canvas,0,0);
+    const cx=w/2,cy=h/2,n=Math.round(p.cnt),sc=Math.max(0.015,1-b*0.985);
+    const R=Math.hypot(w,h)/2*sc*1.02,tw=p.tw/100*Math.PI*0.9*b,rot=sg*p.rot*Math.PI/180*b;
+    const f=1-0.4*ss(b*1.6),bw=TAU/n*f,N=14;
+    g.clearRect(0,0,w,h);g.fillStyle='rgb('+gray(p.wrn)+')';g.fillRect(0,0,w,h);
+    for(let i=0;i<n;i++){
+      const a0=i*TAU/n,a1=a0+bw;
+      g.save();
+      g.translate(cx,cy);g.rotate(rot);
+      g.beginPath();g.moveTo(0,0);
+      for(let t=1;t<=N;t++){const a=a0+tw*t/N,r=R*t/N;g.lineTo(Math.cos(a)*r,Math.sin(a)*r)}
+      for(let t=1;t<=6;t++){const a=a0+tw+(a1-a0)*t/6;g.lineTo(Math.cos(a)*R,Math.sin(a)*R)}
+      for(let t=N-1;t>=0;t--){const a=a1+tw*t/N,r=R*t/N;g.lineTo(Math.cos(a)*r,Math.sin(a)*r)}
+      g.closePath();
+      g.save();g.clip();g.scale(sc,sc);g.translate(-cx,-cy);g.drawImage(S.canvas,0,0);g.restore();
+      g.strokeStyle='rgba(20,20,20,'+(0.8*ss(b*4)).toFixed(3)+')';g.lineWidth=Math.max(1,1.6*k);g.stroke();
+      g.restore();
+    }
+  }
+
   /* ===== definisi efek transisi ===== */
   const LIST=[
     {id:'trzoomkabur',cat:'transisi',name:'Zoom Kabur',desc:'Transisi zoom masuk dengan blur radial, sambungan tertutup di puncak',len:0.8,
@@ -191,7 +326,17 @@ window.APK=window.APK||{};
     {id:'trkaburlembut',cat:'transisi',name:'Kabur Lembut',desc:'Seluruh gambar mengabur lembut di sambungan lalu jernih lagi',len:0.9,
       params:[['blr','Kekuatan blur',0,100,70],['zm','Zoom tipis (%)',0,20,5],['lft','Terang di puncak',0,100,15]],apply:kaburlembut},
     {id:'trtirai',cat:'transisi',name:'Tirai Sinema',desc:'Dua tirai menutup dari tepi, bertemu di sambungan, lalu membuka',len:1.0,
-      params:[['sty','Arah (0 = atas-bawah, 1 = kiri-kanan)',0,1,0],['wrn','Warna (0 = putih, 100 = hitam)',0,100,100],['sf','Kelembutan tepi tirai',0,100,30]],apply:tirai}
+      params:[['sty','Arah (0 = atas-bawah, 1 = kiri-kanan)',0,1,0],['wrn','Warna (0 = putih, 100 = hitam)',0,100,100],['sf','Kelembutan tepi tirai',0,100,30]],apply:tirai},
+    {id:'trpanel',cat:'transisi',name:'Panel Geser',desc:'Gambar terpotong jadi panel persegi yang bergeser dengan bayangan, gaya panel manga',len:0.9,
+      params:[['cnt','Jumlah baris panel',2,6,3],['amt','Jauh geseran',0,100,60],['zm','Zoom dasar (%)',0,30,6],['shw','Bayangan panel',0,100,50],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:panelgeser},
+    {id:'trstrip',cat:'transisi',name:'Strip Putih',desc:'Gambar terpotong jadi pita horizontal yang bergeser berlawanan arah, dipisah celah putih',len:0.9,
+      params:[['cnt','Jumlah pita',3,12,6],['amt','Jauh geseran',0,100,60],['gap','Lebar celah',0,100,35],['wrn','Warna celah (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:strip},
+    {id:'trkipas',cat:'transisi',name:'Kipas Silang',desc:'Layar terbelah silang jadi juring kipas yang berputar berlawanan, celah hitam di antaranya',len:0.9,
+      params:[['cnt','Jumlah juring (genap)',4,16,8],['rot','Sudut putar (derajat)',0,90,25],['opn','Lebar celah hitam',0,100,40],['zm','Zoom dasar (%)',0,30,10],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:kipas},
+    {id:'trinversi',cat:'transisi',name:'Inversi Gelembung',desc:'Gambar jadi garis tepi terang di latar gelap dengan cincin gelembung, lalu kembali normal',len:0.9,
+      params:[['amt','Kekuatan inversi',0,100,100],['cnt','Jumlah gelembung',0,150,70],['edg','Tebal garis tepi',1,6,2],['zm','Zoom dasar (%)',0,30,6]],apply:inversi},
+    {id:'trpusaran',cat:'transisi',name:'Pusaran',desc:'Gambar mengecil dan berputar jadi kincir kecil di layar putih, lalu mekar kembali',len:1.0,
+      params:[['cnt','Jumlah bilah kincir',3,8,5],['rot','Putaran (derajat)',0,360,140],['tw','Lengkung bilah',0,100,50],['wrn','Warna latar (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:pusaran}
   ];
   for(const e of LIST){if(F.DEF[e.id])continue;F.LIST.push(e);F.DEF[e.id]=e}
 })();

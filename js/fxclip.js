@@ -299,6 +299,51 @@ APK.fxclip=(function(){
   }
 
   const WP=[['amt','Kekuatan',0,100,60],['cnt','Jumlah gelombang',1,8,1],['spd','Kecepatan',10,100,50],['ang','Arah gelombang (0 = ke samping, 60 = miring naik, 90 = naik turun, minus = dibalik)',-90,90,60],['atk','Awal pelan (0 = langsung kuat, makin besar makin lama diam dan naik pelan)',0,100,60],['dec','Peredam (mereda sampai akhir clip, 0 = tetap kuat)',0,100,70]];
+
+  /* ===== efek: Shake Video =====
+     Gerak kamera diukur frame demi frame dari video referensi (30 fps, kertas 720x720): tiap hentakan = geser x/y + putar sangat tipis yang meredam seperti pegas (tanpa blur, tanpa zoom).
+     Tiga jenis: Rendah (video 9,5-10,8 dtk), Utama (10,9-11,9 dtk), Acak (12,0-13,1 dtk). Nilai x/y dalam piksel video 720, r dalam derajat, dimulai dari diam (0) dan kembali ke diam di akhir.
+     Tepi yang terbuka akibat geseran diisi cermin tepi gambar (mir) supaya tidak muncul bolong. */
+  const VS=[
+    {x:[0.0,-21.4,-44.3,-61.2,-70.0,-69.8,-61.4,-46.5,-27.8,-8.1,9.0,22.5,30.1,32.2,29.5,23.6,16.6,10.2,6.3,5.5,7.8,13.1,19.8,26.4,31.5,34.0,33.1,29.2,22.7,14.7,6.3,-0.6,-5.6,-8.3,-8.6,-6.7,-3.6,0.0],
+     y:[0.0,11.3,11.6,6.8,-0.8,-8.6,-14.7,-16.6,-13.4,-5.5,6.1,21.2,36.6,50.0,57.9,60.1,56.2,47.1,32.9,17.2,2.9,-8.2,-16.6,-21.3,-21.6,-18.3,-12.9,-7.0,-1.8,2.2,4.5,4.8,4.0,2.3,0.6,-0.5,-0.7,0.0],
+     r:[0.00,0.13,0.10,0.08,-0.03,-0.14,-0.17,-0.19,-0.18,-0.10,0.09,0.12,0.06,-0.10,-0.04,-0.04,-0.05,-0.11,0.08,0.16,0.04,-0.17,-0.25,-0.25,-0.26,-0.25,-0.23,-0.16,-0.06,0.02,0.07,0.11,0.11,0.07,0.04,0.02,-0.00,0.00]},
+    {x:[0.0,-29.7,-62.5,-86.5,-98.8,-98.2,-86.0,-65.0,-39.6,-14.3,6.8,21.2,27.6,26.5,19.9,10.7,1.9,-3.9,-5.1,-1.2,6.8,17.4,28.3,37.1,42.4,43.1,39.4,32.4,23.4,14.4,6.8,1.8,-0.3,0.0],
+     y:[0.0,14.5,14.1,5.6,-7.5,-21.2,-31.3,-34.2,-28.4,-14.3,5.0,28.0,50.2,67.4,77.3,78.7,71.7,58.0,40.5,21.3,5.0,-6.8,-13.7,-15.5,-13.0,-7.9,-2.2,2.6,5.5,6.2,5.0,2.9,1.0,0.0],
+     r:[0.00,0.08,0.05,0.01,-0.07,-0.09,-0.06,-0.07,-0.11,-0.16,0.09,0.07,-0.02,-0.01,-0.00,0.00,-0.01,-0.02,-0.03,0.19,0.09,-0.11,-0.16,-0.17,-0.14,-0.11,-0.05,0.01,0.06,0.08,0.09,0.06,0.01,-0.00]},
+    {x:[0.0,52.0,44.9,28.3,12.2,-0.0,-6.5,-6.4,-0.8,8.5,18.7,26.8,30.3,28.3,21.3,11.0,0.0,-9.4,-15.2,-16.3,-12.9,-6.4,1.4,8.9,14.4,16.9,16.5,13.6,9.5,5.4,2.2,0.5,0.0],
+     y:[0.0,-23.1,-45.7,-54.7,-53.1,-44.0,-30.4,-16.1,-4.1,3.1,5.0,1.6,-5.6,-14.4,-22.2,-26.9,-27.2,-23.6,-17.0,-9.3,-2.6,1.7,3.2,2.1,-1.0,-4.8,-8.0,-9.7,-9.5,-7.5,-4.6,-1.8,0.0],
+     r:[0.00,-0.27,-0.06,-0.02,-0.04,-0.09,-0.18,-0.19,-0.10,0.07,0.10,0.03,-0.13,-0.21,-0.22,-0.20,-0.20,-0.18,-0.17,-0.15,-0.08,0.03,0.08,0.05,-0.01,-0.10,-0.15,-0.17,-0.18,-0.16,-0.12,-0.05,0.00]}
+  ];
+  function crom(a,t){
+    const n=a.length-1;if(t<=0)return a[0];if(t>=n)return a[n];
+    const i=Math.floor(t),f=t-i,p0=a[Math.max(0,i-1)],p1=a[i],p2=a[i+1],p3=a[Math.min(n,i+2)];
+    return p1+0.5*f*(p2-p0+f*(2*p0-5*p1+4*p2-p3+f*(3*(p1-p2)+p3-p0)));
+  }
+  function vshake(g,w,h,p,tm,opaque,rel,dur){
+    const D=VS[clamp(Math.round(p.mode),0,2)],n=D.x.length-1,len=n/30/(p.spd/100);
+    let t=rel;if(p.rep>=1&&len>0)t=t%len;
+    const idx=t/len*n;if(idx>=n||idx<0)return;
+    const k=p.amt/100,x=crom(D.x,idx)*k/720*w,y=crom(D.y,idx)*k/720*h,r=crom(D.r,idx)*k*Math.PI/180;
+    if(Math.abs(x)<0.02&&Math.abs(y)<0.02&&Math.abs(r)<1e-6&&p.zm<=0)return;
+    const S=ac('vs',w,h);S.drawImage(g.canvas,0,0);
+    const z=1+p.zm/100;
+    g.clearRect(0,0,w,h);
+    if(opaque){g.fillStyle='#000';g.fillRect(0,0,w,h)}
+    const draw=(ox,oy,sx,sy)=>{
+      g.save();g.translate(w/2+x,h/2+y);g.rotate(r);g.scale(z,z);
+      g.translate(ox,oy);g.scale(sx,sy);g.translate(-w/2,-h/2);
+      g.drawImage(S.canvas,0,0);g.restore();
+    };
+    if(p.mir>=1){
+      for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){
+        if(!a&&!b)continue;
+        draw(a*w+(a?w*0:0),b*h,a?-1:1,b?-1:1);
+      }
+    }
+    draw(0,0,1,1);
+  }
+
   const LIST=[
     {id:'glitch',name:'Glitch RGB',desc:'Layar pecah dan warnanya terpisah',
       params:[['amt','Kekuatan',0,100,60],['spd','Kecepatan',10,100,50]],apply:glitch},
@@ -311,7 +356,9 @@ APK.fxclip=(function(){
     {id:'jjp',name:'JJ Tipis Pintar',desc:'JJ Tipis yang mengikuti kurva biru: tiap puncak kurva = satu hentakan',len:2,curve:true,
       params:[['amt','Kekuatan geser',0,100,50],['zm','Zoom sentak (%)',0,30,6],['rot','Putaran tipis (derajat, 0 = tanpa putar)',0,10,2]],apply:jjp},
     {id:'mirror',name:'Isi Cermin',desc:'Menutup frame kosong di sekitar media dengan cermin tepinya',len:5,perLayer:true,
-      params:[['blur','Blur isian (0 = cermin tajam)',0,100,0],['dim','Gelapkan isian',0,80,0]],apply:mirrorFill}
+      params:[['blur','Blur isian (0 = cermin tajam)',0,100,0],['dim','Gelapkan isian',0,80,0]],apply:mirrorFill},
+    {id:'vshake',name:'Shake Video',desc:'Hentakan kamera meredam seperti pegas, diukur frame demi frame dari video referensi (tanpa blur, tanpa zoom)',len:1.2,
+      params:[['mode','Jenis (0 = Rendah, 1 = Utama, 2 = Acak)',0,2,1],['amt','Kekuatan (100 = sama persis video)',0,300,100],['spd','Kecepatan (100 = sama persis video)',25,300,100],['rep','Ulangi terus selama clip (0 = sekali di awal)',0,1,1],['mir','Isi tepi dengan cermin (0 = tidak, 1 = ya)',0,1,1],['zm','Zoom tambahan (%)',0,30,0]],apply:vshake}
   ];
   const DEF={};LIST.forEach(e=>DEF[e.id]=e);
   const label=fx=>(DEF[fx&&fx.type]||{name:'Efek'}).name;

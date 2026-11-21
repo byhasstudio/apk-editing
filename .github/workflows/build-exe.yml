@@ -8,6 +8,10 @@ name: Build EXE
 # EXE baru hanya perlu dibuat kalau nama, ikon, atau cangkangnya berubah. Tanpa internet, jendela offline tampil
 # dan menyambung ulang sendiri.
 #
+# Simpan file (export video, preset, QR, dst): cangkang menyediakan jembatan window.swNative (preload.js + ipcMain di main.js)
+# yang membuka jendela Simpan Sebagai asli Windows dan menulis file bertahap. Dipakai oleh js/savefile.js.
+# Unduhan lain yang lolos dari jembatan itu ditangani handler will-download (jendela Simpan Sebagai bawaan Electron + pesan kalau gagal).
+#
 # PENTING: alamat situs (APP_URL) harus sama dengan alamat GitHub Pages repo ini. Repo ini sudah diganti nama dari apk-editing menjadi splineway,
 # jadi alamat lama .../apk-editing/ sudah tidak ada. EXE lama yang masih memuat alamat itu menampilkan layar "Tidak ada koneksi internet"
 # walau internet menyala. Pasang EXE baru hasil build ini.
@@ -70,7 +74,7 @@ jobs:
               "appId": "com.byhasstudio.splineway",
               "productName": "SplineWay",
               "directories": { "output": "dist", "buildResources": "build" },
-              "files": ["main.js", "offline.html", "icon.png", "package.json"],
+              "files": ["main.js", "preload.js", "offline.html", "icon.png", "package.json"],
               "win": { "target": ["nsis", "portable"], "icon": "build/icon.png" },
               "nsis": { "oneClick": true, "perMachine": false, "artifactName": "SplineWay-Setup.${ext}" },
               "portable": { "artifactName": "SplineWay-Portable.${ext}" }
@@ -81,20 +85,84 @@ jobs:
           npm i -D electron@33.2.1 electron-builder@25.1.8 sharp
           mkdir -p build
           node -e "require('sharp')('logo.png').resize(512,512).png().toFile('build/icon.png').then(function(){require('fs').copyFileSync('build/icon.png','icon.png')})"
+          cat > preload.js <<'EOF'
+          // Jembatan aman ke proses utama untuk menyimpan file (dipakai js/savefile.js lewat window.swNative).
+          const { contextBridge, ipcRenderer } = require('electron');
+          contextBridge.exposeInMainWorld('swNative', {
+            begin: (name) => ipcRenderer.invoke('sw-save-begin', String(name || 'export')),
+            chunk: (id, buf) => ipcRenderer.invoke('sw-save-chunk', String(id), buf),
+            end: (id) => ipcRenderer.invoke('sw-save-end', String(id)),
+            abort: (id) => ipcRenderer.invoke('sw-save-abort', String(id))
+          });
+          EOF
           cat > main.js <<'EOF'
-          const { app, BrowserWindow, Menu, shell } = require('electron');
+          const { app, BrowserWindow, Menu, shell, ipcMain, dialog, session } = require('electron');
           const path = require('path');
+          const fs = require('fs');
           const APP_URL = '__APP_URL__';
 
           if (!app.requestSingleInstanceLock()) app.quit();
 
           let win;
+
+          // ===== simpan file lewat jendela Simpan Sebagai asli, ditulis bertahap =====
+          const saves = new Map();
+          let seq = 0;
+          const trusted = (e) => {
+            try {
+              const u = (e.senderFrame && e.senderFrame.url) || e.sender.getURL();
+              return String(u).startsWith(APP_URL);
+            } catch (_) { return false; }
+          };
+          function closeSave(id, remove) {
+            const s = saves.get(id);
+            if (!s) return null;
+            saves.delete(id);
+            try { fs.closeSync(s.fd); } catch (_) {}
+            if (remove) { try { fs.unlinkSync(s.path); } catch (_) {} }
+            return s.path;
+          }
+          ipcMain.handle('sw-save-begin', async (e, name) => {
+            if (!trusted(e)) throw new Error('tidak diizinkan');
+            const safe = String(name || 'export').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 150) || 'export';
+            const ext = path.extname(safe).replace('.', '');
+            const filters = ext
+              ? [{ name: ext.toUpperCase(), extensions: [ext] }, { name: 'Semua file', extensions: ['*'] }]
+              : [{ name: 'Semua file', extensions: ['*'] }];
+            const owner = BrowserWindow.fromWebContents(e.sender) || win;
+            const r = await dialog.showSaveDialog(owner, { defaultPath: path.join(app.getPath('downloads'), safe), filters });
+            if (r.canceled || !r.filePath) return null;
+            const id = String(++seq);
+            saves.set(id, { fd: fs.openSync(r.filePath, 'w'), path: r.filePath });
+            return id;
+          });
+          ipcMain.handle('sw-save-chunk', (e, id, buf) => {
+            if (!trusted(e)) throw new Error('tidak diizinkan');
+            const s = saves.get(String(id));
+            if (!s) throw new Error('sesi simpan tidak ditemukan');
+            const b = Buffer.from(buf.buffer ? buf.buffer : buf, buf.byteOffset || 0, buf.byteLength !== undefined ? buf.byteLength : buf.length);
+            let o = 0;
+            while (o < b.length) o += fs.writeSync(s.fd, b, o, b.length - o);
+            return true;
+          });
+          ipcMain.handle('sw-save-end', (e, id) => {
+            if (!trusted(e)) throw new Error('tidak diizinkan');
+            const p = closeSave(String(id), false);
+            if (p) shell.showItemInFolder(p);
+            return p;
+          });
+          ipcMain.handle('sw-save-abort', (e, id) => {
+            if (!trusted(e)) return false;
+            closeSave(String(id), true);
+            return true;
+          });
+
           function create() {
             win = new BrowserWindow({
               width: 1366, height: 860, minWidth: 900, minHeight: 600,
               backgroundColor: '#000833', title: 'SplineWay',
               icon: path.join(__dirname, 'icon.png'),
-              webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+              webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, preload: path.join(__dirname, 'preload.js') }
             });
             Menu.setApplicationMenu(null);
             win.loadURL(APP_URL);
@@ -105,6 +173,12 @@ jobs:
               if (url.startsWith(APP_URL)) return { action: 'allow' };
               shell.openExternal(url);
               return { action: 'deny' };
+            });
+            // cadangan: unduhan biasa (bukan lewat jembatan) tetap memunculkan jendela Simpan Sebagai bawaan Electron
+            session.defaultSession.on('will-download', (event, item) => {
+              item.once('done', (ev, state) => {
+                if (state === 'interrupted') dialog.showErrorBox('SplineWay', 'Unduhan gagal: ' + item.getFilename());
+              });
             });
           }
 

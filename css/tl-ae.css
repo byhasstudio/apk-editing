@@ -74,3 +74,21 @@ html #editor .playhead::after{top:0;width:14px;height:11px;margin-left:-7px;back
 html #editor .tl-scroll.dropping{outline-color:var(--ae-play)}
 
 @media(max-width:900px){html #editor .timeline{height:50vh}}
+
+/* ikon bilah alat (js/tl-ae.js) */
+html #editor .ti,html .hx-pan .ti{width:26px;height:26px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+html #editor .ti .f,html .hx-pan .ti .f{fill:currentColor;stroke:none}
+html #editor .tl-bar{gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+html #editor .tl-bar .btn.ic-btn{width:50px;min-width:50px;height:50px;min-height:50px;padding:0;display:grid;place-items:center;border-radius:12px;color:#d9dde6}
+html #editor .tl-bar .btn.ic-btn.open{background:#232938;color:#fff}
+html #editor .tl-bar .btn.ic-btn.on{color:var(--ae-play);background:#10261a}
+html #editor .tl-bar .btn.ic-btn.c-rec{color:#ff5c5c}
+html #editor .tl-bar .btn.ic-btn.c-yel{color:#ffd24a}
+html #editor .tl-bar .btn.ic-btn.c-blu{color:#4aa3ff}
+html #editor .tl-bar .btn.ic-btn:disabled{opacity:.35}
+html .hx-pan>.btn.ic-item{display:flex;align-items:center;gap:12px;font-size:15px;min-height:48px}
+html .hx-pan>.btn.ic-item .ti{width:24px;height:24px}
+html #editor .tl-row.lk .tl-head b::after{content:none}
+html #editor .tl-head .ic svg,html #editor .tl-pop .tl-btns svg{display:block}
+html #editor .tl-pop .tl-btns button svg{width:14px;height:14px}
+html #editor .tl-head .ic svg{width:18px;height:18px}

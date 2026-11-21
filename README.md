@@ -76,6 +76,12 @@ Pengedit dan tracking 3D, **bukan** pembuat model 3D. Ruang 3D dengan kamera (po
 - **Efek clip Irisan Pulsa** (menu efek clip di timeline): irisan tegak sama lebar, **semua irisan bergeser naik turun** seperti gelombang dari tengah (termasuk paling kiri dan kanan), jumlah irisan **2 sampai 10** (parameter "Jumlah irisan"), tanpa kilatan terang. Kilatan terang dipindah jadi efek clip sendiri **Flash Pulsa** dengan waktu hentakan yang sama, jadi keduanya bisa dipakai berdampingan.
 Semua di atas ikut tersimpan di project dan di file preset, dan ikut ter-export. Filter memakai `ctx.filter`, yang didukung Chrome, Edge, dan Firefox; di browser yang belum mendukung (Safari lama) efek filter diabaikan.
 
+### Ikon transisi di sambungan clip
+
+- Dua foto/video yang bersebelahan di satu track otomatis dianggap tersambung (selisih maksimal 0,12 detik). Di titik sambungannya muncul ikon bulat kecil di timeline.
+- Ketuk ikon untuk memilih transisi (daftar Efek Transisi). Transisi dipasang tepat di tengah sambungan; ikon berubah warna kalau sudah ada transisi, dan bisa diganti, dihapus, atau diatur dari jendela yang sama.
+- Kalau dua clip itu digeser dan masih bersebelahan, clip transisinya ikut bergeser. Kode: `js/tlseam.js`, `css/tlseam.css`.
+
 ### Kurva otomatis (auto-keyframe, rekam langsung)
 - Tombol **⏺ Kurva otomatis** ada di bar timeline (setelah Grup). Nyalakan, lalu di preview muncul tombol **▶ Mulai**.
 - Tekan Mulai: hitung mundur **3 detik**, lalu **timeline langsung berjalan sendiri** dan mode **● MEREKAM** aktif. Selama berjalan, setiap kali objek digeser, di-zoom (scale), atau diputar di preview (juga lewat slider Posisi, Scale, Opacity, Rotasi di panel Properti), gerakannya direkam otomatis sebagai keyframe di waktu yang sedang berjalan. Tidak perlu menekan ◇ satu-satu.

@@ -1,0 +1,19 @@
+/* Ikon transisi di sambungan dua clip (js/tlseam.js) dan jendela pilih transisi */
+.seam-btn{position:absolute;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;padding:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.85);background:#1a1f2e;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:3;touch-action:manipulation;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.seam-btn::before{content:"";position:absolute;inset:-8px}
+.seam-btn svg{display:block;pointer-events:none}
+.seam-btn:hover{background:#2b3350;transform:scale(1.1)}
+.seam-btn.on{background:#0c8599;border-color:#fff}
+.seam-btn.on:hover{background:#12a5bd}
+.seam-pop{position:fixed;z-index:1000;display:flex;flex-direction:column;background:var(--panel,#1a1f2e);color:var(--text,#fff);border:1px solid var(--line,#333);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.55);overflow:hidden}
+.seam-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--line,#333);font-size:13px;flex:none}
+.seam-x{background:none;border:0;color:var(--dim,#aaa);font-size:14px;cursor:pointer;padding:2px 6px}
+.seam-list{overflow:auto;padding:6px;display:flex;flex-direction:column;gap:4px;min-height:0}
+.seam-it{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;width:100%;padding:8px 10px;background:var(--panel2,#232a3d);color:inherit;border:1px solid var(--line,#333);border-radius:8px;cursor:pointer}
+.seam-it b{font-size:13px}
+.seam-it small{font-size:11px;color:var(--dim,#aaa);line-height:1.3}
+.seam-it:hover{border-color:var(--accent,#7c8cff)}
+.seam-it.on{border-color:#0c8599;box-shadow:inset 0 0 0 1px #0c8599}
+.seam-it.none b{color:var(--danger,#ff6b6b)}
+.seam-ft{padding:6px;border-top:1px solid var(--line,#333);flex:none}
+.seam-set{width:100%;padding:7px;background:none;color:var(--accent,#7c8cff);border:1px solid var(--accent,#7c8cff);border-radius:8px;cursor:pointer;font-size:12px}

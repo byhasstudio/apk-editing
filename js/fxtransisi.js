@@ -178,6 +178,25 @@ window.APK=window.APK||{};
     g.restore();
   }
 
+  /* ===== penghalus untuk 8 efek baru: kurva lebih landai (smootherstep) dan blur gerak dari rata-rata beberapa sub-frame ===== */
+  const sm5=x=>{x=clamp(x,0,1);return x*x*x*(x*(6*x-15)+10)};
+  function bell2(rel,dur){
+    const u=dur>0?clamp(rel/dur,0,1):((rel/1.8)%1);
+    return sm5(Math.min(1,(1-Math.abs(2*u-1))*1.3));
+  }
+  function mb(fn){
+    return function(g,w,h,p,tm,opaque,rel,dur){
+      const n=fastMode()?3:6,sp=(dur>0?dur:1)*0.016;
+      const S=ac('mbs',w,h);S.drawImage(g.canvas,0,0);
+      const A=ac('mba',w,h);
+      for(let i=0;i<n;i++){
+        g.clearRect(0,0,w,h);g.drawImage(S.canvas,0,0);
+        fn(g,w,h,p,tm,opaque,rel+(i/(n-1)-0.5)*sp,dur);
+        A.globalAlpha=1/(i+1);A.drawImage(g.canvas,0,0);
+      }
+      g.clearRect(0,0,w,h);g.drawImage(A.canvas,0,0);
+    };
+  }
   /* ===== efek transisi bergaya video referensi (panel manga, strip, kipas, inversi gelembung, pusaran) ===== */
   const rnd=(i,s)=>{const x=Math.sin(i*127.1+s*311.7)*43758.5453;return x-Math.floor(x)};
   const scl=(w,h)=>Math.min(w,h)/368;
@@ -340,7 +359,7 @@ window.APK=window.APK||{};
 
   /* ===== 12. Pecahan Miring: gambar terbelah jadi pecahan diagonal yang bergeser dan miring, dengan bayangan ===== */
   function pecahan(g,w,h,p,tm,opaque,rel,dur){
-    const b=bell(rel,dur);if(b<0.003)return;
+    const b=bell2(rel,dur);if(b<0.003)return;
     const sg=p.dir>=1?-1:1,k=scl(w,h),S=ac('pc',w,h);S.drawImage(g.canvas,0,0);
     const cx=w/2,cy=h/2,R=Math.hypot(w,h),th=p.ang*Math.PI/180,n=Math.round(p.cnt);
     put(g,S.canvas,w,h,1+p.zm/100*b,0,0,0,true);
@@ -348,8 +367,8 @@ window.APK=window.APK||{};
       const y0=-R/2+R*i/n,y1=-R/2+R*(i+1)/n,sh=(i%2?1:-1)*sg*p.amt/100*0.45*w*b*(0.5+0.5*rnd(i,4)),tl=(rnd(i,9)-0.5)*0.25*b;
       const path=()=>{g.beginPath();g.rect(-R,y0,2*R,y1-y0)};
       g.save();g.translate(cx,cy);g.rotate(th);g.translate(sh,0);g.rotate(tl);
-      g.shadowColor='rgba(0,0,0,'+(0.55*ss(b*3)).toFixed(3)+')';g.shadowBlur=10*k*b;
-      path();g.fillStyle='#000';g.fill();g.shadowColor='transparent';g.shadowBlur=0;
+      g.shadowColor='rgba(0,0,0,'+(0.55*ss(b*3)).toFixed(3)+')';g.shadowBlur=10*k*b;g.shadowOffsetX=20000*Math.cos(th+tl);g.shadowOffsetY=20000*Math.sin(th+tl);
+      g.translate(-20000,0);path();g.fillStyle='#000';g.fill();g.translate(20000,0);g.shadowColor='transparent';g.shadowBlur=0;g.shadowOffsetX=0;g.shadowOffsetY=0;
       path();g.clip();
       g.rotate(-tl);g.translate(-sh,0);g.rotate(-th);g.translate(-cx,-cy);
       g.translate(cx,cy);g.rotate(th);g.translate(sh,0);g.rotate(tl);g.rotate(-th);g.translate(-cx,-cy);
@@ -361,7 +380,7 @@ window.APK=window.APK||{};
 
   /* ===== 13. Belah Garis: celah tipis membelah layar, kedua sisi bergeser dan pita tengah menyelip ===== */
   function belahgaris(g,w,h,p,tm,opaque,rel,dur){
-    const b=bell(rel,dur);if(b<0.003)return;
+    const b=bell2(rel,dur);if(b<0.003)return;
     const sg=p.dir>=1?-1:1,k=scl(w,h),S=ac('bg',w,h);S.drawImage(g.canvas,0,0);
     const V=p.ori>=1,L=V?w:h,T=V?h:w,pos=L*p.pos/100,gap=p.gap/100*L*0.18*b,bw=L*0.12*b;
     g.clearRect(0,0,w,h);g.fillStyle='rgb('+gray(p.wrn)+')';g.fillRect(0,0,w,h);
@@ -383,7 +402,7 @@ window.APK=window.APK||{};
 
   /* ===== 14. Mosaik Kotak: layar terpecah jadi kotak-kotak yang masing-masing berzoom dan bergeser acak ===== */
   function mosaik(g,w,h,p,tm,opaque,rel,dur){
-    const b=bell(rel,dur);if(b<0.003)return;
+    const b=bell2(rel,dur);if(b<0.003)return;
     const k=scl(w,h),S=ac('ms',w,h);S.drawImage(g.canvas,0,0);
     put(g,S.canvas,w,h,1,0,0,0,true);
     const cols=Math.round(p.cnt),rows=Math.max(2,Math.round(cols*h/w)),tw=w/cols,th=h/rows,gp=Math.max(0,1.2*k*ss(b*4));
@@ -413,21 +432,21 @@ window.APK=window.APK||{};
     {id:'trtirai',cat:'transisi',name:'Tirai Sinema',desc:'Dua tirai menutup dari tepi, bertemu di sambungan, lalu membuka',len:1.0,
       params:[['sty','Arah (0 = atas-bawah, 1 = kiri-kanan)',0,1,0],['wrn','Warna (0 = putih, 100 = hitam)',0,100,100],['sf','Kelembutan tepi tirai',0,100,30]],apply:tirai},
     {id:'trpanel',cat:'transisi',name:'Panel Geser',desc:'Gambar terpotong jadi panel persegi yang bergeser dengan bayangan, gaya panel manga',len:0.9,
-      params:[['cnt','Jumlah baris panel',2,6,3],['amt','Jauh geseran',0,100,80],['zm','Zoom dasar (%)',0,30,10],['shw','Bayangan panel',0,100,50],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:panelgeser},
+      params:[['cnt','Jumlah baris panel',2,6,3],['amt','Jauh geseran',0,100,80],['zm','Zoom dasar (%)',0,30,10],['shw','Bayangan panel',0,100,50],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:mb(panelgeser)},
     {id:'trstrip',cat:'transisi',name:'Strip Putih',desc:'Gambar terpotong jadi pita horizontal yang bergeser berlawanan arah, dipisah celah putih',len:0.9,
-      params:[['cnt','Jumlah pita',3,12,6],['amt','Jauh geseran',0,100,60],['gap','Lebar celah',0,100,60],['wrn','Warna celah (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:strip},
+      params:[['cnt','Jumlah pita',3,12,6],['amt','Jauh geseran',0,100,60],['gap','Lebar celah',0,100,60],['wrn','Warna celah (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:mb(strip)},
     {id:'trkipas',cat:'transisi',name:'Kipas Silang',desc:'Layar terbelah silang jadi juring kipas yang berputar berlawanan, celah hitam di antaranya',len:0.9,
-      params:[['cnt','Jumlah juring (genap)',4,16,8],['rot','Sudut putar (derajat)',0,90,35],['opn','Lebar celah hitam',0,100,50],['zm','Zoom dasar (%)',0,30,10],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:kipas},
+      params:[['cnt','Jumlah juring (genap)',4,16,8],['rot','Sudut putar (derajat)',0,90,35],['opn','Lebar celah hitam',0,100,50],['zm','Zoom dasar (%)',0,30,10],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:mb(kipas)},
     {id:'trinversi',cat:'transisi',name:'Inversi Gelembung',desc:'Gambar jadi garis tepi terang di latar gelap dengan cincin gelembung, lalu kembali normal',len:0.9,
-      params:[['amt','Kekuatan inversi',0,100,100],['cnt','Jumlah gelembung',0,150,90],['edg','Tebal garis tepi',1,6,2],['zm','Zoom dasar (%)',0,30,6]],apply:inversi},
+      params:[['amt','Kekuatan inversi',0,100,100],['cnt','Jumlah gelembung',0,150,90],['edg','Tebal garis tepi',1,6,2],['zm','Zoom dasar (%)',0,30,6]],apply:mb(inversi)},
     {id:'trpusaran',cat:'transisi',name:'Pusaran',desc:'Gambar mengecil dan berputar jadi kincir kecil di layar putih, lalu mekar kembali',len:1.0,
       params:[['cnt','Jumlah bilah kincir',3,8,5],['rot','Putaran (derajat)',0,360,140],['tw','Lengkung bilah',0,100,50],['wrn','Warna latar (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:pusaran},
     {id:'trpecahan',cat:'transisi',name:'Pecahan Miring',desc:'Gambar terbelah jadi pecahan diagonal yang bergeser dan miring dengan bayangan',len:0.9,
-      params:[['cnt','Jumlah pecahan',2,6,3],['ang','Sudut potong (derajat)',-80,80,-20],['amt','Jauh geseran',0,100,60],['zm','Zoom dasar (%)',0,30,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:pecahan},
+      params:[['cnt','Jumlah pecahan',2,6,3],['ang','Sudut potong (derajat)',-80,80,-20],['amt','Jauh geseran',0,100,60],['zm','Zoom dasar (%)',0,30,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:mb(pecahan)},
     {id:'trbelahgaris',cat:'transisi',name:'Belah Garis',desc:'Celah tipis membelah layar, kedua sisi merenggang dan pita tengah menyelip',len:0.8,
-      params:[['ori','Arah (0 = mendatar, 1 = tegak)',0,1,0],['pos','Posisi belahan (%)',10,90,50],['gap','Lebar celah',0,100,40],['amt','Geser pita tengah',0,100,60],['wrn','Warna celah (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:belahgaris},
+      params:[['ori','Arah (0 = mendatar, 1 = tegak)',0,1,0],['pos','Posisi belahan (%)',10,90,50],['gap','Lebar celah',0,100,40],['amt','Geser pita tengah',0,100,60],['wrn','Warna celah (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:mb(belahgaris)},
     {id:'trmosaik',cat:'transisi',name:'Mosaik Kotak',desc:'Layar pecah jadi kotak-kotak yang berzoom dan bergeser acak',len:0.9,
-      params:[['cnt','Jumlah kolom',2,8,4],['amt','Jauh geseran',0,100,50],['zm','Zoom kotak (%)',0,100,50]],apply:mosaik}
+      params:[['cnt','Jumlah kolom',2,8,4],['amt','Jauh geseran',0,100,50],['zm','Zoom kotak (%)',0,100,50]],apply:mb(mosaik)}
   ];
   for(const e of LIST){if(F.DEF[e.id])continue;F.LIST.push(e);F.DEF[e.id]=e}
 })();

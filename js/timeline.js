@@ -2,8 +2,8 @@
    multi-select, salin/potong/tempel, kunci & sembunyikan layer */
 window.APK=window.APK||{};
 APK.timeline=(function(){
-  const HEAD=164,MIN=0.1,LABEL={video:'Video',audio:'Audio',image:'Gambar'};
-  let pps=50,snapOn=true,sel=null,msel=new Set(),multiMode=false,clip=null,drag=null,dragMid=null,tt=()=>{};
+  const HEAD=56,MIN=0.1,LABEL={video:'Video',audio:'Audio',image:'Gambar'};
+  let openTr=null,pps=50,snapOn=true,sel=null,msel=new Set(),multiMode=false,clip=null,drag=null,dragMid=null,tt=()=>{};
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
   const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
@@ -11,6 +11,8 @@ APK.timeline=(function(){
   const media=id=>P().media.find(m=>m.id===id);
   const spd=c=>c.speed||1;
   const nameOf=(c,m)=>m?m.name:c.shape?'◆  '+APK.shapes.label(c.shape.type):c.text?(c.stk?'☺  ':'T  ')+String(c.text.content).split('\n')[0]:'(media hilang)';
+  const EYE='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    EYEOFF='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><path d="M3 3l18 18"/></svg>';
   const mkTrack=kind=>({id:uid('t_'),kind,name:`${LABEL[kind]} ${P().tracks.filter(t=>t.kind===kind).length+1}`,muted:false,clips:[]});
   /* ig = satu id atau daftar id clip yang diabaikan saat mengecek tabrakan */
   const free=(tr,s,d,ig)=>{const ex=Array.isArray(ig)?ig:[ig];return !tr.clips.some(x=>!ex.includes(x.id)&&s<x.start+x.dur-1e-6&&s+d>x.start+1e-6)};
@@ -55,13 +57,16 @@ APK.timeline=(function(){
     const rows=p.tracks.map((tr,i)=>{
       const clips=tr.clips.map(c=>{const m=media(c.mediaId),nm=nameOf(c,m);
         return `<div class="clip ${tr.kind}${c.text?' text':''}${c.shape?' shape':''}${c.stk?' stk':''}${msel.has(c.id)?' sel':''}${c.id===sel?' pri':''}${tr.locked?' locked':''}" data-id="${c.id}" style="left:${c.start*pps}px;width:${Math.max(3,c.dur*pps)}px" title="${esc(nm)}"><i class="h l"></i>${tr.kind==='audio'?`<canvas class="wf" data-c="${c.id}"></canvas>`:''}<span>${esc(nm)}</span>${kfMarks(c)}<i class="h r"></i></div>`}).join('');
-      return `<div class="tl-row${tr.hidden?' hid':''}${tr.locked?' lk':''}"><div class="tl-head"><b title="${esc(tr.name)}">${esc(tr.name)}</b><span class="tl-btns">
+      const prim=tr.kind==='audio'
+        ?`<button data-act="mute" data-t="${tr.id}" class="ic${tr.muted?' off':''}" title="${tr.muted?'Suarakan track':'Bisukan track'}" aria-label="${tr.muted?'Suarakan track':'Bisukan track'}">${tr.muted?'🔇':'🔊'}</button>`
+        :`<button data-act="hide" data-t="${tr.id}" class="ic${tr.hidden?' off':''}" title="${tr.hidden?'Tampilkan layer':'Sembunyikan layer di preview'}" aria-label="${tr.hidden?'Tampilkan layer':'Sembunyikan layer'}">${tr.hidden?EYEOFF:EYE}</button>`;
+      const pop=tr.id===openTr?`<div class="tl-pop"><b>${esc(tr.name)}</b><span class="tl-btns">
         <button data-act="up" data-t="${tr.id}" title="Layer naik (tampil lebih depan)" ${i===0?'disabled':''}>▲</button>
         <button data-act="down" data-t="${tr.id}" title="Layer turun (tampil lebih belakang)" ${i===p.tracks.length-1?'disabled':''}>▼</button>
         ${tr.kind==='image'?'':`<button data-act="mute" data-t="${tr.id}" class="${tr.muted?'on':''}" title="${tr.muted?'Suarakan track':'Bisukan track'}">M</button>`}
         <button data-act="lock" data-t="${tr.id}" class="${tr.locked?'on':''}" title="${tr.locked?'Buka kunci layer':'Kunci layer (clip tidak bisa diedit)'}">${tr.locked?'🔒':'🔓'}</button>
-        ${tr.kind==='audio'?'':`<button data-act="hide" data-t="${tr.id}" class="${tr.hidden?'on':''}" title="${tr.hidden?'Tampilkan layer':'Sembunyikan layer di preview'}">${tr.hidden?'🚫':'👁'}</button>`}
-        <button data-act="rm" data-t="${tr.id}" title="Hapus track">✕</button></span></div>
+        <button data-act="rm" data-t="${tr.id}" title="Hapus track">✕</button></span></div>`:'';
+      return `<div class="tl-row${tr.hidden?' hid':''}${tr.locked?' lk':''}${tr.id===openTr?' menu':''}"><div class="tl-head" title="${esc(tr.name)}">${prim}<button data-act="menu" data-t="${tr.id}" class="ic more${tr.id===openTr?' on':''}" title="Menu layer ${esc(tr.name)}" aria-label="Menu layer">⋮</button>${pop}</div>
         <div class="tl-lane" data-lane="${tr.id}" style="width:${W}px">${clips}</div></div>`}).join('');
     const root=$('tl-content');
     root.style.width=(HEAD+W)+'px';
@@ -459,6 +464,7 @@ APK.timeline=(function(){
     const b=e.target.closest('[data-act]');if(!b)return;
     const p=P(),i=p.tracks.findIndex(t=>t.id===b.dataset.t);if(i<0)return;
     const tr=p.tracks[i],a=b.dataset.act;
+    if(a==='menu'){openTr=openTr===tr.id?null:tr.id;render();return}
     if(a==='rm'&&tr.locked){tt('Layer terkunci. Buka kunci dulu');return}
     if(a==='rm'&&tr.clips.length&&!confirm(`Hapus track "${tr.name}" beserta ${tr.clips.length} clip?`))return;
     APK.history.record();
@@ -468,7 +474,7 @@ APK.timeline=(function(){
     else if(a==='lock')tr.locked=!tr.locked;
     else if(a==='hide')tr.hidden=!tr.hidden;
     else if(a==='rm'){
-      p.tracks.splice(i,1);prune();
+      p.tracks.splice(i,1);if(openTr===tr.id)openTr=null;prune();
     }
     changed();
   }

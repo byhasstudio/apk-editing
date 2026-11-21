@@ -6,7 +6,7 @@
    Semua memakai tombol dan fungsi yang sudah ada (tl-zin, tl-zout, pv-full, tl-snap, btn-export, preview.toggle), jadi tidak mengubah logika timeline. */
 (function(){
 'use strict';
-const $=id=>document.getElementById(id),HEAD=164;
+const $=id=>document.getElementById(id),HEAD=56;
 const dev=()=>(window.APK&&APK.device)||{mode:'pc',input:'mouse',isMobile:false,isTouch:false};
 const shown=id=>{const e=$(id);return !!e&&!e.hidden};
 const typing=e=>{const t=e.target;return !!t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||!!t.isContentEditable)};

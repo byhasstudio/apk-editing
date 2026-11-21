@@ -30,6 +30,7 @@
 <link rel="stylesheet" href="css/device3d.css?v=1">
 <link rel="stylesheet" href="css/brand.css?v=1">
 <link rel="stylesheet" href="css/home-ref.css?v=1">
+<link rel="stylesheet" href="css/tl-ae.css?v=1">
 </head>
 <body>
 <section id="home" class="view">
@@ -68,7 +69,11 @@
     <aside class="panel" id="panel-props"><h3>Properti</h3><p class="empty">Pilih clip di timeline untuk melihat properti dan keyframe animasi.</p></aside>
     <aside class="panel" id="panel-efek" aria-label="Daftar efek"><div class="panel-head"><h3>Efek</h3><button class="btn" id="fx-close" title="Kembali ke panel Properti">Properti</button></div><p class="kf-hint" id="fx-note"></p><div id="fx-grid" class="fx-grid"></div></aside>
   </div>
-  <div class="panel timeline" id="panel-timeline"><div class="tl-bar">
+  <div class="panel timeline" id="panel-timeline"><div class="tl-tr" id="tl-tr">
+    <div class="grp"><button type="button" id="tr-snap" title="Snap: clip menempel ke tepi clip lain dan playhead" aria-label="Snap"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16M12 4v16"/></svg></button><span class="time" id="tr-time">00:00.00</span></div>
+    <div class="grp mid"><button type="button" id="tr-prev" title="Mundur 1 frame" aria-label="Mundur 1 frame"><svg viewBox="0 0 24 24"><path d="M18 5L8 12l10 7z"/><path d="M5 5v14"/></svg></button><button type="button" id="tr-play" title="Play / Pause" aria-label="Play / Pause"></button><button type="button" id="tr-next" title="Maju 1 frame" aria-label="Maju 1 frame"><svg viewBox="0 0 24 24"><path d="M6 5l10 7-10 7z"/><path d="M19 5v14"/></svg></button></div>
+    <div class="grp"><button type="button" id="tr-undo" title="Undo" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button><button type="button" id="tr-redo" title="Redo" aria-label="Redo"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 000 12h3"/></svg></button></div>
+  </div><div class="tl-bar">
     <button class="btn" id="tl-split" title="Belah clip terpilih di playhead (S)">Split</button><button class="btn" id="tl-dup" title="Duplikat clip terpilih (Ctrl+D)">Duplikat</button><button class="btn danger" id="tl-del" title="Hapus clip terpilih (Delete)">Hapus</button>
     <button class="btn" id="tl-copy" title="Salin clip terpilih (Ctrl+C)">Salin</button><button class="btn" id="tl-paste" title="Tempel di posisi playhead (Ctrl+V)">Tempel</button>
     <button class="btn" id="tl-multi" title="Aktifkan agar mengetuk clip menambah / melepas seleksi (di komputer: tahan Shift atau Ctrl)">Pilih banyak</button>
@@ -269,5 +274,6 @@
 <script src="js/qrlink.js?v=1"></script>
 <script src="js/sync.js?v=1"></script>
 <script src="js/home-ref.js?v=1"></script>
+<script src="js/tl-ae.js?v=1"></script>
 </body>
 </html>

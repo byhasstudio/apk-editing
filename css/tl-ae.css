@@ -50,14 +50,14 @@ html #editor .clip{top:1px;bottom:1px;border-radius:4px;padding:0 22px 0 6px;fon
 html #editor .clip::after{content:"";position:absolute;right:6px;top:50%;width:14px;height:8px;margin-top:-4px;pointer-events:none;opacity:.75;
   background:linear-gradient(#fff 0 0) 0 0/100% 1.5px no-repeat,linear-gradient(#fff 0 0) 0 50%/100% 1.5px no-repeat,linear-gradient(#fff 0 0) 0 100%/100% 1.5px no-repeat}
 html #editor .clip.video{background-color:#2f6df0}
-html #editor .clip.image{background-color:#f2f4f8;color:#14161c;background-image:none}
+html #editor .clip.image{background-color:#f5b82e;color:#2a1c00;background-image:none}
 html #editor .clip.image::after{filter:invert(1)}
 html #editor .clip.audio{background-color:#1fa97a}
-html #editor .clip.text{background-color:#2f6df0}
-html #editor .clip.shape{background-color:#5cc8f5;color:#06222e}
+html #editor .clip.text{background-color:#a64dff}
+html #editor .clip.shape{background-color:#3cc8e8;color:#04242c}
 html #editor .clip.shape::after{filter:invert(1)}
-html #editor .clip.stk{background-color:#ef4b4b}
-html #editor .clip.fx{background-color:#f59a1b}
+html #editor .clip.stk{background-color:#f0487a}
+html #editor .clip.fx{background-color:#f2761b}
 html #editor .clip.locked{background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.25) 0 5px,transparent 5px 10px)}
 html #editor .clip.sel{outline:0;box-shadow:inset 0 0 0 2px #fff;z-index:2}
 html #editor .clip.sel.pri{box-shadow:inset 0 0 0 2px #fff,0 0 0 1px #000}

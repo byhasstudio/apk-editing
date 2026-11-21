@@ -96,3 +96,76 @@ function start(){
 }
 if(document.readyState==='complete')start();else addEventListener('load',start);
 })();
+
+/* ===== v24: Mode Halus (tombol), playhead mulus, klip timeline lebih besar (css/tl-big.css) =====
+   Hanya menambah: logika timeline dan preview lama tidak diubah. Mode Halus sendiri ada di js/preview.js (APK.preview.setSmooth). */
+(function(){
+'use strict';
+const $=id=>document.getElementById(id),HEAD=56;
+try{
+  const l=document.createElement('link');l.rel='stylesheet';l.href='css/tl-big.css?v=1';
+  document.head.appendChild(l);
+}catch(_){}
+const BOLT='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12z"/></svg>';
+const pv=()=>window.APK&&APK.preview&&APK.preview.setSmooth?APK.preview:null;
+function toast(m){const t=$('toast');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),2600)}
+function sync(){
+  const p=pv(),on=!!(p&&p.smooth);
+  for(const id of ['tr-smooth','pv-smooth']){const b=$(id);if(b){b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false')}}
+}
+function flip(){
+  const p=pv();if(!p)return;
+  p.setSmooth(!p.smooth);sync();
+  toast(p.smooth?'Mode Halus nyala: frame digambar dengan irama rata. Efek dan kualitas tidak dikurangi.':'Mode Halus mati');
+}
+const TIP='Mode Halus: pemutaran preview dibuat rata mengikuti refresh layar (tidak patah-patah). Semua efek dan kualitas tetap, hasil export tidak berubah.';
+function mk(id,cls){const b=document.createElement('button');b.type='button';b.id=id;if(cls)b.className=cls;b.innerHTML=BOLT;b.title=TIP;b.setAttribute('aria-label','Mode Halus');b.setAttribute('aria-pressed','false');b.onclick=flip;return b}
+function addButtons(){
+  if(!pv())return;
+  const snap=$('tr-snap'),stop=$('pv-stop');
+  if(snap&&!$('tr-smooth'))snap.insertAdjacentElement('afterend',mk('tr-smooth'));
+  if(stop&&!$('pv-smooth'))stop.insertAdjacentElement('afterend',mk('pv-smooth',stop.className));
+  sync();
+}
+function pps(){
+  const r=$('tl-ruler'),p=window.APK&&APK.preview;if(!r||!p)return 0;
+  const w=parseFloat(r.style.width);
+  return w>0?w/Math.max(30,p.duration+10):0;
+}
+/* playhead digeser tiap refresh layar dan timeline mengikuti pelan-pelan (bukan loncat satu halaman) */
+function place(t){
+  const ph=$('tl-ph'),sc=$('tl-scroll'),k=pps();
+  if(!ph||!sc||!k)return false;
+  const x=HEAD+t*k;
+  if(Math.abs((parseFloat(ph.style.left)||0)-x)>=0.2)ph.style.left=x+'px';
+  const lim=sc.clientWidth*0.72;
+  if(x-sc.scrollLeft>lim)sc.scrollLeft=x-lim;
+  else if(x<sc.scrollLeft+HEAD)sc.scrollLeft=Math.max(0,x-HEAD-40);
+  return true;
+}
+const T=window.APK&&APK.timeline;
+if(T&&T.setPlayhead&&!T.__halus){
+  const orig=T.setPlayhead;T.__halus=1;
+  T.setPlayhead=function(t){
+    const p=window.APK&&APK.preview;
+    if(p&&p.playing&&p.smooth&&place(t))return;
+    return orig.apply(this,arguments);
+  };
+}
+let raf=0;
+function tick(){
+  raf=0;
+  const p=window.APK&&APK.preview;
+  if(!p||!p.playing||!p.smooth)return;
+  place(p.time);
+  raf=requestAnimationFrame(tick);
+}
+function kick(){const p=window.APK&&APK.preview;if(!raf&&p&&p.playing&&p.smooth)raf=requestAnimationFrame(tick)}
+function start(){
+  addButtons();
+  const b=$('pv-play');
+  if(b)new MutationObserver(kick).observe(b,{childList:true,characterData:true,subtree:true});
+  addEventListener('apk-smooth',()=>{sync();kick()});
+}
+if(document.readyState==='complete')start();else addEventListener('load',start);
+})();

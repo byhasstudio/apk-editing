@@ -1,0 +1,166 @@
+/* pro-dark.css (v31): desain ulang editor video 2D bergaya gelap profesional (ala DaVinci / Premiere).
+   Yang didesain ulang: bilah atas, panel Media / Properti / Efek, preview dan kontrolnya, dialog Project Baru / Export / Stiker, dan Beranda.
+   TIMELINE TIDAK DISENTUH (css/tl-ae.css, css/tl-big.css, js/timeline.js, js/tl-ae.js tetap seperti sebelumnya).
+   Hanya tampilan: ID, struktur, dan logika tidak diubah. Warna dipasang sebagai variabel di bagian-bagian yang didesain ulang saja
+   (bukan di #editor utuh), jadi timeline dan Edit 3D tidak ikut berubah. Tata letak baru hanya untuk PC (data-device=pc); ponsel hanya ganti warna. */
+
+/* ===== warna ===== */
+html #home,
+html #editor .top,
+html #editor .workspace,
+html #editor .mtabs,
+html :is(#dlg-new,#dlg-export,#dlg-sticker,#dlg-help,#dlg-keys){
+  --bg:#0f1012;--panel:#17181c;--panel2:#202228;--line:#2a2c33;--text:#e4e6eb;--dim:#8d929e;
+  --accent:#4da3ff;--accent-ink:#04111f;--danger:#ff6b6b;--r:6px;color-scheme:dark;
+}
+
+/* ===== bilah atas ===== */
+html #editor .top{background:linear-gradient(#1c1d22,#16171b);border-bottom:1px solid #07080a;box-shadow:inset 0 1px 0 #272a31}
+html #editor .top .btn{background:transparent;border:1px solid transparent;color:#c5c9d2;border-radius:5px;font-size:12.5px;transition:background .12s,color .12s,border-color .12s}
+html #editor .top .btn:hover{background:#262830;border-color:#363a44;color:#fff}
+html #editor .top .btn:disabled{opacity:.3}
+html #editor .top .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+html #editor .top .btn.primary:hover{background:var(--accent);filter:brightness(1.12)}
+html #editor .top #btn-export{background:#23262d;border-color:#3a3e49;color:#fff}
+html #editor .top #btn-export:hover{border-color:var(--accent)}
+html #editor .top .name-input{background:#0c0d0f;border:1px solid #26282f;border-radius:5px;color:#eef0f4;font-weight:600}
+html #editor .top .name-input:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
+html #editor .top .meta{color:#6f7480;font:11px ui-monospace,Menlo,Consolas,monospace}
+html #editor .top .save-state{font-size:11px;color:#6f7480}
+html #editor .top .save-state.dirty{color:#ffb454}
+
+/* ikon di bilah atas (tulisan tetap) */
+html #editor :is(#btn-back,#btn-png,#btn-export,#btn-export-json,#btn-save,#btn-mode)::before{content:"";width:15px;height:15px;flex:none;background:currentColor;-webkit-mask:var(--pi) center/contain no-repeat;mask:var(--pi) center/contain no-repeat;opacity:.9}
+html #editor .top .btn:is(#btn-back,#btn-png,#btn-export,#btn-export-json,#btn-save,#btn-mode){display:inline-flex;align-items:center;gap:6px}
+html #editor #btn-back{--pi:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 11l9-8 9 8M5 9.5V20h5v-6h4v6h5V9.5'/%3E%3C/svg%3E")}
+html #editor #btn-png{--pi:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='16' rx='2.5'/%3E%3Ccircle cx='9' cy='9.5' r='1.7'/%3E%3Cpath d='M21 16l-5-5-9 9'/%3E%3C/svg%3E")}
+html #editor #btn-export{--pi:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v12M7 10l5 5 5-5M4 20h16'/%3E%3C/svg%3E")}
+html #editor #btn-export-json{--pi:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3h8l4 4v14H6zM14 3v5h4'/%3E%3C/svg%3E")}
+html #editor #btn-save{--pi:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 3h11l3 3v15H5zM8 3v6h7V3M8 21v-7h8v7'/%3E%3C/svg%3E")}
+html #editor #btn-mode{--pi:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h9M17 7h3M4 17h3M11 17h9'/%3E%3Ccircle cx='15' cy='7' r='2'/%3E%3Ccircle cx='9' cy='17' r='2'/%3E%3C/svg%3E")}
+html[data-device=mobile] #editor .top .btn::before{display:none}
+
+/* tombol lipat panel kiri / kanan (js/pro-ui.js, hanya PC) */
+html #editor .top .pro-tg{width:30px;height:30px;padding:0;display:inline-grid;place-items:center;color:#7d8391}
+html #editor .top .pro-tg svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+html #editor .top .pro-tg.on{color:#c5c9d2}
+html #editor .top .pro-tg.on svg .f{fill:currentColor;fill-opacity:.35}
+html[data-device=mobile] #editor .top .pro-tg{display:none}
+
+/* ===== bilah atas: ukuran PC ===== */
+html[data-device=pc] #editor .top{height:46px;padding:0 10px;gap:4px}
+html[data-device=pc] #editor .top .btn{height:30px;padding:0 11px;white-space:nowrap}
+html[data-device=pc] #editor .top #btn-undo,html[data-device=pc] #editor .top #btn-redo,html[data-device=pc] #editor .top #btn-help{width:30px;padding:0;font-size:15px}
+html[data-device=pc] #editor .top .name-input{width:240px;max-width:240px;height:30px;margin:0 8px;padding:0 10px;font-size:13px;text-align:center}
+html[data-device=pc] #editor .top .meta{flex:1;text-align:left;margin-left:4px}
+
+/* ===== tata letak PC: preview besar di tengah, panel samping ramping dan bisa dilipat ===== */
+html[data-device=pc] #editor .workspace{--pro-l:272px;--pro-r:312px;grid-template-columns:var(--pro-l) minmax(0,1fr) var(--pro-r);gap:0;background:#08090a;overflow:hidden}
+@media(min-width:901px) and (max-width:1180px){html[data-device=pc] #editor .workspace{--pro-l:236px;--pro-r:276px}}
+@media(min-width:1500px){html[data-device=pc] #editor .workspace{--pro-l:300px;--pro-r:340px}}
+html[data-device=pc] #editor #panel-media{grid-column:1;grid-row:1}
+html[data-device=pc] #editor #panel-preview{grid-column:2;grid-row:1}
+html[data-device=pc] #editor :is(#panel-props,#panel-efek){grid-column:3;grid-row:1}
+html[data-device=pc] #editor[data-pl="0"] .workspace{--pro-l:0px}
+html[data-device=pc] #editor[data-pr="0"] .workspace{--pro-r:0px}
+html[data-device=pc] #editor[data-pl="0"] #panel-media{display:none}
+html[data-device=pc] #editor[data-pr="0"] :is(#panel-props,#panel-efek){display:none!important}
+
+/* ===== panel Media / Properti / Efek ===== */
+html #editor :is(#panel-media,#panel-props,#panel-efek){background:var(--panel);scrollbar-width:thin;scrollbar-color:#343741 transparent}
+html #editor #panel-media{box-shadow:inset -1px 0 0 #23252b}
+html #editor :is(#panel-props,#panel-efek){box-shadow:inset 1px 0 0 #23252b}
+html #editor :is(#panel-media,#panel-props,#panel-efek) h3{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9aa0ad}
+html #editor :is(#panel-media,#panel-efek)>.panel-head,html #editor #panel-props>h3:first-child{position:sticky;top:0;z-index:2;margin:-12px -12px 12px;padding:0 12px;height:38px;display:flex;align-items:center;justify-content:space-between;background:#1c1e23;border-bottom:1px solid #0b0c0e}
+html #editor :is(#panel-media,#panel-efek)>.panel-head h3{margin:0}
+html #editor :is(#panel-media,#panel-efek)>.panel-head .btn{height:26px;padding:0 12px;font-size:12px;border-radius:5px;background:#262830;border-color:#363a44}
+html #editor :is(#panel-media,#panel-efek)>.panel-head .btn:hover{border-color:var(--accent)}
+html #editor #panel-props label{font-size:11px;color:#8d929e;letter-spacing:.02em}
+html #editor :is(#panel-props,#panel-media,#panel-efek) :is(input[type=number],input[type=text],select,textarea){background:#0c0d0f;border:1px solid #2b2e36;border-radius:4px;color:#e4e6eb;color-scheme:dark}
+html #editor :is(#panel-props,#panel-media,#panel-efek) :is(input[type=number],input[type=text],select,textarea):focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}
+html #editor :is(#panel-props,#panel-media,#panel-efek) input:is([type=range],[type=checkbox]){accent-color:var(--accent)}
+html #editor #panel-props input[type=color]{background:#0c0d0f;border:1px solid #2b2e36;border-radius:4px}
+html #editor #panel-props .btn,html #editor #panel-efek .btn{background:#262830;border-color:#363a44;border-radius:5px}
+html #editor #panel-props .btn:hover,html #editor #panel-efek .btn:hover{border-color:var(--accent)}
+html #editor #panel-props .pr-name{color:#eef0f4}
+html #editor .empty,html #editor .kf-hint{color:#7d8391}
+
+/* daftar media */
+html #editor .media-item{background:#1c1e24;border:1px solid #272a31;border-radius:6px;padding:6px;margin-bottom:6px;transition:border-color .12s,background .12s}
+html #editor .media-item:hover{background:#21242b;border-color:#3a3f4a}
+html #editor .m-thumb{width:64px;height:44px;background:#0c0d0f;border-radius:4px}
+html #editor .m-info b{color:#e4e6eb}
+html #editor .media-item .btn{background:#262830;border-color:#363a44;border-radius:4px}
+html #editor .curve-dock{margin-top:14px;padding-top:12px;border-top:1px solid #262830}
+html #editor .kf-graph{background:#0c0d0f;border:1px solid #2b2e36;border-radius:6px}
+
+/* daftar efek */
+html #editor .fx-card{background:#1c1e24;border:1px solid #272a31;border-radius:6px;transition:border-color .12s,transform .12s}
+html #editor .fx-card:hover{border-color:var(--accent);transform:translateY(-1px)}
+
+/* ===== preview dan kontrolnya ===== */
+html #editor #panel-preview{background:#0b0c0e}
+html[data-device=pc] #editor #panel-preview{padding:12px 14px 10px;gap:10px}
+html #editor .preview-wrap{background:#000;border:1px solid #1f2127;border-radius:3px;box-shadow:0 0 0 1px #000,0 14px 36px -16px #000}
+html #editor .pv-controls{background:#141519;border:1px solid #23252b;border-radius:8px;padding:5px 8px;gap:4px}
+html #editor .pv-controls :is(.btn,#pv-smooth,#pv-loop){background:transparent;border:1px solid transparent;color:#cfd3db;border-radius:6px;transition:background .12s,color .12s}
+html #editor .pv-controls :is(.btn,#pv-smooth,#pv-loop):hover{background:#252830;color:#fff;border-color:#33363f}
+html #editor .pv-controls #pv-play{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+html #editor .pv-controls #pv-play:hover{background:var(--accent);filter:brightness(1.12);color:var(--accent-ink)}
+html #editor .pv-controls #pv-smooth.on{color:#2ee06f;border-color:color-mix(in srgb,#2ee06f 55%,transparent)}
+html #editor .pv-controls #pv-time{font:600 12px ui-monospace,Menlo,Consolas,monospace;color:#cfd3db;background:#0c0d0f;border:1px solid #23252b;border-radius:5px;padding:5px 10px;letter-spacing:.02em}
+html #editor .pv-controls label.meta{color:#8d929e;display:inline-flex;align-items:center;gap:6px}
+html #editor .pv-controls input[type=range]{accent-color:var(--accent)}
+html #editor .pv-controls select{background:#0c0d0f;border:1px solid #2b2e36;color:#cfd3db;border-radius:5px;color-scheme:dark}
+html[data-device=pc] #editor .pv-controls :is(.btn,#pv-smooth,#pv-loop){width:34px;height:34px;padding:0;display:inline-grid;place-items:center;font-size:15px}
+html[data-device=pc] #editor .pv-controls #pv-play{width:38px;height:38px;border-radius:50%}
+html[data-device=pc] #editor .pv-controls select{height:30px;padding:0 8px}
+
+/* ===== dialog (hanya dialog editor 2D) ===== */
+html :is(#dlg-new,#dlg-export,#dlg-sticker,#dlg-help,#dlg-keys){background:#17181c;border:1px solid #2a2c33;border-radius:10px;box-shadow:0 30px 80px -20px #000;color:#e4e6eb}
+html :is(#dlg-new,#dlg-export,#dlg-sticker){padding:0;width:min(480px,94vw);overflow:hidden}
+html #dlg-export{width:min(580px,94vw);max-height:92vh;overflow:auto}
+html :is(#dlg-new,#dlg-export,#dlg-sticker)>form{padding:0 20px 18px}
+html :is(#dlg-new,#dlg-export,#dlg-sticker) h3{margin:0 -20px 16px;padding:14px 20px;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#cfd3db;background:#1d1f24;border-bottom:1px solid #0b0c0e}
+html :is(#dlg-new,#dlg-export,#dlg-sticker,#dlg-help,#dlg-keys) label{color:#8d929e;font-size:11.5px;font-weight:600;letter-spacing:.02em}
+html :is(#dlg-new,#dlg-export,#dlg-sticker,#dlg-help,#dlg-keys) :is(input,select,textarea){background:#0c0d0f;border:1px solid #2b2e36;border-radius:5px;padding:8px 10px;color:#e4e6eb}
+html :is(#dlg-new,#dlg-export,#dlg-sticker,#dlg-help,#dlg-keys) :is(input,select,textarea):focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 24%,transparent)}
+html :is(#dlg-new,#dlg-export) input:is([type=range],[type=checkbox]){accent-color:var(--accent);padding:0;background:none;border:0}
+html :is(#dlg-new,#dlg-export,#dlg-sticker,#dlg-help,#dlg-keys) .btn{background:#23262d;border:1px solid #343741;border-radius:5px;color:#e4e6eb}
+html :is(#dlg-new,#dlg-export,#dlg-sticker,#dlg-help,#dlg-keys) .btn:hover{border-color:var(--accent)}
+html :is(#dlg-new,#dlg-export,#dlg-sticker,#dlg-help,#dlg-keys) .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+html :is(#dlg-new,#dlg-export,#dlg-sticker) .dlg-actions{margin:18px -20px -18px;padding:12px 20px;background:#14151a;border-top:1px solid #0b0c0e}
+html :is(#dlg-new,#dlg-export,#dlg-sticker) .dlg-actions .btn{min-height:34px;padding:0 18px;height:34px}
+html :is(#dlg-new,#dlg-export,#dlg-sticker) .meta{color:#7d8391}
+html #dlg-export .ex-bar{background:#0c0d0f}
+html #dlg-sticker .stk-grid button{background:#1c1e24;border-color:#272a31;border-radius:6px}
+html #dlg-sticker .stk-grid button:hover{border-color:var(--accent);background:#23262d}
+
+/* dialog dua kolom di PC */
+html[data-device=pc] #form-new{display:grid;grid-template-columns:1fr 1fr;column-gap:14px}
+html[data-device=pc] #form-new>h3,html[data-device=pc] #form-new>label:first-of-type,html[data-device=pc] #form-new>.meta,html[data-device=pc] #form-new>.dlg-actions{grid-column:1/-1}
+html[data-device=pc] #ex-settings{display:grid;grid-template-columns:1fr 1fr;column-gap:14px;grid-auto-flow:row dense}
+html[data-device=pc] #ex-settings>.fps-slide,html[data-device=pc] #ex-settings>.meta,html[data-device=pc] #ex-settings>.dlg-actions{grid-column:1/-1}
+
+/* ===== Beranda ===== */
+html #home{background:radial-gradient(1100px 380px at 18% -12%,rgba(77,163,255,.11),transparent 60%),#0f1012}
+html #home .home-head{background:#131418;border-bottom:1px solid #1d1f25}
+html #home .brand b{letter-spacing:.01em;color:#eef0f4}
+html #home .hr-hi h1{color:#f1f3f7}
+html .hr-main{background:linear-gradient(135deg,#1d5a99 0%,#153a62 58%,#112b47 100%);border:1px solid #2a5d94;color:#eaf3ff;box-shadow:0 12px 32px -16px rgba(77,163,255,.65)}
+html .hr-main::after{background:rgba(255,255,255,.06)}
+html .hr-main:hover{box-shadow:0 16px 36px -14px rgba(77,163,255,.8)}
+html .hr-main .ic{background:#0a1522;color:#7cc0ff}
+html .hr-sm{background:#17181c;border:1px solid #25272e;border-radius:12px}
+html .hr-sm:hover{border-color:var(--accent)}
+html .hr-sm .ic{color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent);border-radius:10px}
+html #home .card{background:#17181c;border:1px solid #25272e;border-radius:10px}
+html #home .card:hover{border-color:var(--accent)}
+html #home .card .thumb{background:#0b0c0e;border-radius:8px}
+html #home .card-foot .btn{background:#23262d;border-color:#343741;border-radius:5px}
+html #home .empty-home{background:#131418;border-color:#2a2c33}
+html #home .home-main h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9aa0ad}
+
+/* ===== ponsel: tab bawah editor ===== */
+html[data-device=mobile] #editor .mtabs{background:#131418;border-top:1px solid #0a0b0d}
+html[data-device=mobile] #editor .mtabs button.on{color:var(--accent);border-top-color:var(--accent)}

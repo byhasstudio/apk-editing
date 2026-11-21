@@ -12,7 +12,7 @@
      Sesi lama tanpa rt tetap bisa dipakai, tapi sinkron baru aktif setelah Keluar lalu Masuk lagi.
    - Keluar: tombol "Keluar" di beranda (project sudah tersimpan otomatis di sana).
 
-   LOGIN LEWAT BROWSER LAIN (untuk APK / WebView / browser dalam aplikasi):
+   LOGIN LEWAT BROWSER LAIN (untuk APK / WebView / Electron (exe) / browser dalam aplikasi):
    Google memblokir login di dalam WebView (disallowed_useragent), jadi di sana tombol Google diganti alur kode:
    1) Aplikasi membuat kode acak 10 karakter dan menampilkannya, lalu memeriksa Realtime Database tiap 2 detik (REST, tanpa SDK).
       Kalau kode gagal / tidak jalan, tombol "Buat kode baru" membuat kode dan tautan baru (kode lama dihapus).
@@ -41,10 +41,11 @@ const proto=window.IDBFactory&&IDBFactory.prototype;
 if(!proto||!window.indexedDB)return;
 const rawOpen=proto.open,rawDelete=proto.deleteDatabase;
 
-/* Deteksi WebView / browser dalam aplikasi: di sini login Google langsung diblokir Google */
+/* Deteksi WebView / Electron (exe) / browser dalam aplikasi: di sini login Google langsung diblokir Google */
 const WV=(function(){
   const u=navigator.userAgent||'';
   try{if(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())return true}catch(e){}
+  if(/Electron\//.test(u))return true;
   if(/; wv\)|\bwv\b|FBAN|FBAV|Instagram|Line\/|MicroMessenger/.test(u))return true;
   if(/Android/.test(u)&&/Chrome\//.test(u)&&/Version\/\d+\.\d+/.test(u)&&!/SamsungBrowser|OPR\/|EdgA/.test(u))return true;
   return false;

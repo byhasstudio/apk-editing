@@ -5,7 +5,8 @@
    Aturan yang sama dengan js/fxbersih.js: tepi tidak pernah kosong (zoom otomatis menutup), blur lewat kecilkan-besarkan gambar (tanpa ctx.filter),
    cahaya dan gelap hanya menyentuh piksel yang sudah ada.
    Efek ditandai cat:'transisi' supaya muncul di tab "Efek Transisi" (js/fxlib.js); efek tanpa cat masuk tab "Efek Media".
-   Dimuat setelah js/fxclip.js dan sebelum js/fxlib.js. */
+   Dimuat setelah js/fxclip.js dan sebelum js/fxlib.js.
+   Di akhir file ada tambahan: Shake Video dibuat MENYAMBUNG (pelan masuk > klimaks > pelan reda) dan dua transisi baru dari video referensi (Kotak Bingkai, Belah Empat). */
 window.APK=window.APK||{};
 (function(){
   const F=APK.fxclip;
@@ -408,6 +409,57 @@ window.APK=window.APK||{};
     }
   }
 
+  /* ===== 15. Kotak Bingkai (dari video referensi): gambar mengecil jadi kotak berbingkai tipis di tengah, latarnya cermin gambar yang diperbesar dan digelapkan,
+     lalu kotak membesar lagi sampai penuh. Latar disusun dari ubin cermin (bolak-balik) jadi tepi tidak pernah kosong. ===== */
+  function kotak(g,w,h,p,tm,opaque,rel,dur){
+    const b=bell2(rel,dur);if(b<0.003)return;
+    const k=scl(w,h),S=ac('kx',w,h);S.drawImage(g.canvas,0,0);
+    const si=1-b*(1-p.sz/100),zb=1+p.zm/100*b;
+    g.clearRect(0,0,w,h);g.fillStyle='#000';g.fillRect(0,0,w,h);
+    for(let a=-1;a<=1;a++)for(let c=-1;c<=1;c++){
+      g.save();
+      g.translate(w/2+a*w*zb,h/2+c*h*zb);g.scale(a?-zb:zb,c?-zb:zb);g.translate(-w/2,-h/2);
+      g.drawImage(S.canvas,0,0);
+      g.restore();
+    }
+    const dm=clamp(p.dim/100*b*0.85,0,1);
+    if(dm>0.004){g.fillStyle='rgba(0,0,0,'+dm.toFixed(3)+')';g.fillRect(0,0,w,h)}
+    const bw=w*si,bh=h*si,x=(w-bw)/2,y=(h-bh)/2;
+    if(b>0.02){
+      g.save();
+      g.shadowColor='rgba(0,0,0,'+(p.shw/100*0.8*ss(b*3)).toFixed(3)+')';g.shadowBlur=16*k*b;
+      g.fillStyle='#000';g.fillRect(x,y,bw,bh);
+      g.restore();
+    }
+    g.save();
+    g.beginPath();g.rect(x,y,bw,bh);g.clip();
+    g.translate(w/2,h/2);g.scale(si,si);g.translate(-w/2,-h/2);
+    g.drawImage(S.canvas,0,0);
+    g.restore();
+    g.strokeStyle='rgba(235,235,235,'+(0.9*ss(b*4)).toFixed(3)+')';g.lineWidth=Math.max(1,1.5*k);
+    g.strokeRect(x,y,bw,bh);
+  }
+
+  /* ===== 16. Belah Empat (dari video referensi): layar terbelah silang jadi empat petak dengan celah tipis di tengah,
+     tiap petak mengalir satu arah (bergantian per petak, ada jeda acak) lalu kembali menyatu persis seperti semula. ===== */
+  function empat(g,w,h,p,tm,opaque,rel,dur){
+    const b=bell2(rel,dur);if(b<0.003)return;
+    const u=uOf(rel,dur),sg=p.dir>=1?-1:1,k=scl(w,h),S=ac('em',w,h);S.drawImage(g.canvas,0,0);
+    const gp=p.gap/100*Math.min(w,h)*0.012*b+1.2*k*ss(b*4),cx=w/2,cy=h/2;
+    g.clearRect(0,0,w,h);g.fillStyle='rgb('+gray(p.wrn)+')';g.fillRect(0,0,w,h);
+    for(let q=0;q<4;q++){
+      const qx=q&1,qy=q>>1;
+      const x0=qx?cx+gp/2:0,x1=qx?w:cx-gp/2,y0=qy?cy+gp/2:0,y1=qy?h:cy-gp/2;
+      const sh=((q===0||q===3)?1:-1)*sg*w*run(u,rnd(q,7)*p.amt/100);
+      const z=1+p.zm/100*b*(0.4+0.8*rnd(q,5));
+      g.save();
+      g.beginPath();g.rect(x0,y0,x1-x0,y1-y0);g.clip();
+      g.translate(cx+sh,cy);g.scale(z,z);g.translate(-cx,-cy);
+      for(let s=-1;s<=1;s++)g.drawImage(S.canvas,s*w,0);
+      g.restore();
+    }
+  }
+
   /* ===== definisi efek transisi ===== */
   const LIST=[
     {id:'trzoomkabur',cat:'transisi',name:'Zoom Kabur',desc:'Transisi zoom masuk dengan blur radial, sambungan tertutup di puncak',len:0.8,
@@ -431,13 +483,48 @@ window.APK=window.APK||{};
     {id:'trinversi',cat:'transisi',name:'Inversi Gelembung',desc:'Gambar jadi garis tepi terang di latar gelap dengan cincin gelembung, lalu kembali normal',len:0.9,
       params:[['amt','Kekuatan inversi',0,100,100],['cnt','Jumlah gelembung',0,150,90],['edg','Tebal garis tepi',1,6,2],['zm','Zoom dasar (%)',0,30,6]],apply:mb(inversi)},
     {id:'trpusaran',cat:'transisi',name:'Pusaran',desc:'Gambar mengecil dan berputar jadi kincir kecil di layar putih, lalu mekar kembali',len:1.0,
-      params:[['cnt','Jumlah bilah kincir',3,8,5],['trn','Putaran penuh (kali)',1,3,1],['tw','Lengkung bilah',0,100,50],['wrn','Warna latar (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:pusaran},
+      params:[['cnt','Jumlah bilah kincir',3,8,5],['trn','Putaran penuh (kali)',1,3,1],['tw','Lengkung bilah',0,100,50],['wrn','Warna latar (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:mb(pusaran)},
     {id:'trpecahan',cat:'transisi',name:'Pecahan Miring',desc:'Gambar terbelah jadi pecahan diagonal yang bergeser dan miring dengan bayangan',len:0.9,
       params:[['cnt','Jumlah pecahan',2,6,3],['ang','Sudut potong (derajat)',-80,80,-20],['amt','Jeda antar pecahan',0,100,60],['zm','Zoom dasar (%)',0,30,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:mb(pecahan)},
     {id:'trbelahgaris',cat:'transisi',name:'Belah Garis',desc:'Celah tipis membelah layar, kedua sisi merenggang dan pita tengah menyelip',len:0.8,
       params:[['ori','Arah (0 = mendatar, 1 = tegak)',0,1,0],['pos','Posisi belahan (%)',10,90,50],['gap','Lebar celah',0,100,40],['amt','Lebar pita tengah',0,100,60],['wrn','Warna celah (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:mb(belahgaris)},
     {id:'trmosaik',cat:'transisi',name:'Mosaik Kotak',desc:'Layar pecah jadi kotak-kotak yang berzoom dan bergeser acak',len:0.9,
-      params:[['cnt','Jumlah kolom',2,8,4],['amt','Jeda antar kotak',0,100,70],['zm','Zoom kotak (%)',0,100,50]],apply:mb(mosaik)}
+      params:[['cnt','Jumlah kolom',2,8,4],['amt','Jeda antar kotak',0,100,70],['zm','Zoom kotak (%)',0,100,50]],apply:mb(mosaik)},
+    {id:'trkotak',cat:'transisi',name:'Kotak Bingkai',desc:'Gambar mengecil jadi kotak berbingkai di tengah dengan latar cermin yang diperbesar, lalu membesar penuh lagi',len:0.9,
+      params:[['sz','Ukuran kotak di puncak (%)',30,90,55],['zm','Zoom latar cermin (%)',0,80,30],['dim','Gelapkan latar',0,80,30],['shw','Bayangan kotak',0,100,60]],apply:mb(kotak)},
+    {id:'trempat',cat:'transisi',name:'Belah Empat',desc:'Layar terbelah empat petak dengan celah tipis, tiap petak mengalir bergantian lalu menyatu lagi',len:0.9,
+      params:[['gap','Lebar celah',0,100,60],['amt','Jeda antar petak',0,100,50],['zm','Zoom petak (%)',0,50,15],['wrn','Warna celah (0 = putih, 100 = hitam)',0,100,20],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:mb(empat)}
   ];
   for(const e of LIST){if(F.DEF[e.id])continue;F.LIST.push(e);F.DEF[e.id]=e}
+
+  /* ===== Shake Video MENYAMBUNG =====
+     Shake Video asli (js/fxclip.js) mengulang satu hentakan dari awal sampai akhir clip dengan kekuatan tetap, jadi tiap putaran terasa seperti hentakan baru.
+     Di sini kekuatannya dibungkus kurva sepanjang clip: DIAM > naik pelan > KLIMAKS (dataran di tengah clip) > mereda pelan > DIAM,
+     jadi gerakannya menyambung seperti fade in > klimaks > fade out. Zoom tambahan ikut dikalikan kurva yang sama supaya tidak melompat di awal atau akhir.
+     Gerak dasar tetap data dari video referensi (tidak diubah). "Naik pelan" dan "Turun pelan" mengatur panjang bagian naik dan turun (0 = tajam, 100 = sepanjang separuh clip).
+     Kalau "Ulangi terus" = 0 (sekali di awal), perilaku lama dipakai apa adanya tanpa kurva. */
+  (function(){
+    const d=F.DEF.vshake;
+    if(!d||d.cont)return;
+    const orig=d.apply;
+    d.cont=true;
+    d.len=3;
+    d.desc='Hentakan kamera dari video referensi yang menyambung: pelan masuk, klimaks di tengah clip, lalu pelan mereda sampai diam';
+    d.params=d.params.concat([
+      ['atk','Naik pelan (0 = langsung kuat, 100 = naik pelan sampai tengah clip)',0,100,60],
+      ['dec','Turun pelan (0 = tetap kuat sampai akhir, 100 = mereda pelan dari tengah clip)',0,100,60]
+    ]);
+    d.apply=function(g,w,h,p,tm,opaque,rel,dur){
+      let q=p;
+      if(p.rep>=1&&dur>0){
+        const u=clamp(rel/dur,0,1),ri=0.04+0.46*p.atk/100,fa=0.04+0.46*p.dec/100;
+        let e=1;
+        if(u<ri)e=sm5(u/ri);
+        if(u>1-fa)e=Math.min(e,sm5((1-u)/fa));
+        if(e<0.002)return;
+        q=Object.assign({},p,{amt:p.amt*e,zm:p.zm*e});
+      }
+      orig(g,w,h,q,tm,opaque,rel,dur);
+    };
+  })();
 })();

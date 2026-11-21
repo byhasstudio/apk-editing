@@ -7,6 +7,10 @@ name: Build APK
 # Setiap push ke situs otomatis sampai ke APK: dicek saat dibuka dan tiap 1 jam (lihat js/updater.js).
 # APK baru hanya perlu dibuat kalau nama, ikon, atau pengaturan cangkangnya berubah.
 #
+# Simpan file (export video, preset, QR, dst): WebView Android tidak menangani unduhan blob:, jadi cangkang memasang plugin
+# @capacitor/filesystem (menulis file) dan @capacitor/share (menu Bagikan / Simpan). Dipakai oleh js/savefile.js.
+# APK lama tanpa dua plugin itu tidak bisa menyimpan file sama sekali: pasang APK baru hasil build ini.
+#
 # PENTING: alamat situs (APP_URL) harus sama dengan alamat GitHub Pages repo ini. Repo ini sudah diganti nama dari apk-editing menjadi splineway,
 # jadi alamat lama .../apk-editing/ sudah tidak ada. APK lama yang masih memuat alamat itu menampilkan layar "Tidak ada koneksi internet"
 # walau internet menyala. Pasang APK baru hasil build ini.
@@ -66,7 +70,7 @@ jobs:
         working-directory: shell
         run: |
           npm init -y > /dev/null
-          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 sharp
+          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6 @capacitor/share@6 sharp
           mkdir -p www
           cat > www/index.html <<'EOF'
           <!doctype html><meta charset="utf-8"><title>SplineWay</title>

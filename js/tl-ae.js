@@ -103,7 +103,7 @@ if(document.readyState==='complete')start();else addEventListener('load',start);
 'use strict';
 const $=id=>document.getElementById(id),HEAD=56;
 try{
-  const l=document.createElement('link');l.rel='stylesheet';l.href='css/tl-big.css?v=1';
+  const l=document.createElement('link');l.rel='stylesheet';l.href='css/tl-big.css?v=2';
   document.head.appendChild(l);
 }catch(_){}
 const BOLT='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12z"/></svg>';

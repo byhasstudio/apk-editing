@@ -24,7 +24,13 @@
      bentuknya tidak persegi (sudut miring, strip bergeser, tepi gelombang). Celah itu dulu lolos dan jadi hitam. Sekarang di akhir frame, SEBELUM latar hitam
      ditambahkan, semua area transparan yang masih tersisa diisi bayangan kabur dari isi frame itu sendiri (lihat safeFill di bawah), dihitung dari alfa piksel
      yang sebenarnya, jadi bentuk celah apa pun dan urutan efek apa pun (di atas atau di bawah clip isi-cermin) tetap tidak ada frame hitam.
-     Kanvas dasar transparan dan jaring ini juga berlaku kalau clip isi-cermin hanya memilih clip tertentu (bertarget). */
+     Kanvas dasar transparan dan jaring ini juga berlaku kalau clip isi-cermin hanya memilih clip tertentu (bertarget).
+   v30: MODE HALUS (tombol petir di samping Stop dan di bilah transport timeline, js/tl-ae.js; pilihan disimpan di perangkat, bawaan nyala).
+     Hanya mengatur CARA pemutaran preview. Tidak ada fitur, efek, atau kualitas yang dikurangi, dan hasil export tidak terpengaruh:
+     - frame digambar dengan irama rata (tiap 1, 2, atau 3 kali refresh layar) mengikuti refresh layar yang diukur otomatis, bukan irama acak yang membuat gambar tersendat
+     - kalau perangkat tidak kuat, yang turun adalah jumlah frame per detik (tetap rata, mis. 60 ke 30), BUKAN resolusi preview
+     - tidak ada perubahan ukuran kanvas saat memutar (tidak ada kedipan), clip disiapkan 2x lebih awal, pembaruan antarmuka lebih jarang
+     - playhead bergerak mulus di setiap refresh layar dan timeline mengikuti dengan halus (js/tl-ae.js) */
 window.APK=window.APK||{};
 APK.preview=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
@@ -34,9 +40,20 @@ APK.preview=(function(){
   const LV=[[60,1],[30,1],[30,0.75],[24,0.6],[24,0.45]];            /* tingkat kualitas preview: [fps maksimum, skala resolusi] */
   const AUTO=[{type:'mirror',p:{blur:14}}];                         /* efek isi cermin otomatis (blur isian tipis supaya terasa seperti latar) */
   let lat=0.1,lv=0,Q=1,ema=0,dema=0,slow=0,fast=0,nextDraw=0,lastUi=0,gcN=0,needResize=false;
+  /* Mode Halus (v30): irama frame rata mengikuti refresh layar; refMs = jarak antar refresh layar (ms), div0 = tiap berapa refresh frame digambar saat perangkat kuat,
+     divN = yang berlaku sekarang (naik kalau perangkat tidak sanggup, turun lagi kalau sudah lega) */
+  let smooth=true,refMs=1000/60,div0=1,divN=1,sSlow=0,sFast=0,lastDraw=0,rafPrev=0;
+  const dts=[];
+  try{smooth=localStorage.getItem('apk-pv-smooth')!=='0'}catch(_){}
   const clampN=(v,a,b)=>Math.min(b,Math.max(a,v));
   const mediaOf=id=>P().media.find(m=>m.id===id);
   const capFps=()=>{const p=P();return Math.max(10,Math.min(LV[lv][0],(p&&p.fps)||30))};
+  const sCap=()=>{const p=P();return Math.min(60,Math.max(30,(p&&p.fps)||30))};
+  function setDiv0(){
+    const hz=1000/refMs;
+    div0=Math.max(1,Math.round(hz/sCap()));
+    divN=Math.min(Math.max(divN,div0),div0+3);
+  }
   /* kotak objek di koordinat project (dipakai gizmo untuk memilih dan memindah objek) */
   /* w dan h = ukuran dasar (sudah dikali scale); regang (sx, sy) dan titik pusat ikut dihitung di sini */
   /* Crop foto: c.crop = {l,t,r,b} dalam persen yang dibuang dari tiap sisi. Hasil potongan disimpan di kanvas (per clip) supaya tidak digambar ulang tiap frame;
@@ -286,7 +303,7 @@ APK.preview=(function(){
             if(e.type!=='image'&&!e.el.paused)e.el.pause();
             if(off?(t>c.start+c.dur+0.25||t<c.start-1):(t<c.start-5||t>c.start+c.dur+5))release(c.id);
           }
-          if(playing&&c.mediaId&&c.start>t&&c.start-t<LOOK)pre(c,tr);
+          if(playing&&c.mediaId&&c.start>t&&c.start-t<(smooth?LOOK*2:LOOK))pre(c,tr);
           continue;
         }
         /* clip efek (js/fxclip.js): tanpa target = mengolah semua yang sudah tergambar di bawahnya; yang bertarget diterapkan per clip di bawah */
@@ -394,13 +411,15 @@ APK.preview=(function(){
       ctx.restore();
     }
   }
-  /* live = dipanggil dari loop playback: antarmuka (waktu, playhead, gizmo) tidak perlu diperbarui di setiap frame */
+  /* live = dipanggil dari loop playback: antarmuka (waktu, playhead, gizmo) tidak perlu diperbarui di setiap frame.
+     Mode Halus: playhead diperbarui di setiap frame yang tergambar (ringan), sisanya (teks waktu, gizmo, properti) lebih jarang */
   function draw(live){
     if(!P()||!ctx)return;
     frame();
     if(live){
       const n=performance.now();
-      if(n-lastUi<(exporting?250:50))return;
+      if(smooth&&!exporting)APK.timeline.setPlayhead(t);
+      if(n-lastUi<(exporting?250:smooth?120:50))return;
       lastUi=n;
     }
     $('pv-time').textContent=fmt(t)+' / '+fmt(duration());
@@ -420,6 +439,38 @@ APK.preview=(function(){
       if(++fast>=150){lv--;fast=0;slow=0;ema=0;dema=0;needResize=true}
     }else fast=0;
   }
+  /* Mode Halus: ukur refresh layar dari jarak antar requestAnimationFrame (ambil nilai kecil supaya frame yang berat tidak ikut terhitung),
+     lalu cocokkan ke refresh layar umum */
+  const RATES=[240,165,144,120,90,75,60,30];
+  function sampleRefresh(n){
+    if(rafPrev){
+      const dt=n-rafPrev;
+      if(dt>2&&dt<60){
+        dts.push(dt);
+        if(dts.length>=45){
+          dts.sort((a,b)=>a-b);
+          const hz=1000/dts[10];
+          dts.length=0;
+          let best=0,bd=1e9;
+          for(const r of RATES){const d=Math.abs(r-hz)/r;if(d<bd){bd=d;best=r}}
+          if(best&&bd<0.12){refMs=1000/best;setDiv0()}
+        }
+      }
+    }
+    rafPrev=n;
+  }
+  /* Mode Halus: kalau menggambar satu frame melebihi jatahnya, irama dinaikkan satu tingkat (mis. 60 ke 30 fps) dan TETAP rata;
+     kalau sudah lega cukup lama, kembali ke irama lebih rapat. Resolusi preview tidak diubah. */
+  function adaptSmooth(ms){
+    const per=divN*refMs;
+    ema=ema?ema*0.85+ms*0.15:ms;
+    if(divN<div0+3&&ema>per*0.9){
+      if(++sSlow>=20){divN++;sSlow=0;sFast=0;ema=0}
+    }else sSlow=0;
+    if(divN>div0&&ema<(per-refMs)*0.55){
+      if(++sFast>=180){divN--;sFast=0;sSlow=0;ema=0}
+    }else sFast=0;
+  }
   function loop(){
     if(!playing)return;
     const n=performance.now();
@@ -429,16 +480,29 @@ APK.preview=(function(){
       if(looping&&!exporting&&d>0){
         /* ulangi: semua video/audio dihentikan lalu dimulai lagi dari awal lewat jalur "mulai" biasa supaya sinkron */
         els.forEach(e=>{if(e.type!=='image'){e.el.pause();e.pre=false;e.seekAt=0}});
-        t=0;base=0;t0=n;nextDraw=0;
+        t=0;base=0;t0=n;nextDraw=0;lastDraw=0;
       }else{t=d;pause();if(onEnd)onEnd();return}
     }
-    if(exporting||n>=nextDraw-2){
-      const iv=1000/capFps();
-      const di=nextDraw?n-(nextDraw-iv):iv;
-      nextDraw+=iv;if(nextDraw<n)nextDraw=n+iv*0.1;
-      if(needResize&&!exporting){needResize=false;Q=LV[lv][1];resize()}
-      draw(true);
-      if(!exporting)adapt(performance.now()-n,di);
+    let go=exporting;
+    if(!go){
+      if(smooth){
+        sampleRefresh(n);
+        go=n-lastDraw>=(divN-0.45)*refMs;
+      }else go=n>=nextDraw-2;
+    }
+    if(go){
+      if(smooth&&!exporting){
+        lastDraw=n;
+        draw(true);
+        adaptSmooth(performance.now()-n);
+      }else{
+        const iv=1000/capFps();
+        const di=nextDraw?n-(nextDraw-iv):iv;
+        nextDraw+=iv;if(nextDraw<n)nextDraw=n+iv*0.1;
+        if(needResize&&!exporting){needResize=false;Q=LV[lv][1];resize()}
+        draw(true);
+        if(!exporting)adapt(performance.now()-n,di);
+      }
     }
     raf=requestAnimationFrame(loop);
   }
@@ -446,8 +510,11 @@ APK.preview=(function(){
     if(!P()||!duration())return;
     if(t>=duration()-0.01)t=0;
     playing=true;
-    if(!exporting&&Q!==LV[lv][1]){Q=LV[lv][1];resize()}
+    if(smooth)lv=0;
+    const tq=smooth?1:LV[lv][1];
+    if(!exporting&&Q!==tq){Q=tq;resize()}
     base=t;t0=performance.now();nextDraw=0;ema=0;dema=0;slow=0;fast=0;
+    lastDraw=0;rafPrev=0;dts.length=0;sSlow=0;sFast=0;setDiv0();
     $('pv-play').textContent='❚❚';loop();
   }
   function pause(){
@@ -539,6 +606,15 @@ APK.preview=(function(){
     let saved=false;try{saved=localStorage.getItem('apk-pv-loop')==='1'}catch(_){}
     setLoop(saved);
   }
+  /* Mode Halus (v30): nyala / mati, disimpan di perangkat. Tombolnya dipasang js/tl-ae.js; peristiwa apk-smooth memberi tahu tombol untuk menyesuaikan tampilan */
+  function setSmooth(v){
+    smooth=!!v;
+    try{localStorage.setItem('apk-pv-smooth',smooth?'1':'0')}catch(_){}
+    lastDraw=0;rafPrev=0;dts.length=0;sSlow=0;sFast=0;ema=0;dema=0;nextDraw=0;
+    setDiv0();divN=div0;
+    if(smooth){lv=0;needResize=false;if(P()&&canvas&&!exporting&&Q!==1){Q=1;resize()}}
+    try{dispatchEvent(new CustomEvent('apk-smooth',{detail:smooth}))}catch(_){}
+  }
   function init(){
     canvas=$('pv-canvas');ctx=canvas.getContext('2d');
     $('pv-play').onclick=toggle;$('pv-stop').onclick=stop;
@@ -547,9 +623,9 @@ APK.preview=(function(){
     $('pv-full').onclick=()=>{if(APK.fsctl){APK.fsctl.toggle();return}const w=$('preview-wrap');document.fullscreenElement?document.exitFullscreen():w.requestFullscreen&&w.requestFullscreen()};
     $('pv-aspect').onchange=e=>{APK.project.setAspect(e.target.value);resize();draw()};
   }
-  function load(){t=0;playing=false;Q=1;lv=0;needResize=false;$('pv-aspect').value=P().aspect;$('pv-play').textContent='▶';resize();draw()}
+  function load(){t=0;playing=false;Q=1;lv=0;needResize=false;lastDraw=0;rafPrev=0;dts.length=0;sSlow=0;sFast=0;divN=1;setDiv0();$('pv-aspect').value=P().aspect;$('pv-play').textContent='▶';resize();draw()}
   function unload(){playing=false;cancelAnimationFrame(raf);for(const id of [...els.keys()])release(id);imgs.clear()}
-  return{init,load,unload,beginExport,beginOffline,endExport,prepare,exportFrame,refresh:()=>draw(),seek,play,pause,toggle,stop,fmt,bounds:id=>bmap.get(id),setLoop,
-    get looping(){return looping},
+  return{init,load,unload,beginExport,beginOffline,endExport,prepare,exportFrame,refresh:()=>draw(),seek,play,pause,toggle,stop,fmt,bounds:id=>bmap.get(id),setLoop,setSmooth,
+    get looping(){return looping},get smooth(){return smooth},
     get exporting(){return exporting},get time(){return t},get playing(){return playing},get duration(){return duration()}};
 })();

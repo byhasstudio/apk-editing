@@ -483,7 +483,7 @@ window.APK=window.APK||{};
     {id:'trinversi',cat:'transisi',name:'Inversi Gelembung',desc:'Gambar jadi garis tepi terang di latar gelap dengan cincin gelembung, lalu kembali normal',len:0.9,
       params:[['amt','Kekuatan inversi',0,100,100],['cnt','Jumlah gelembung',0,150,90],['edg','Tebal garis tepi',1,6,2],['zm','Zoom dasar (%)',0,30,6]],apply:mb(inversi)},
     {id:'trpusaran',cat:'transisi',name:'Pusaran',desc:'Gambar mengecil dan berputar jadi kincir kecil di layar putih, lalu mekar kembali',len:1.0,
-      params:[['cnt','Jumlah bilah kincir',3,8,5],['trn','Putaran penuh (kali)',1,3,1],['tw','Lengkung bilah',0,100,50],['wrn','Warna latar (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:mb(pusaran)},
+      params:[['cnt','Jumlah bilah kincir',3,8,5],['trn','Putaran penuh (kali)',1,3,1],['tw','Lengkung bilah',0,100,50],['wrn','Warna latar (0 = putih, 100 = hitam)',0,100,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:pusaran},
     {id:'trpecahan',cat:'transisi',name:'Pecahan Miring',desc:'Gambar terbelah jadi pecahan diagonal yang bergeser dan miring dengan bayangan',len:0.9,
       params:[['cnt','Jumlah pecahan',2,6,3],['ang','Sudut potong (derajat)',-80,80,-20],['amt','Jeda antar pecahan',0,100,60],['zm','Zoom dasar (%)',0,30,6],['dir','Balik arah (0 = tidak, 1 = ya)',0,1,0]],apply:mb(pecahan)},
     {id:'trbelahgaris',cat:'transisi',name:'Belah Garis',desc:'Celah tipis membelah layar, kedua sisi merenggang dan pita tengah menyelip',len:0.8,

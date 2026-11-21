@@ -12,8 +12,8 @@ APK.properties=(function(){
     ['skx','Miring horizontal (°)',-80,80,1,'video image text shape'],['sky','Miring vertikal (°)',-80,80,1,'video image text shape']];
   const BLEND=[['source-over','Normal'],['multiply','Multiply'],['screen','Screen'],['overlay','Overlay'],['darken','Darken'],['lighten','Lighten'],['color-dodge','Color Dodge'],['color-burn','Color Burn'],['hard-light','Hard Light'],['soft-light','Soft Light'],['difference','Difference'],['exclusion','Exclusion'],['lighter','Tambah (Add)']];
   /* atribut data-xx pada kontrol -> properti objek di clip, dan nilai bawaannya */
-  const GROUP={tx:'text',sh:'shape',ck:'chroma',mk:'mask'},GK=Object.keys(GROUP);
-  const DG={tx:()=>APK.text.DEF,sh:()=>APK.shapes.DEF,ck:()=>APK.fx.DEF.chroma,mk:()=>APK.fx.DEF.mask};
+  const GROUP={tx:'text',sh:'shape',ck:'chroma',mk:'mask',cr:'crop'},GK=Object.keys(GROUP);
+  const DG={tx:()=>APK.text.DEF,sh:()=>APK.shapes.DEF,ck:()=>APK.fx.DEF.chroma,mk:()=>APK.fx.DEF.mask,cr:()=>({l:0,t:0,r:0,b:0})};
   const GPAD=14;
   let shown=null,editing=false,spanRef=0,gd=null;
   const rnd=v=>Math.round(v*100)/100;
@@ -64,6 +64,13 @@ APK.properties=(function(){
       <label>Lebar (%)<input type="range" data-mk="w" min="1" max="200" step="1"></label>
       <label>Tinggi (%)<input type="range" data-mk="h" min="1" max="200" step="1"></label>
       <label>Tepi lembut (%)<input type="range" data-mk="feather" min="0" max="100" step="1"></label></div>`:'';
+    const crop=type==='image'?`<div><h3 class="kf-title">Crop (potong foto)</h3>
+      <label>Buang dari kiri (%)<input type="range" data-cr="l" min="0" max="90" step="0.5"></label>
+      <label>Buang dari atas (%)<input type="range" data-cr="t" min="0" max="90" step="0.5"></label>
+      <label>Buang dari kanan (%)<input type="range" data-cr="r" min="0" max="90" step="0.5"></label>
+      <label>Buang dari bawah (%)<input type="range" data-cr="b" min="0" max="90" step="0.5"></label>
+      <div class="kf-bar">${['1:1','4:5','3:4','4:3','16:9','9:16'].map(r=>`<button type="button" class="btn" data-crratio="${r}" title="Potong foto dari tengah ke rasio ${r}">${r}</button>`).join('')}<button type="button" class="btn" data-crreset="1" title="Kembalikan foto utuh">Reset crop</button></div>
+      <p class="kf-hint">Geser slider untuk memotong tiap sisi foto, atau ketuk rasio untuk memotong otomatis dari tengah.</p></div>`:'';
     const txt=type==='text'?`<h3 class="kf-title">Teks</h3>
       <label>Isi teks<textarea data-tx="content" rows="3"></textarea></label>
       <label>Font<select data-tx="font">${T.FONTS.map(f=>`<option value="${esc(f[1])}">${f[0]}</option>`).join('')}</select></label>
@@ -89,7 +96,7 @@ APK.properties=(function(){
       <fieldset${locked?' disabled':''}>
       <label>Waktu mulai (detik)<input type="number" data-t="start" min="0" step="0.01"></label>
       <label>Durasi (detik)<input type="number" data-t="dur" min="0.1" step="0.01"></label>
-      <label>Waktu selesai (detik)<input type="number" data-end readonly></label>${speed}${rev}${aud}${txt}${shp}${vis}${anc}${ext2}${chroma}${mask}
+      <label>Waktu selesai (detik)<input type="number" data-end readonly></label>${speed}${rev}${aud}${txt}${shp}${vis}${anc}${crop}${ext2}${chroma}${mask}
       <h3 class="kf-title">Keyframe animasi</h3>
       <div class="kf-bar"><button type="button" class="btn" data-kfall="add" title="Keyframe semua properti di playhead (K)">◆ Semua</button><button type="button" class="btn" data-kfall="del" title="Hapus keyframe di playhead">Hapus di playhead</button><button type="button" class="btn" data-kfall="clear" title="Hapus semua animasi clip ini">Reset</button></div>
       <p class="kf-hint adv">Grafik kurva kecepatan ada di tab Media, di bawah daftar media.</p>
@@ -239,6 +246,16 @@ APK.properties=(function(){
     const b=e.target.closest('button'),s=APK.timeline.selectedClip();
     if(!b||!s||s.tr.locked)return;
     const K=APK.kf,c=s.c,r=rel(s);
+    if(b.dataset.crreset){if(c.crop){APK.history.record();delete c.crop;APK.timeline.touch();refresh(true)}return}
+    if(b.dataset.crratio){
+      const m=s.m,[ra,rb]=b.dataset.crratio.split(':').map(Number);
+      if(!m||!m.width||!m.height)return;
+      const ar=m.width/m.height,tg=ra/rb;let l=0,t=0;
+      if(ar>tg)l=(1-tg/ar)/2*100;else t=(1-ar/tg)/2*100;
+      APK.history.record();
+      c.crop={l:rnd(l),t:rnd(t),r:rnd(l),b:rnd(t)};
+      APK.timeline.touch();refresh(true);return;
+    }
     if(b.dataset.anreset){if(c.anchor){APK.history.record();delete c.anchor;APK.timeline.commit()}return}
     if(b.dataset.kf){
       const p=b.dataset.kf;APK.history.record();

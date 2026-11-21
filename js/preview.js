@@ -39,6 +39,23 @@ APK.preview=(function(){
   const capFps=()=>{const p=P();return Math.max(10,Math.min(LV[lv][0],(p&&p.fps)||30))};
   /* kotak objek di koordinat project (dipakai gizmo untuk memilih dan memindah objek) */
   /* w dan h = ukuran dasar (sudah dikali scale); regang (sx, sy) dan titik pusat ikut dihitung di sini */
+  /* Crop foto: c.crop = {l,t,r,b} dalam persen yang dibuang dari tiap sisi. Hasil potongan disimpan di kanvas (per clip) supaya tidak digambar ulang tiap frame;
+     w/h yang dikembalikan = ukuran area potongan dalam piksel foto asli, jadi ukuran tampil di layar tetap sesuai. */
+  const cropCache=new Map();
+  function cropOf(c,el,w,h){
+    const o=c.crop;if(!o)return null;
+    let l=Math.max(0,+o.l||0),t=Math.max(0,+o.t||0),r=Math.max(0,+o.r||0),b=Math.max(0,+o.b||0);
+    if(!(l||t||r||b))return null;
+    if(l+r>95){const k=95/(l+r);l*=k;r*=k}
+    if(t+b>95){const k=95/(t+b);t*=k;b*=k}
+    const sx=w*l/100,sy=h*t/100,sw=Math.max(1,w*(1-(l+r)/100)),sh=Math.max(1,h*(1-(t+b)/100)),
+      key=[l,t,r,b,w,h].join(','),hit=cropCache.get(c.id);
+    if(hit&&hit.key===key&&hit.el===el)return hit;
+    const k=Math.min(1,4096/Math.max(sw,sh)),cv=hit&&hit.cv||document.createElement('canvas');
+    cv.width=Math.max(1,Math.round(sw*k));cv.height=Math.max(1,Math.round(sh*k));
+    const g=cv.getContext('2d');g.clearRect(0,0,cv.width,cv.height);g.drawImage(el,sx,sy,sw,sh,0,0,cv.width,cv.height);
+    const o2={key,el,cv,w:sw,h:sh};cropCache.set(c.id,o2);return o2;
+  }
   const mark=(c,pr,W,H,w,h)=>{const q=APK.layers.center(c,pr);bmap.set(c.id,{cx:W/2+q.x,cy:H/2+q.y,w:w*(pr.sx==null?1:pr.sx),h:h*(pr.sy==null?1:pr.sy),rot:pr.rotation})};
   function fmt(s,short){s=Math.max(0,s);const m=Math.floor(s/60);
     return short?m+':'+String(Math.floor(s%60)).padStart(2,'0'):String(m).padStart(2,'0')+':'+(s%60).toFixed(2).padStart(5,'0')}
@@ -73,7 +90,7 @@ APK.preview=(function(){
   }
   function release(id){
     const e=els.get(id);if(!e)return;
-    els.delete(id);
+    els.delete(id);cropCache.delete(id);
     if(e.type==='image'){
       if(--e.refs>0)return;                       /* masih dipakai clip lain */
       if(imgs.get(e.mid)===e)imgs.delete(e.mid);
@@ -341,10 +358,12 @@ APK.preview=(function(){
             }
           }
           if(tr.kind==='audio')continue;
-          const w=e.type==='image'?e.el.naturalWidth:e.el.videoWidth,h=e.type==='image'?e.el.naturalHeight:e.el.videoHeight;
+          let w=e.type==='image'?e.el.naturalWidth:e.el.videoWidth,h=e.type==='image'?e.el.naturalHeight:e.el.videoHeight;
           if(!w||!h)continue;
+          let srcEl=e.el;
+          if(e.type==='image'&&c.crop){const cc=cropOf(c,e.el,w,h);if(cc){srcEl=cc.cv;w=cc.w;h=cc.h}}
           const fit=Math.min(W/w,H/h),s=fit*Math.max(0,pr.scale),
-            fxc=APK.fx.process(e.el,w,h,c,Math.ceil(Math.max(W,H)*K*clampN(pr.scale,1,2)));
+            fxc=APK.fx.process(srcEl,w,h,c,Math.ceil(Math.max(W,H)*K*clampN(pr.scale,1,2)));
           mark(c,pr,W,H,w*s,h*s);
           const q=E?E.begin(ctx,c,t,pr,W,H,K):pr;
           drew=true;
@@ -352,7 +371,7 @@ APK.preview=(function(){
           ctx.globalAlpha=Math.min(1,Math.max(0,q.opacity));
           ctx.globalCompositeOperation=c.blend||'source-over';
           APK.layers.xf(ctx,c,q,W,H,Math.max(0,q.scale));
-          ctx.drawImage(fxc||e.el,-w*fit/2,-h*fit/2,w*fit,h*fit);
+          ctx.drawImage(fxc||srcEl,-w*fit/2,-h*fit/2,w*fit,h*fit);
           ctx.restore();
           if(E)E.end(ctx);
         }finally{

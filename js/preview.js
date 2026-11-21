@@ -30,7 +30,10 @@
      - frame digambar dengan irama rata (tiap 1, 2, atau 3 kali refresh layar) mengikuti refresh layar yang diukur otomatis, bukan irama acak yang membuat gambar tersendat
      - kalau perangkat tidak kuat, yang turun adalah jumlah frame per detik (tetap rata, mis. 60 ke 30), BUKAN resolusi preview
      - tidak ada perubahan ukuran kanvas saat memutar (tidak ada kedipan), clip disiapkan 2x lebih awal, pembaruan antarmuka lebih jarang
-     - playhead bergerak mulus di setiap refresh layar dan timeline mengikuti dengan halus (js/tl-ae.js) */
+     - playhead bergerak mulus di setiap refresh layar dan timeline mengikuti dengan halus (js/tl-ae.js)
+   v31: CROP VIDEO. Crop (clip.crop = {l,t,r,b}, persen yang dibuang dari tiap sisi) dulu hanya untuk foto; sekarang foto DAN video. Foto di-crop sekali lalu disimpan di kanvas;
+     video di-crop di setiap frame yang tergambar (kanvas per clip dipakai ulang, ukurannya mengikuti kebutuhan layar). Saat mode "Atur crop di preview" aktif untuk sebuah clip
+     (js/crop.js), clip itu digambar UTUH tanpa crop supaya bingkai crop bisa diseret di atasnya. */
 window.APK=window.APK||{};
 APK.preview=(function(){
   const $=id=>document.getElementById(id),P=()=>APK.project.current;
@@ -56,10 +59,11 @@ APK.preview=(function(){
   }
   /* kotak objek di koordinat project (dipakai gizmo untuk memilih dan memindah objek) */
   /* w dan h = ukuran dasar (sudah dikali scale); regang (sx, sy) dan titik pusat ikut dihitung di sini */
-  /* Crop foto: c.crop = {l,t,r,b} dalam persen yang dibuang dari tiap sisi. Hasil potongan disimpan di kanvas (per clip) supaya tidak digambar ulang tiap frame;
-     w/h yang dikembalikan = ukuran area potongan dalam piksel foto asli, jadi ukuran tampil di layar tetap sesuai. */
+  /* Crop foto dan video: c.crop = {l,t,r,b} dalam persen yang dibuang dari tiap sisi. Foto: hasil potongan disimpan di kanvas (per clip) supaya tidak digambar ulang tiap frame.
+     Video: potongan digambar ulang di setiap frame (live = true) ke kanvas per clip yang dipakai ulang; lim = sisi terpanjang yang dibutuhkan layar (px kanvas).
+     w/h yang dikembalikan = ukuran area potongan dalam piksel media asli, jadi ukuran tampil di layar tetap sesuai. */
   const cropCache=new Map();
-  function cropOf(c,el,w,h){
+  function cropOf(c,el,w,h,live,lim){
     const o=c.crop;if(!o)return null;
     let l=Math.max(0,+o.l||0),t=Math.max(0,+o.t||0),r=Math.max(0,+o.r||0),b=Math.max(0,+o.b||0);
     if(!(l||t||r||b))return null;
@@ -67,10 +71,11 @@ APK.preview=(function(){
     if(t+b>95){const k=95/(t+b);t*=k;b*=k}
     const sx=w*l/100,sy=h*t/100,sw=Math.max(1,w*(1-(l+r)/100)),sh=Math.max(1,h*(1-(t+b)/100)),
       key=[l,t,r,b,w,h].join(','),hit=cropCache.get(c.id);
-    if(hit&&hit.key===key&&hit.el===el)return hit;
-    const k=Math.min(1,4096/Math.max(sw,sh)),cv=hit&&hit.cv||document.createElement('canvas');
-    cv.width=Math.max(1,Math.round(sw*k));cv.height=Math.max(1,Math.round(sh*k));
-    const g=cv.getContext('2d');g.clearRect(0,0,cv.width,cv.height);g.drawImage(el,sx,sy,sw,sh,0,0,cv.width,cv.height);
+    if(!live&&hit&&hit.key===key&&hit.el===el)return hit;
+    const cap=live?clampN(lim>0?lim:2048,640,4096):4096,k=Math.min(1,cap/Math.max(sw,sh)),
+      nw=Math.max(1,Math.round(sw*k)),nh=Math.max(1,Math.round(sh*k)),cv=hit&&hit.cv||document.createElement('canvas');
+    if(cv.width!==nw||cv.height!==nh){cv.width=nw;cv.height=nh}
+    const g=cv.getContext('2d');g.clearRect(0,0,nw,nh);g.drawImage(el,sx,sy,sw,sh,0,0,nw,nh);
     const o2={key,el,cv,w:sw,h:sh};cropCache.set(c.id,o2);return o2;
   }
   const mark=(c,pr,W,H,w,h)=>{const q=APK.layers.center(c,pr);bmap.set(c.id,{cx:W/2+q.x,cy:H/2+q.y,w:w*(pr.sx==null?1:pr.sx),h:h*(pr.sy==null?1:pr.sy),rot:pr.rotation})};
@@ -378,9 +383,11 @@ APK.preview=(function(){
           let w=e.type==='image'?e.el.naturalWidth:e.el.videoWidth,h=e.type==='image'?e.el.naturalHeight:e.el.videoHeight;
           if(!w||!h)continue;
           let srcEl=e.el;
-          if(e.type==='image'&&c.crop){const cc=cropOf(c,e.el,w,h);if(cc){srcEl=cc.cv;w=cc.w;h=cc.h}}
+          const lim=Math.ceil(Math.max(W,H)*K*clampN(pr.scale,1,2));
+          /* crop foto dan video (v31); saat clip ini sedang diatur cropnya di preview (js/crop.js), digambar utuh */
+          if(c.crop&&!(APK.crop&&APK.crop.editing&&APK.crop.editing(c.id))){const cc=cropOf(c,e.el,w,h,e.type!=='image',lim);if(cc){srcEl=cc.cv;w=cc.w;h=cc.h}}
           const fit=Math.min(W/w,H/h),s=fit*Math.max(0,pr.scale),
-            fxc=APK.fx.process(srcEl,w,h,c,Math.ceil(Math.max(W,H)*K*clampN(pr.scale,1,2)));
+            fxc=APK.fx.process(srcEl,w,h,c,lim);
           mark(c,pr,W,H,w*s,h*s);
           const q=E?E.begin(ctx,c,t,pr,W,H,K):pr;
           drew=true;

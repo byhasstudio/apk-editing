@@ -1,19 +1,19 @@
 /* Timeline 2D bergaya editor After Effects mobile: layer ramping, bar berwarna, playhead hijau, bilah transport di atas, bilah alat di bawah.
    Dimuat paling akhir; selektor "html #editor" supaya menang atas css lain. Lebar kolom kepala = HEAD di js/timeline.js dan js/controls.js (56px). */
-html #editor{--ae-bg:#050608;--ae-row:22px;--ae-line:#15181f;--ae-play:#2ee06f}
+html #editor{--ae-bg:var(--bg);--ae-row:22px;--ae-line:#232731;--ae-play:#2ee06f}
 html #editor .timeline{background:var(--ae-bg);height:340px}
 html #editor .tl-tr{order:0;flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;background:var(--ae-bg);border-top:1px solid var(--ae-line)}
 html #editor .tl-tr .grp{display:flex;align-items:center;gap:6px}
 html #editor .tl-tr .mid{gap:14px}
 html #editor .tl-tr button{background:none;border:0;color:#e7e9ee;width:38px;height:34px;padding:0;border-radius:8px;display:grid;place-items:center;cursor:pointer}
-html #editor .tl-tr button:active{background:#1a1d24}
+html #editor .tl-tr button:active{background:var(--panel2)}
 html #editor .tl-tr button:disabled{opacity:.3;cursor:default}
 html #editor .tl-tr button.on{color:var(--ae-play)}
 html #editor .tl-tr svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 html #editor .tl-tr svg .f{fill:currentColor;stroke:none}
 html #editor .tl-tr .time{font:600 11px ui-monospace,Menlo,Consolas,monospace;color:#8b93a3;min-width:64px;text-align:center}
 html #editor .tl-scroll{order:1;background:var(--ae-bg)}
-html #editor .tl-bar{order:2;background:#0b0d12;border-top:1px solid var(--ae-line);border-bottom:0;gap:2px;padding:4px 6px calc(4px + env(safe-area-inset-bottom));overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+html #editor .tl-bar{order:2;background:var(--panel);border-top:1px solid var(--ae-line);border-bottom:0;gap:2px;padding:4px 6px calc(4px + env(safe-area-inset-bottom));overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
 html #editor .tl-bar::-webkit-scrollbar{display:none}
 html #editor .tl-bar>*{flex:none}
 html #editor .tl-bar .sp{display:none}
@@ -26,7 +26,7 @@ html #editor .tl-bar .btn::before{content:none}
 
 /* baris dan kepala layer */
 html #editor .tl-row{height:var(--ae-row);border-bottom:1px solid var(--ae-line)}
-html #editor .tl-row.tl-ruler{height:24px;background:var(--ae-bg);border-bottom:1px solid #1d212a}
+html #editor .tl-row.tl-ruler{height:24px;background:var(--ae-bg);border-bottom:1px solid var(--ae-line)}
 html #editor .tl-head{width:56px;padding:0 2px;flex-direction:row;align-items:center;justify-content:space-between;gap:0;background:var(--ae-bg);border-right:0}
 html #editor .tl-head .ic{background:none;border:0;color:#d9dde6;width:26px;height:var(--ae-row);padding:0;display:grid;place-items:center;font-size:13px;cursor:pointer;line-height:1}
 html #editor .tl-head .ic.off{color:#5b6270}
